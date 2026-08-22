@@ -32,7 +32,7 @@ from scrutics.db.inventory import AssetInventory
 from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 
-VERSION = "v0.2.0-dev"
+from scrutics.diagnostics import VERSION
 TAGLINE = "Passive OT/ICS Network Asset Discovery"
 
 BANNER_ART = """\
@@ -291,6 +291,16 @@ Input:focus {
 """
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _sanitize_mac(mac: str) -> str:
+    """
+    Remove non-printable and non-ASCII characters from MAC address strings.
+    Textual's DataTable can render garbage if a MAC contains unexpected bytes.
+    """
+    if not mac:
+        return "Unknown"
+    return "".join(c for c in mac if c.isprintable() and ord(c) < 128)
+
 
 def _type_label(is_ot) -> str:
     if is_ot is True:  return "OT"
@@ -1145,6 +1155,13 @@ class ScruticsApp(App):
     def _set_status(self, value: str, style: str = "dim white"):
         self._status_style = style
         self.status_text = value
+        # Errors stay visible longer so users can read them
+        timeout = 12.0 if style == "bold red" else 4.0
+        self.set_timer(timeout, self._clear_status)
+
+    def _clear_status(self):
+        self._status_style = "dim white"
+        self.status_text = "Passive OT/ICS asset discovery ready."
 
     def watch_status_text(self, value: str):
         try:
@@ -1308,8 +1325,9 @@ class ScruticsApp(App):
         else:
             table.clear()
             for asset in assets:
+                mac = _sanitize_mac(asset.mac)
                 table.add_row(
-                    asset.ip, asset.mac, asset.vendor[:20],
+                    asset.ip, mac, asset.vendor[:20],
                     ", ".join(asset.protocols)[:18] if asset.protocols else "Unknown",
                     asset.role[:26], f"{asset.confidence_pct}%",
                     _baseline_display(asset.baseline_status),

@@ -56,7 +56,7 @@ def format_cef(anomaly: dict) -> str:
     ip     = anomaly.get("ip", "")
     rt     = int(anomaly.get("timestamp", 0)) * 1000
     msg = (
-        f"CEF:0|Scrutics|Scrutics|v0.2|{atype}|{atype}|{cef_sv}|"
+        f"CEF:0|Scrutics|Scrutics|v0.4|{atype}|{atype}|{cef_sv}|"
         f"src={ip} rt={rt} msg={detail}"
     )
     return f"<{pri}>{_syslog_ts()} {_HOSTNAME} {_PROGRAM}: {msg}"
@@ -70,7 +70,7 @@ def format_leef(anomaly: dict) -> str:
     detail = anomaly.get("detail", "").replace("\t", " ")
     rt     = int(anomaly.get("timestamp", 0)) * 1000
     msg = (
-        f"LEEF:1.0|Scrutics|Scrutics|v0.2|{atype}|"
+        f"LEEF:1.0|Scrutics|Scrutics|v0.4|{atype}|"
         f"src={ip}\tsev={sev}\tdetail={detail}\trt={rt}"
     )
     return f"<{pri}>{_syslog_ts()} {_HOSTNAME} {_PROGRAM}: {msg}"

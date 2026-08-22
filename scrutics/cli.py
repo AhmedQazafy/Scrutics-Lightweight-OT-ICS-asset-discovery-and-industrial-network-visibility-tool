@@ -1,18 +1,26 @@
 """
 Scrutics CLI — headless and scriptable interface.
 
-Usage:
-  python3 -m scrutics                                    # TUI
-  python3 -m scrutics --live eth0                        # TUI, pre-loads live capture
-  python3 -m scrutics --live eth0 --headless             # headless live capture
-  python3 -m scrutics --live eth0 --duration 0 --headless  # infinite until Ctrl+C
-  python3 -m scrutics --file capture.pcap --headless     # headless file analysis
-  python3 -m scrutics --file big.pcap --no-baseline      # inventory only, no anomalies
+Examples:
+  scrutics                                         # launch TUI (recommended)
+  scrutics --live eth0                             # TUI with interface pre-loaded
+  scrutics --live eth0 --headless                  # headless live capture
+  scrutics --live eth0 --duration 0 --headless     # infinite until Ctrl+C
+  scrutics --file capture.pcap                     # analyze PCAP file
+  scrutics --file big.pcap --no-baseline           # fast inventory, no anomaly detection
+  scrutics --file eve.json --headless              # analyze Suricata EVE log
+  scrutics doctor                                  # print diagnostic info
 
-Runtime reload:
-  Edit scrutics_rules.yaml while live capture runs — Scrutics reloads it
-  automatically when the file parses and validates successfully.
-  On Linux, SIGHUP is also supported for headless workflows.
+Rule reload:
+  Edit scrutics/config/custom_rules.yaml while running — Scrutics detects
+  the change and reloads automatically within 2-3 seconds.
+  Press R in the TUI for an immediate manual reload.
+  On Linux, SIGHUP is also available for headless workflows.
+
+Background processes:
+  Do NOT use & (background) with --duration 0. Ctrl+C on a backgrounded
+  process sends SIGINT to the shell, not to Scrutics. assets.csv will not
+  be saved. Use SIGTERM or bring the process to the foreground first.
 """
 
 import argparse
@@ -23,44 +31,170 @@ import signal
 import datetime
 import threading
 
+from scrutics.diagnostics import (
+    VERSION, check_dependencies, full_report,
+    list_interfaces, suggest_interface, check_output_dir,
+)
 from scrutics.db.inventory import AssetInventory
 
-VERSION = "v0.3.0"
 
+# ── Argument parser ────────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="scrutics",
-        description="Scrutics -- Passive OT/ICS Network Asset Discovery",
+        description="Scrutics — Passive OT/ICS Network Asset Discovery",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-output:
-  All results saved to: output/scrutics_TIMESTAMP/
-    assets.csv    -- full asset inventory with confidence scores
-    events.csv    -- classification event log  (written continuously)
-    anomalies.csv -- behavioral anomaly feed   (written continuously)
+examples:
+  scrutics                              launch TUI (recommended for first use)
+  scrutics --live eth0                  TUI with interface pre-loaded
+  scrutics --live eth0 --headless       headless live capture, 60s
+  scrutics --live eth0 --duration 0 --headless
+                                        headless infinite capture (Ctrl+C to stop)
+  scrutics --file capture.pcap          TUI file analysis
+  scrutics --file capture.pcap --headless --no-baseline
+                                        fast headless inventory, no anomaly detection
+  scrutics doctor                       print diagnostics for bug reports
+
+output files (written to output/scrutics_TIMESTAMP/):
+  assets.csv    full asset inventory   — written on session end
+  events.csv    classification log     — written continuously
+  anomalies.csv behavioral anomalies   — written continuously
+
+config:
+  edit scrutics/config/custom_rules.yaml to add custom rules and SIEM sinks
+  run 'scrutics doctor' to verify config is loaded correctly
         """
     )
+
+    subparsers = parser.add_subparsers(dest="command")
+    subparsers.add_parser(
+        "doctor",
+        help="print diagnostic information for bug reports and troubleshooting",
+    )
+
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--live", metavar="INTERFACE",
-                      help="Network interface to capture on (e.g. eth0, br-abc123)")
+                      help="network interface to capture on (e.g. eth0, br-abc123)")
     mode.add_argument("--file", metavar="FILEPATH",
-                      help="File to analyze (.pcap, .pcapng, .log, .json)")
+                      help="file to analyze (.pcap, .pcapng, .log, .json)")
     parser.add_argument("--duration", type=int, default=60, metavar="SECONDS",
-                        help="Capture duration in seconds. 0 = infinite until Ctrl+C. (default: 60)")
+                        help="capture duration. 0 = run until Ctrl+C (default: 60)")
     parser.add_argument("--baseline", type=int, default=60, metavar="SECONDS",
-                        help="Baseline observation window in seconds (default: 60)")
+                        help="baseline observation window in seconds (default: 60)")
     parser.add_argument("--output", default="output", metavar="DIR",
-                        help="Output directory (default: ./output)")
+                        help="output directory (default: ./output)")
     parser.add_argument("--headless", action="store_true",
-                        help="Run without TUI — CSV output only. Useful for scripts and servers.")
+                        help="run without TUI — results printed to console")
     parser.add_argument("--no-baseline", action="store_true", dest="no_baseline",
-                        help="Skip behavioral baseline and anomaly detection. "
-                             "Inventory and classification only. "
-                             "Recommended for large PCAP files.")
+                        help="skip anomaly detection — inventory only. "
+                             "recommended for large PCAP files")
     parser.add_argument("--version", action="version", version=f"Scrutics {VERSION}")
     return parser
 
+
+# ── scrutics doctor ────────────────────────────────────────────────────────────
+
+def run_doctor(output_dir: str = "output"):
+    """Print full diagnostic report. Paste the output in GitHub issues."""
+    report = full_report(headless=True, output_dir=output_dir)
+    w = 56
+
+    print(f"\n  Scrutics doctor — {report['version']}")
+    print(f"  {'─' * w}")
+    print(f"  Python    {report['python']}")
+    print(f"  Platform  {report['platform']}")
+    print()
+
+    print(f"  Dependencies")
+    for dep in report["deps"]:
+        status = "✓" if dep["ok"] else "✗"
+        ver    = dep["version"] or "missing"
+        print(f"  {status}  {dep['name']:<12} {ver}")
+        if not dep["ok"]:
+            print(f"       install: {dep['install_cmd']}")
+
+    lp = report["libpcap"]
+    status = "✓" if lp["ok"] else "✗"
+    print(f"  {status}  {'libpcap':<12} {lp['detail']}")
+    if not lp["ok"] and "fix" in lp:
+        print(f"       fix: {lp['fix']}")
+
+    print()
+    cfg = report["config"]
+    print(f"  Configuration")
+    if cfg["error"]:
+        print(f"  ✗  error: {cfg['error']}")
+    else:
+        if cfg["using_default"]:
+            if cfg["user_rules"] == 0:
+                label = "scrutics/config/custom_rules.yaml  (default — no custom rules yet)"
+            else:
+                n = cfg["user_rules"]
+                label = f"scrutics/config/custom_rules.yaml  ({n} custom rule{'s' if n != 1 else ''} active)"
+        else:
+            label = cfg["path"]
+        print(f"  ✓  config:        {label}")
+        print(f"     built-in rules: {cfg['builtin_rules']}")
+        if not cfg["using_default"] or cfg["user_rules"] > 0:
+            print(f"     custom rules:   {cfg['user_rules']}")
+        sinks = cfg["sinks"]
+        if sinks:
+            print(f"     sinks:          {sinks} ({', '.join(cfg['sink_types'])})")
+        else:
+            print(f"     sinks:          none configured")
+
+    print()
+    out = report["output_dir"]
+    status = "✓" if out["ok"] else "✗"
+    print(f"  Output directory")
+    print(f"  {status}  {out['path']}  ({out['detail']})")
+
+    print()
+    ifaces = report["interfaces"]
+    print(f"  Network interfaces ({len(ifaces)} found)")
+    for iface in ifaces[:12]:
+        desc = f"  — {iface['description']}" if iface["description"] else ""
+        print(f"     {iface['name']}{desc}")
+    if len(ifaces) > 12:
+        print(f"     ... and {len(ifaces) - 12} more")
+
+    print(f"\n  {'─' * w}")
+    all_ok = (
+        all(d["ok"] for d in report["deps"])
+        and report["libpcap"]["ok"]
+        and not cfg.get("error")
+        and out["ok"]
+    )
+    if all_ok:
+        print("  ✓  Everything looks good.\n")
+    else:
+        print("  ✗  Some issues found above. Fix them before running Scrutics.\n")
+
+    return 0 if all_ok else 1
+
+
+# ── Interface error helper ─────────────────────────────────────────────────────
+
+def _interface_error(interface: str):
+    """Print a helpful error when the requested interface is not found."""
+    ifaces = list_interfaces()
+    print(f"\n[!] Interface not found: {interface}")
+    if ifaces:
+        print("    Available interfaces:")
+        for iface in ifaces:
+            desc = f"  — {iface['description']}" if iface["description"] else ""
+            print(f"      {iface['name']}{desc}")
+        suggestion = suggest_interface()
+        if suggestion and suggestion != interface:
+            print(f"\n    Suggested: scrutics --live {suggestion} --headless")
+    else:
+        print("    No interfaces found. Are you running as root?")
+    print()
+
+
+# ── Output helpers ─────────────────────────────────────────────────────────────
 
 def _make_session_dir(base: str) -> str:
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -112,6 +246,8 @@ def _periodic_table(inventory: AssetInventory, done_event: threading.Event,
             _print_table(inventory)
 
 
+# ── Main headless runner ───────────────────────────────────────────────────────
+
 def run_headless(args) -> int:
     from scrutics.capture.engine import CaptureEngine
     from scrutics.db.writer import RollingWriter
@@ -133,6 +269,8 @@ def run_headless(args) -> int:
         print(f"[!] Config error: {e}")
         return 1
 
+    _last_reload_error = [None]
+
     def _reload():
         from scrutics.classifier.protocol import reload_rules
         try:
@@ -147,9 +285,13 @@ def run_headless(args) -> int:
                 errors = []
             if errors:
                 raise ValueError("; ".join(errors))
+            _last_reload_error[0] = None
             print("\n[+] Rules and sinks reloaded.", flush=True)
         except Exception as e:
-            print(f"\n[!] Reload failed (old rules kept): {e}", flush=True)
+            msg = str(e)
+            if msg != _last_reload_error[0]:
+                _last_reload_error[0] = msg
+                print(f"\n[!] Reload failed (old rules kept): {msg}", flush=True)
 
     signals.set_reload_callback(_reload)
     signals.start_file_watch()
@@ -164,20 +306,35 @@ def run_headless(args) -> int:
     # ── Live capture ──────────────────────────────────────────────────────────
     if args.live:
         dur_str = "infinite (Ctrl+C to stop)" if args.duration == 0 else f"{args.duration}s"
-        print(f"\n[*] Scrutics {VERSION} -- Headless Mode")
-        print(f"[*] Interface : {args.live}")
-        print(f"[*] Duration  : {dur_str}")
-        print(f"[*] Baseline  : {'disabled' if engine.no_baseline else f'{args.baseline}s'}")
-        print(f"[*] Output    : {session_dir}")
+        print(f"\n[*] Scrutics {VERSION} — Headless")
+        print(f"[*] Interface    : {args.live}")
+        print(f"[*] Duration     : {dur_str}")
+        print(f"[*] Baseline     : {'disabled' if engine.no_baseline else f'{args.baseline}s'}")
         if engine.sink_manager:
-            print(f"[*] Sinks     : {engine.sink_manager.count} configured")
+            print(f"[*] Sinks        : {engine.sink_manager.count} configured")
+        print(f"[*] Output       : {session_dir}")
         print()
 
+        _first_packet = threading.Event()
+
         def on_progress(count: int):
+            if not _first_packet.is_set():
+                _first_packet.set()
             if count % 100 == 0:
                 print(f"\r  packets: {count}  assets: {inventory.count()}",
                       end="", flush=True)
         engine.progress_callback = on_progress
+
+        def _quiet_warning():
+            _first_packet.wait(timeout=30)
+            if not _first_packet.is_set() and not stop_event.is_set():
+                print(
+                    f"\n[!] No packets seen on {args.live} after 30 seconds."
+                    f"\n    Is this the correct interface? "
+                    f"Try: sudo tcpdump -i {args.live} -c 5"
+                    f"\n    Run 'scrutics doctor' to list available interfaces.\n",
+                    flush=True,
+                )
 
         capture_done = threading.Event()
 
@@ -185,11 +342,26 @@ def run_headless(args) -> int:
             try:
                 engine.start_live(interface=args.live, timeout=args.duration)
             except Exception as e:
-                print(f"\n[!] Capture error: {e}")
+                err = str(e)
+                if any(kw in err.lower() for kw in
+                       ("no such device", "invalid", "not found",
+                        "does not exist", "cannot open", "no interface")):
+                    print()
+                    _interface_error(args.live)
+                elif isinstance(e, PermissionError) or "permission" in err.lower():
+                    print(
+                        "\n[!] Permission denied — live capture requires root.\n"
+                        "    Run with: sudo scrutics --live ...\n"
+                        "    Or grant capability: "
+                        "sudo setcap cap_net_raw+eip $(which python3)\n"
+                    )
+                else:
+                    print(f"\n[!] Capture error: {e}")
             finally:
                 capture_done.set()
 
         threading.Thread(target=run_capture, daemon=True).start()
+        threading.Thread(target=_quiet_warning, daemon=True).start()
         threading.Thread(
             target=_periodic_table,
             args=(inventory, capture_done, stop_event, 60),
@@ -200,17 +372,19 @@ def run_headless(args) -> int:
             while not capture_done.is_set() and not stop_event.is_set():
                 capture_done.wait(timeout=1.0)
         finally:
-            pass  # always fall through to export
+            pass
 
     # ── File analysis ─────────────────────────────────────────────────────────
     elif args.file:
         if not os.path.exists(args.file):
             print(f"[!] File not found: {args.file}")
             return 1
-        print(f"\n[*] Scrutics {VERSION} -- Headless Mode")
-        print(f"[*] Analyzing : {args.file}")
-        print(f"[*] Baseline  : {'disabled' if engine.no_baseline else f'{args.baseline}s window'}")
-        print(f"[*] Output    : {session_dir}\n")
+
+        print(f"\n[*] Scrutics {VERSION} — Headless")
+        print(f"[*] File         : {args.file}")
+        print(f"[*] Baseline     : "
+              f"{'disabled' if engine.no_baseline else f'{args.baseline}s window'}")
+        print(f"[*] Output       : {session_dir}\n")
 
         spin_done  = threading.Event()
         file_error = [None]
@@ -232,7 +406,7 @@ def run_headless(args) -> int:
             print(f"[!] Error: {file_error[0]}")
             return 1
 
-    # ── Export — always runs regardless of how capture ended ──────────────────
+    # ── Export ────────────────────────────────────────────────────────────────
     print()
     _print_table(inventory)
 
@@ -242,7 +416,7 @@ def run_headless(args) -> int:
         if not engine.no_baseline:
             anomaly_count = len(engine.baseline.get_anomalies())
             if anomaly_count:
-                print(f"[!] {anomaly_count} anomalies -- see {session_dir}/anomalies.csv")
+                print(f"[!] {anomaly_count} anomalies — see {session_dir}/anomalies.csv")
             else:
                 print("[+] No anomalies detected.")
 
@@ -256,6 +430,10 @@ def run_headless(args) -> int:
 
 
 def should_use_tui(args) -> bool:
-    if args.headless:           return False
-    if not sys.stdout.isatty(): return False
+    if getattr(args, "command", None) == "doctor":
+        return False
+    if getattr(args, "headless", False):
+        return False
+    if not sys.stdout.isatty():
+        return False
     return True

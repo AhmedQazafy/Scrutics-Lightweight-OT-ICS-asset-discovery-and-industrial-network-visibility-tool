@@ -203,7 +203,7 @@ class TestRuleLoader:
         assert any(rule["classify_as"] == "Modbus TCP" for rule in rules)
 
     def test_load_user_rules_reads_first_user_config(self, tmp_path, monkeypatch):
-        config = tmp_path / "scrutics_rules.yaml"
+        config = tmp_path / "custom_rules.yaml"
         config.write_text(
             """
 rules:
@@ -220,7 +220,7 @@ rules:
         assert rules[0]["classify_as"] == "PI Historian"
 
     def test_load_sinks_config_reads_output_sinks(self, tmp_path, monkeypatch):
-        config = tmp_path / "scrutics_rules.yaml"
+        config = tmp_path / "custom_rules.yaml"
         config.write_text(
             """
 rules: []
@@ -239,7 +239,7 @@ output:
         assert sinks[0]["type"] == "syslog"
 
     def test_load_inventory_config_reads_scope(self, tmp_path, monkeypatch):
-        config = tmp_path / "scrutics_rules.yaml"
+        config = tmp_path / "custom_rules.yaml"
         config.write_text(
             """
 rules: []

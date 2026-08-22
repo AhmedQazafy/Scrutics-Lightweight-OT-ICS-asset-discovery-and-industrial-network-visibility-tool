@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrutics"
+version = "0.4.0"
+description = "Passive OT/ICS network asset discovery — zero packet injection"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["ot", "ics", "scada", "network", "security", "passive", "asset-discovery"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Topic :: System :: Networking :: Monitoring",
+    "Topic :: Security",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "scapy>=2.5,<3",
+    "textual>=0.80",
+    "pyyaml>=6.0,<7",
+]
+
+[project.scripts]
+scrutics = "scrutics.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/AhmedQazafy/Scrutics"
+Repository = "https://github.com/AhmedQazafy/Scrutics"
+Issues = "https://github.com/AhmedQazafy/Scrutics/issues"
+Changelog = "https://github.com/AhmedQazafy/Scrutics/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+include = ["scrutics*"]
+
+[tool.setuptools.package-data]
+scrutics = [
+    "config/*.yaml",
+    "classifier/ics_oui.txt",
+    "classifier/oui.txt",
+]

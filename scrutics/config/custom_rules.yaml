@@ -1,139 +1,103 @@
-# Scrutics Custom Rules and Output Configuration
-# ────────────────────────────────────────────────
-# This file is yours to edit. It is never overwritten by package updates.
+# Scrutics — Custom Rules and Output Configuration
+# ──────────────────────────────────────────────────
+# This file is yours to edit. It ships with Scrutics and is always active.
 #
-# To activate: copy or rename this file to scrutics_rules.yaml in your
-# working directory, or place it at ~/.scrutics/scrutics.yaml.
+# Scrutics also checks ~/.scrutics/scrutics.yaml for a machine-wide override.
+# Custom rules here always take precedence over built-in rules.
+# If a custom rule matches the same port as a built-in, yours wins.
 #
-# Custom rules always take precedence over builtin rules.
-# If a custom rule matches the same port as a builtin, yours wins.
+# Reload at runtime: edit and save this file while Scrutics is running.
+# The file watcher reloads valid changes automatically within 2-3 seconds.
+# Press R in the TUI for an immediate manual reload.
+# On Linux, SIGHUP is also available for headless workflows.
+
+
+# ── Classification rules ──────────────────────────────────────────────────────
+# Each rule classifies a device by port, MAC prefix, or both.
+# Behavioral constraint fields are optional — add them to any rule to define
+# what that device is allowed to do. Violations fire immediately as
+# BEHAVIORAL_VIOLATION anomalies (severity HIGH), independent of the baseline.
 #
-# ── Rule fields ──────────────────────────────────────────────────────
-#   name        : Human-readable label (required)
-#   port        : Destination port to match (optional)
-#   protocol    : TCP or UDP (optional, defaults to any)
-#   mac_prefix  : First 3 bytes of MAC e.g. "00:80:F4" (optional)
-#   classify_as : Protocol label shown in output (required)
-#   role        : Device role shown in output (required)
-#   is_ot       : true / false (required)
-#   confidence  : HIGH / MEDIUM / LOW (optional, defaults to HIGH)
+# Required fields:
+#   name        : Human-readable label
+#   classify_as : Protocol label shown in output
+#   role        : Device role shown in output
+#   is_ot       : true or false
 #
-# ── Example custom rules ─────────────────────────────────────────────
+# Optional classification fields:
+#   port        : Destination port to match
+#   protocol    : TCP or UDP (defaults to either)
+#   mac_prefix  : First 3 bytes of MAC e.g. "00:80:F4"
+#   confidence  : HIGH / MEDIUM / LOW (defaults to HIGH)
+#
+# Optional behavioral constraint fields:
+#   never_initiates       : true — alert if device ever initiates a connection
+#   allowed_peers         : list of IPs — alert if device talks to any other IP
+#   allowed_ports         : list of ports — alert if traffic seen on any other port
+#   alert_on_new_port     : true — alert first time each new port is observed
+#   max_new_peers_per_hour: N — alert if device exceeds N new peers in 60 minutes
+#
+# ── Examples ─────────────────────────────────────────────────────────────────
 #
 # rules:
+#   # Minimal rule — classification only
 #   - name: "OSIsoft PI Historian"
 #     port: 5461
 #     classify_as: "PI Historian"
 #     role: "Data Historian"
 #     is_ot: true
 #
+#   # Rule with behavioral constraints
+#   - name: "Modbus PLC Fleet"
+#     port: 502
+#     classify_as: "Modbus TCP"
+#     role: "PLC / RTU"
+#     is_ot: true
+#     never_initiates: true        # PLCs respond to polling, never initiate
+#     allowed_peers:
+#       - "192.168.1.100"          # SCADA server
+#       - "192.168.1.101"          # Engineering workstation
+#     max_new_peers_per_hour: 2
+#
+#   # MAC prefix match — useful for vendor-specific devices without fixed ports
 #   - name: "Legacy RTU Fleet"
 #     mac_prefix: "00:AB:CD"
 #     classify_as: "Legacy RTU"
 #     role: "Remote Terminal Unit"
 #     is_ot: true
 #     confidence: MEDIUM
-#
-#   - name: "Custom Fieldbus"
-#     port: 9999
-#     protocol: UDP
-#     classify_as: "Proprietary Fieldbus"
-#     role: "Field Device"
-#     is_ot: true
-
-rules: []
-
-# ── Behavioral constraints ────────────────────────────────────────────
-# Add these optional fields to any rule to encode expected device behavior.
-# When a device matches the rule's classification criteria (port/MAC), its
-# traffic is checked against the constraints on every packet. Violations
-# are emitted immediately as BEHAVIORAL_VIOLATION anomalies (severity: HIGH)
-# and forwarded to all configured SIEM sinks, independent of the baseline
-# observation window.
-#
-# Fields:
-#   never_initiates: true
-#       Alert if this device ever initiates a connection. PLCs and RTUs
-#       normally only respond to polling — they never connect outbound.
-#
-#   allowed_peers: ["192.168.1.1", "192.168.1.2"]
-#       Alert if this device communicates with any IP not in this list.
-#       Leave empty or omit to allow any peer.
-#
-#   allowed_ports: [502, 80]
-#       Alert if traffic is seen on any port not in this list.
-#
-#   alert_on_new_port: true
-#       Alert the first time this device is seen on any port not previously
-#       observed. Useful for devices with a small fixed set of ports that
-#       should never vary.
-#
-#   max_new_peers_per_hour: 5
-#       Alert if this device communicates with more than N new IP addresses
-#       within any rolling 60-minute window. Good for catching lateral movement
-#       or unexpected scanning from a compromised device.
-#
-# ── Example with behavioral constraints ──────────────────────────────
-#
-# rules:
-#   - name: "Modbus PLC Fleet"
-#     port: 502
-#     classify_as: "Modbus TCP"
-#     role: "PLC / RTU"
-#     is_ot: true
-#     never_initiates: true
-#     allowed_peers:
-#       - "192.168.1.100"    # SCADA server
-#       - "192.168.1.101"    # Engineering workstation
-#     max_new_peers_per_hour: 2
-#
-#   - name: "Siemens PLC"
-#     port: 102
-#     classify_as: "S7comm"
-#     role: "Siemens PLC"
-#     is_ot: true
-#     never_initiates: true
 #     alert_on_new_port: true
-#
-#   - name: "SCADA Server"
-#     port: 4840
-#     classify_as: "OPC-UA"
-#     role: "SCADA / HMI"
-#     is_ot: true
-#     allowed_ports: [4840, 80, 443, 22]
-#     max_new_peers_per_hour: 10
 
+rules: [] # Remove the [] and add your rules below when ready, like the examples above
 
-# Inventory scope
-# By default Scrutics inventories private/local IPs and treats public Internet
-# endpoints as peers, not assets. Set include_public_ips to true only if your
-# OT network intentionally uses public/routed address space internally.
+# ── Inventory scope ───────────────────────────────────────────────────────────
+# By default Scrutics tracks RFC1918 private IPs as assets and treats public
+# internet addresses as peers only. Set include_public_ips: true only if your
+# OT network uses public/routed address space internally.
 #
-# Optional CIDRs restrict inventory to specific ranges:
+# Use cidrs to restrict discovery to specific subnets:
 #
 # inventory:
 #   include_public_ips: false
 #   cidrs:
-#     - 192.168.88.0/24
-#     - 10.10.10.0/24
+#     - "192.168.88.0/24"
+#     - "10.10.0.0/16"
 
 inventory:
   include_public_ips: false
-  cidrs: []
+  cidrs: [] # Remove the [] and add your rules below when ready, like the examples above
 
 
-# ── Output sinks ─────────────────────────────────────────────────────
-# Configure where anomaly events are forwarded in real time.
-# Multiple sinks can be active simultaneously.
-# Reload at runtime: edit scrutics_rules.yaml while Scrutics is running.
-# The TUI/headless watcher reloads valid changes automatically. Press R in
-# the TUI for a manual reload; SIGHUP remains available on Linux.
+# ── Output sinks ─────────────────────────────────────────────────────────────
+# Forward anomaly events to a SIEM in real time. Multiple sinks can be active
+# simultaneously. A slow or unreachable SIEM never stalls packet capture —
+# delivery runs in a background queue.
 #
 # Supported sink types:
-#   syslog      — UDP or TCP syslog; formats: json (default), cef, leef, plain
-#   splunk_hec  — Splunk HTTP Event Collector
+#   syslog     — UDP or TCP syslog; formats: json (default), cef, leef, plain
+#   splunk_hec — Splunk HTTP Event Collector (HTTP/HTTPS)
 #
-# ── Syslog examples ──────────────────────────────────────────────────
+# ── Wazuh / Graylog / Elastic (JSON syslog) ──────────────────────────────────
 #
 # output:
 #   sinks:
@@ -141,21 +105,23 @@ inventory:
 #       host: 192.168.1.50
 #       port: 514
 #       protocol: udp
-#       format: json          # json | cef | leef | plain
+#       format: json
 #
-#     - type: syslog
-#       host: 192.168.1.50
-#       port: 1514
-#       protocol: tcp
-#       format: cef
-#
-# ── Splunk HEC example ───────────────────────────────────────────────
+# ── Splunk HEC ────────────────────────────────────────────────────────────────
 #
 #     - type: splunk_hec
 #       url: https://splunk.example.com:8088
 #       token: your-hec-token-here
-#       verify_ssl: true      # set false for self-signed certs in lab environments
-#       index: scrutics       # optional — uses default index if omitted
+#       verify_ssl: true
+#       index: scrutics           # optional
+#
+# ── ArcSight (CEF) / QRadar (LEEF) ──────────────────────────────────────────
+#
+#     - type: syslog
+#       host: 192.168.1.20
+#       port: 514
+#       protocol: udp
+#       format: cef               # or leef for QRadar
 
 output:
-  sinks: []
+  sinks: [] # Remove the [] and add your rules below when ready, like the examples above

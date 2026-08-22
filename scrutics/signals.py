@@ -8,7 +8,7 @@ code path via trigger().
 Usage:
     signals.setup()                       # register SIGHUP handler where available
     signals.set_reload_callback(fn)       # fn() called on SIGHUP/watch/trigger()
-    signals.start_file_watch()            # poll scrutics_rules.yaml changes
+    signals.start_file_watch()            # poll custom_rules.yaml for changes
     signals.trigger()                     # call from TUI button
 """
 
@@ -51,10 +51,12 @@ def setup():
 
 
 def _first_existing_config_path() -> str | None:
+    # Check advanced override paths first, then fall back to package custom_rules.yaml
+    from scrutics.config.loader import get_user_config_paths, _CUSTOM_TEMPLATE
     for path in get_user_config_paths():
         if os.path.exists(path):
             return path
-    return None
+    return _CUSTOM_TEMPLATE  # always watch custom_rules.yaml as fallback
 
 
 def start_file_watch(interval: float = 2.5):

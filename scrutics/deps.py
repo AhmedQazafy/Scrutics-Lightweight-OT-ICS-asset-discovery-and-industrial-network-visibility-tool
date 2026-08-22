@@ -1,29 +1,22 @@
-"""Startup dependency checker — clear error messages instead of tracebacks."""
+"""
+Startup dependency checker.
+Delegates to scrutics.diagnostics so the logic lives in one place.
+"""
 
-import sys
-
-REQUIRED = {
-    "scapy":   "pip install scapy --break-system-packages",
-    "textual": "pip install textual --break-system-packages",
-    "yaml":    "pip install pyyaml --break-system-packages",
-}
+from scrutics.diagnostics import check_dependencies as _check
 
 
 def check_dependencies(headless: bool = False) -> bool:
-    check = dict(REQUIRED)
-    if headless:
-        check.pop("textual", None)
-    missing = []
-    for pkg, cmd in check.items():
-        try:
-            __import__(pkg)
-        except ImportError:
-            missing.append((pkg, cmd))
+    """
+    Check required dependencies. Print clear errors if any are missing.
+    Returns True if all required deps are present, False otherwise.
+    """
+    results = _check(headless=headless)
+    missing = [r for r in results if not r["ok"]]
     if not missing:
         return True
     print("\n  [!] Scrutics: missing required dependencies\n")
-    for pkg, cmd in missing:
-        print(f"  Missing : {pkg}")
-        print(f"  Install : {cmd}\n")
-    print("  Or run: bash setup.sh\n")
+    for r in missing:
+        print(f"  Missing : {r['name']}")
+        print(f"  Install : {r['install_cmd']}\n")
     return False

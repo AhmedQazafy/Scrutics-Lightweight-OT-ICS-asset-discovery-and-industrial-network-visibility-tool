@@ -2,9 +2,12 @@
 Configuration loader for Scrutics.
 
 Search order for user config:
-  1. ./scrutics_rules.yaml        (current working directory — per-environment)
-  2. ~/.scrutics/scrutics.yaml    (home directory — user global)
-  3. package custom_rules.yaml    (template, empty rules/sinks)
+  1. ~/.scrutics/scrutics.yaml    (advanced override — home directory)
+  2. package custom_rules.yaml    (default — always present, users edit this directly)
+
+  The intended workflow is simple: edit scrutics/config/custom_rules.yaml directly.
+  The ~/.scrutics/scrutics.yaml path exists for advanced users who want a
+  machine-wide config independent of the cloned repository.
 
 Builtin rules always load from the package builtin_rules.yaml.
 User/custom rules always take precedence over builtin rules.
@@ -24,7 +27,6 @@ _VALID_PROTOCOLS = {"TCP", "UDP"}
 _VALID_SINK_FORMATS = {"json", "cef", "leef", "plain"}
 
 _USER_SEARCH_PATHS = [
-    os.path.join(os.getcwd(), "scrutics_rules.yaml"),
     os.path.join(os.path.expanduser("~"), ".scrutics", "scrutics.yaml"),
 ]
 
@@ -39,11 +41,12 @@ def get_user_config_paths() -> list[str]:
 
 
 def get_active_user_config_path() -> str | None:
-    """Return the first existing user config path, excluding package templates."""
+    """Return the active user config path. Checks override paths first, then the package default."""
     for path in _USER_SEARCH_PATHS:
         if os.path.exists(path):
             return path
-    return None
+    # Package custom_rules.yaml is always the active config when no override exists
+    return _CUSTOM_TEMPLATE
 
 
 def _load_yaml(path: str, *, strict: bool = False) -> dict:
