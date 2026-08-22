@@ -11,3 +11,4 @@ oui.txt
 *.log
 .pytest_cache/
 .coverage
+output/
