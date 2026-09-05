@@ -19,7 +19,7 @@ from scrutics.db.inventory import AssetInventory
 from scrutics.parsers.detector import detect_file_type
 from scrutics.parsers.zeek import extract_flows_from_zeek
 from scrutics.parsers.suricata import extract_flows_from_eve
-from scrutics.baseline.engine import BaselineEngine, DeviceBaseline
+from scrutics.baseline.baselineengine import BaselineEngine, DeviceBaseline
 from scrutics.baseline.scorer import (
     oui_score, protocol_score, confidence_pct, confidence_color
 )

@@ -6,16 +6,6 @@ import csv
 import datetime
 import ipaddress
 
-# Evidence weights (moved here for central definition)
-EVIDENCE_WEIGHT_OT_VENDOR = 30
-EVIDENCE_WEIGHT_OT_LISTEN_PORT = 10
-EVIDENCE_WEIGHT_OT_CONTACT_PORT = 3
-EVIDENCE_WEIGHT_OT_PROTOCOL = 20
-EVIDENCE_WEIGHT_BEHAVIOR_INITIATES = 5
-EVIDENCE_WEIGHT_OS_HINT = 5
-EVIDENCE_WEIGHT_DISCOVERY = 15
-EVIDENCE_WEIGHT_IT_PORT = 5
-
 
 def is_inventory_ip(
     ip: str | None,
@@ -108,20 +98,44 @@ class Asset:
     classification_type: str = "Unknown"                   # "OT" | "IT" | "Infrastructure" | "Unknown"
     classification_confidence_pct: int = 0                 # Overall confidence based on evidence
     domain: str = "Unknown"                                # "Industrial" | "Building_Automation" | "Utility" | "Enterprise" | "Unknown"
+    ip: str
+    mac: str
+    vendor: str = "Unknown"
+    is_ot_vendor: bool = False
+    protocols: list = field(default_factory=list)
+    ports_seen: set = field(default_factory=set)
+    contacted_ports: set = field(default_factory=set)
+    role: str = "Unclassified"
+    is_ot: Optional[bool] = None
+    confidence: str = "LOW"
+    oui_score: int = 0
+    protocol_score: int = 0
+    behavioral_score: int = 0
+    directionality_score: int = 0
+    confidence_pct: int = 0
+    baseline_status: str = "no_data"
+    packet_count: int = 0
+    peer_ips: set = field(default_factory=set)
+    initiates: bool = False
+    first_seen: str = ""
+    last_seen: str = ""
+    behavioral_constraints: dict = field(default_factory=dict)
+    peer_first_seen: dict = field(default_factory=dict)   # peer_ip -> epoch float
+    _constraint_anomaly_ts: dict = field(default_factory=dict)  # type -> epoch float
 
+    # New v0.5.0 fields
+    evidence: list = field(default_factory=list)           # List[Evidence]
+    os_hints: list = field(default_factory=list)           # List[str] - tentative OS hints
+    dns_names: list = field(default_factory=list)          # List[str] - DNS names if observed
+    observed_services: list = field(default_factory=list)  # List[dict] - {port, protocol, last_seen}
+    classification_type: str = "Unknown"                   # "OT" | "IT" | "Infrastructure" | "Unknown"
+    classification_confidence_pct: int = 0                 # Overall confidence based on evidence
+    domain: str = "Unknown"
+    role: str = "Unclassified"  # Note: role already exists, but we'll keep it for backward compatibility
+    domain: str = "Unknown"  # "Industrial" | "Building_Automation" | "Utility" | "Enterprise" | "Unknown"
     def add_evidence(self, evidence_type: str, value: str, weight: int,
                      source: str, confidence: str = "MEDIUM", detail: str = ""):
-        """
-        Add evidence, deduplicating by type+value+source.
-        If identical evidence already exists, skip adding.
-        """
-        # Check if identical evidence exists (same type, value, source)
-        for ev in self.evidence:
-            if ev.type == evidence_type and ev.value == value and ev.source == source:
-                # Optionally update timestamp here if we had one, but we don't.
-                return
-
-        # Create new evidence
+        """Add evidence and update classification confidence."""
         ev = Evidence(
             type=evidence_type,
             value=value,
@@ -134,7 +148,7 @@ class Asset:
 
         # Recalculate classification confidence based on evidence weights
         total_weight = sum(e.weight for e in self.evidence)
-        max_possible = 100
+        max_possible = 100  # Cap at 100%
         self.classification_confidence_pct = min(total_weight, max_possible)
 
         # Update classification type based on strongest evidence
@@ -142,12 +156,7 @@ class Asset:
 
     def _update_classification_type(self):
         """Determine classification type from evidence."""
-        # If asset has no listening ports, it cannot be OT/IT – it's a client.
-        if not self.ports_seen:
-            self.classification_type = "Unknown"
-            return
-
-        # Existing logic (only runs if ports_seen is non-empty)
+        # Count evidence by type
         ot_evidence = sum(1 for e in self.evidence
                          if e.type in ["protocol", "port"] and "OT" in str(e.detail))
         it_evidence = sum(1 for e in self.evidence
@@ -165,20 +174,16 @@ class Asset:
             self.classification_type = "Unknown"
 
     def add_os_hint(self, hint: str, confidence: str = "LOW"):
-        """Add a tentative OS hint, deduplicated by value."""
-        # Check if this exact hint already exists in evidence
-        for ev in self.evidence:
-            if ev.type == "os_hint" and ev.value == hint:
-                return
-        # If not, add it
+        """Add a tentative OS hint."""
         self.os_hints.append(hint)
+        # Add as evidence with low weight
         self.add_evidence(
             evidence_type="os_hint",
             value=hint,
             weight=5 if confidence == "LOW" else 10 if confidence == "MEDIUM" else 15,
             source="traffic",
             confidence=confidence,
-            detail="Tentative OS hint from passive observation"
+            detail=f"Tentative OS hint from passive observation"
         )
 
     def add_service(self, port: int, protocol: str, last_seen: str):
@@ -200,7 +205,7 @@ class Asset:
             "OT" if self.is_ot is True else "IT" if self.is_ot is False else "Unknown"
         )
 
-        # Evidence summary for CSV (only first 5 for brevity)
+        # Evidence summary for CSV
         evidence_summary = "; ".join(
             f"{e.type}:{e.value}({e.weight})" for e in self.evidence[:5]
         )
@@ -275,6 +280,8 @@ class AssetInventory:
         if self.is_asset_ip(dst_ip):
             asset.peer_ips.add(dst_ip)
             asset.initiates = True
+
+            # Add behavioral evidence
             asset.add_evidence(
                 evidence_type="behavior",
                 value="initiates_connections",
@@ -287,8 +294,27 @@ class AssetInventory:
         # Track contacted ports
         if dst_port:
             asset.contacted_ports.add(dst_port)
-            # We add evidence in engine.py separately, so we don't duplicate here.
-            # But if we ever want to add here, ensure dedup prevents duplicates.
+
+            # Add port evidence
+            from scrutics.classifier.protocol import ICS_PORTS, IT_PORTS
+            if dst_port in ICS_PORTS:
+                asset.add_evidence(
+                    evidence_type="port",
+                    value=str(dst_port),
+                    weight=10,
+                    source="traffic",
+                    confidence="HIGH",
+                    detail=f"OT port {dst_port} observed"
+                )
+            elif dst_port in IT_PORTS:
+                asset.add_evidence(
+                    evidence_type="port",
+                    value=str(dst_port),
+                    weight=5,
+                    source="traffic",
+                    confidence="MEDIUM",
+                    detail=f"IT port {dst_port} observed"
+                )
 
     def credit_listener_port(self, ip: str, port: int):
         if not self.is_asset_ip(ip) or not port:

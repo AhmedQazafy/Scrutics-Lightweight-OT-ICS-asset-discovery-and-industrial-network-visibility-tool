@@ -19,8 +19,21 @@ def protocol_score(matched_ics: bool, matched_it: bool) -> int:
     return 0
 
 
-def confidence_pct(oui_s: int, protocol_s: int, behavioral_s: int, directional_s: int) -> int:
+def confidence_pct(oui_s: int, protocol_s: int, behavioral_s: int, directional_s: int,
+                   evidence: list = None) -> int:
+    """Calculate confidence percentage."""
+    if evidence:
+        return confidence_from_evidence(evidence)
     return min(oui_s + protocol_s + behavioral_s + directional_s, 100)
+
+
+def confidence_from_evidence(evidence: list) -> int:
+    """Calculate confidence percentage from evidence list."""
+    if not evidence:
+        return 0
+    total_weight = sum(e.weight for e in evidence)
+    # Cap at 100
+    return min(total_weight, 100)
 
 
 def confidence_color(pct: int) -> str:

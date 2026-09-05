@@ -68,7 +68,7 @@
 #     confidence: MEDIUM
 #     alert_on_new_port: true
 
-rules: [] # Remove the [] and add your rules below when ready, like the examples above
+rules: [] # Leave empty if you do not need custom rules, or replace [] with rules in the format shown above.
 
 # ── Inventory scope ───────────────────────────────────────────────────────────
 # By default Scrutics tracks RFC1918 private IPs as assets and treats public
@@ -85,7 +85,7 @@ rules: [] # Remove the [] and add your rules below when ready, like the examples
 
 inventory:
   include_public_ips: false
-  cidrs: [] # Remove the [] and add your rules below when ready, like the examples above
+  cidrs: [] # Leave empty to monitor all private ranges, or replace [] with the CIDR ranges you want to monitor.
 
 
 # ── Output sinks ─────────────────────────────────────────────────────────────
@@ -124,4 +124,4 @@ inventory:
 #       format: cef               # or leef for QRadar
 
 output:
-  sinks: [] # Remove the [] and add your rules below when ready, like the examples above
+  sinks: [] # Leave empty to disable SIEM forwarding, or replace [] with a sink configuration shown above.

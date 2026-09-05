@@ -152,3 +152,63 @@ def classify_by_ports(ports_seen: set, mac: str = None) -> dict:
         "matched_rule":           None,
         "behavioral_constraints": {},
     }
+
+
+# ── Phase 2: Evidence generation ──────────────────────────────────────────────
+
+def classification_evidence_from_ports(ports_seen: set, mac: str = None) -> list:
+    """Generate evidence objects from observed ports and MAC."""
+    evidence = []
+
+    # Check ICS ports
+    for port in ports_seen:
+        if port in ICS_PORTS:
+            evidence.append({
+                "type": "port",
+                "value": str(port),
+                "weight": 10,
+                "source": "traffic",
+                "confidence": "HIGH",
+                "detail": f"OT port {port} ({ICS_PORTS[port]['protocol']})"
+            })
+        elif port in IT_PORTS:
+            evidence.append({
+                "type": "port",
+                "value": str(port),
+                "weight": 5,
+                "source": "traffic",
+                "confidence": "MEDIUM",
+                "detail": f"IT port {port}"
+            })
+
+    # Check MAC vendor (if provided)
+    if mac:
+        from scrutics.classifier.oui import lookup_vendor, is_ot_vendor
+        # Load OUI DB (lazy import to avoid circular dependency)
+        try:
+            from scrutics.classifier.oui import load_oui_db
+            oui_db = load_oui_db()
+            vendor = lookup_vendor(mac, oui_db)
+            if vendor and vendor != "Unknown":
+                if is_ot_vendor(vendor):
+                    evidence.append({
+                        "type": "vendor",
+                        "value": vendor,
+                        "weight": 30,
+                        "source": "OUI",
+                        "confidence": "HIGH",
+                        "detail": f"OT vendor: {vendor}"
+                    })
+                else:
+                    evidence.append({
+                        "type": "vendor",
+                        "value": vendor,
+                        "weight": 10,
+                        "source": "OUI",
+                        "confidence": "LOW",
+                        "detail": f"Vendor: {vendor}"
+                    })
+        except Exception:
+            pass  # Silently fail if OUI DB can't be loaded
+
+    return evidence

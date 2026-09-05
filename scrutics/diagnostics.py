@@ -10,7 +10,7 @@ import platform
 import shutil
 
 
-VERSION = "v0.4.0"
+VERSION = "v0.5.0"
 _PKG_DIR = os.path.dirname(__file__)
 
 
@@ -46,19 +46,6 @@ def check_all_dependencies() -> list[dict]:
 
 
 def _run_dep_checks(checks: list) -> list[dict]:
-    results = []
-    for pkg, install_cmd in checks:
-        display = "pyyaml" if pkg == "yaml" else pkg
-        try:
-            mod = __import__(pkg)
-            version = getattr(mod, "__version__", "installed")
-            results.append({"name": display, "ok": True,
-                            "version": version, "install_cmd": install_cmd})
-        except ImportError:
-            results.append({"name": display, "ok": False,
-                            "version": None, "install_cmd": install_cmd})
-    return results
-
     results = []
     for pkg, install_cmd in checks:
         display = "pyyaml" if pkg == "yaml" else pkg

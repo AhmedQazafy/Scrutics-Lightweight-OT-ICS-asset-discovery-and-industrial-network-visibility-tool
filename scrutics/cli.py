@@ -30,12 +30,18 @@ import os
 import signal
 import datetime
 import threading
+import time
+import json
+import csv
 
 from scrutics.diagnostics import (
     VERSION, check_dependencies, full_report,
     list_interfaces, suggest_interface, check_output_dir,
 )
 from scrutics.db.inventory import AssetInventory
+from scrutics.topology import export_topology
+
+SESSION_FLUSH_INTERVAL = 15.0
 
 
 # ── Argument parser ────────────────────────────────────────────────────────────
@@ -246,6 +252,53 @@ def _periodic_table(inventory: AssetInventory, done_event: threading.Event,
             _print_table(inventory)
 
 
+def _checkpoint_session(inventory, engine, session_dir, lock):
+    """Atomic checkpoint for headless mode – writes all data + topology."""
+    if not session_dir or not inventory:
+        return
+    with lock:
+        try:
+            # 1. Write standard inventory & evidence
+            inventory.export_csv(os.path.join(session_dir, "assets.csv"))
+            
+            evidence_path = os.path.join(session_dir, "evidence.json")
+            evidence_data = {}
+            for asset in inventory.get_all():
+                if asset.evidence:
+                    evidence_data[asset.ip] = [ev.to_dict() for ev in asset.evidence]
+            if evidence_data:
+                with open(evidence_path, "w", encoding="utf-8") as f:
+                    json.dump(evidence_data, f, indent=2)
+            
+            # Events & anomalies
+            if engine:
+                events_path = os.path.join(session_dir, "events.csv")
+                with open(events_path, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["timestamp", "message", "type"])
+                    for ts, msg, typ in engine.event_log:
+                        writer.writerow([ts, msg, typ])
+                
+                anomalies_path = os.path.join(session_dir, "anomalies.csv")
+                with open(anomalies_path, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["timestamp", "ip", "severity", "type", "detail"])
+                    for anom in engine.baseline.get_anomalies():
+                        writer.writerow([
+                            datetime.datetime.fromtimestamp(anom.get("timestamp", 0)).isoformat(),
+                            anom.get("ip", ""),
+                            anom.get("severity", ""),
+                            anom.get("type", ""),
+                            anom.get("detail", ""),
+                        ])
+            
+            # 2. Now call export_topology for topology files
+            from scrutics.topology import export_topology
+            export_topology(inventory, engine.topology_edges if engine else None, session_dir)
+            
+        except Exception as e:
+            print(f"\r[!] Checkpoint failed: {e}", flush=True)
+
 # ── Main headless runner ───────────────────────────────────────────────────────
 
 def run_headless(args) -> int:
@@ -298,10 +351,26 @@ def run_headless(args) -> int:
 
     stop_event = threading.Event()
 
-    def handle_sigint(sig, frame):
+    def handle_stop(sig, frame):
         print("\n[*] Stopping...")
         stop_event.set()
-    signal.signal(signal.SIGINT, handle_sigint)
+        engine.request_stop()
+
+    signal.signal(signal.SIGINT, handle_stop)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, handle_stop)
+
+    # ── Checkpoint thread ─────────────────────────────────────────────────────
+    checkpoint_lock = threading.Lock()
+
+    def checkpoint_loop():
+        while not stop_event.is_set():
+            stop_event.wait(SESSION_FLUSH_INTERVAL)
+            if not stop_event.is_set():
+                _checkpoint_session(inventory, engine, session_dir, checkpoint_lock)
+
+    checkpoint_thread = threading.Thread(target=checkpoint_loop, daemon=True)
+    checkpoint_thread.start()
 
     # ── Live capture ──────────────────────────────────────────────────────────
     if args.live:
@@ -368,11 +437,11 @@ def run_headless(args) -> int:
             daemon=True,
         ).start()
 
-        try:
-            while not capture_done.is_set() and not stop_event.is_set():
-                capture_done.wait(timeout=1.0)
-        finally:
-            pass
+        while not capture_done.is_set() and not stop_event.is_set():
+            capture_done.wait(timeout=1.0)
+
+        if stop_event.is_set() and not capture_done.is_set():
+            capture_done.wait(timeout=2.0)
 
     # ── File analysis ─────────────────────────────────────────────────────────
     elif args.file:
@@ -406,12 +475,16 @@ def run_headless(args) -> int:
             print(f"[!] Error: {file_error[0]}")
             return 1
 
-    # ── Export ────────────────────────────────────────────────────────────────
+    # ── Final checkpoint ─────────────────────────────────────────────────────
+    _checkpoint_session(inventory, engine, session_dir, checkpoint_lock)
+
     print()
     _print_table(inventory)
 
     try:
-        inventory.export_csv(os.path.join(session_dir, "assets.csv"))
+        # Ensure final export (non-atomic) for cleanliness
+        from scrutics.topology import export_topology
+        topology_paths = export_topology(inventory, engine.topology_edges, session_dir)
 
         if not engine.no_baseline:
             anomaly_count = len(engine.baseline.get_anomalies())
@@ -421,6 +494,10 @@ def run_headless(args) -> int:
                 print("[+] No anomalies detected.")
 
         print(f"\n[+] Session saved to: {session_dir}")
+        if topology_paths:
+            print(f"[+] Topology map saved to: {topology_paths['html']}")
+            if "connections_csv" in topology_paths:
+                print(f"[+] Connections saved to: {topology_paths['connections_csv']}")
         return 0 if inventory.count() > 0 else 2
 
     finally:

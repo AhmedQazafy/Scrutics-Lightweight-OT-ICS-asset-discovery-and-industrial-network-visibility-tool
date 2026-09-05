@@ -41,7 +41,7 @@ class TestProtocolClassifier:
         assert result["confidence"] == CONFIDENCE_MEDIUM
 
     def test_unknown_ports_return_low_confidence(self):
-        result = classify_by_ports({9999, 12345})
+        result = classify_by_ports({55555, 66666})
         assert result["confidence"] == CONFIDENCE_LOW
         assert result["is_ot"] is None
 

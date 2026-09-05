@@ -35,9 +35,19 @@ def _detect_zeek(filepath: str) -> str:
 def _detect_suricata(filepath: str) -> str:
     try:
         with open(filepath, "r", errors="ignore") as f:
-            obj = json.loads(f.readline().strip())
-            if "event_type" in obj or "src_ip" in obj:
-                return "suricata"
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                # Skip comments
+                if line.startswith("#"):
+                    continue
+                try:
+                    obj = json.loads(line)
+                    if "event_type" in obj or "src_ip" in obj:
+                        return "suricata"
+                except json.JSONDecodeError:
+                    continue
     except Exception:
         pass
     return "unknown"

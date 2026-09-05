@@ -13,53 +13,70 @@ Keyboard navigation:
 
 import os
 import csv
+import json
 import threading
 import datetime
+import time
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import (
-    Header, DataTable, Label, Log,
+    DataTable, Label, Log,
     Button, Input, Static
 )
 from textual import on
 from rich.text import Text
 
-from scrutics.db.inventory import AssetInventory
+from scrutics.db.inventory import AssetInventory, Asset, Evidence
 from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
-
 from scrutics.diagnostics import VERSION
-TAGLINE = "Passive OT/ICS Network Asset Discovery"
+from scrutics.topology import export_topology
 
-BANNER_ART = """\
-███████╗ ██████╗██████╗ ██╗   ██╗████████╗██╗ ██████╗███████╗
-██╔════╝██╔════╝██╔══██╗██║   ██║╚══██╔══╝██║██╔════╝██╔════╝
-███████╗██║     ██████╔╝██║   ██║   ██║   ██║██║     ███████╗
-╚════██║██║     ██╔══██╗██║   ██║   ██║   ██║██║     ╚════██║
-███████║╚██████╗██║  ██║╚██████╔╝   ██║   ██║╚██████╗███████║
-╚══════╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═╝ ╚═════╝╚══════╝"""
+TAGLINE = "Passive OT/ICS Network Asset Discovery"
+SESSION_FLUSH_INTERVAL = 15.0
 
 CSS = """
 Screen {
     background: $surface;
 }
 
+#app-header {
+    height: 1;
+    dock: top;
+    background: $panel;
+    color: $foreground;
+    align: left middle;
+}
+
+#header-title {
+    width: 1fr;
+    height: 2;
+    content-align: center middle;
+}
+
+#header-clock {
+    width: 10;
+    height: 1;
+    padding: 0 1;
+    content-align: center middle;
+}
+
 #banner {
-    height: 8;
+    height: 2;
     content-align: center middle;
     color: $accent;
     text-style: bold;
     border-bottom: solid $accent-darken-2;
+    padding: 0 1;
 }
 
 /* ── Toolbar ─────────────────────────────── */
 #toolbar {
     height: 2;
-    background: $surface-darken-1;
     border-bottom: solid $accent-darken-2;
     padding: 0 1;
     align: left top;
@@ -68,7 +85,7 @@ Screen {
 #toolbar Button {
     margin: 0 1;
     min-width: 19;
-    height: 1;
+    height: 1.5;
     background: $accent-darken-2;
     color: $text;
     border: none;
@@ -185,8 +202,8 @@ ChoiceListModal {
     height: auto;
     background: $surface;
     border: solid $accent;
-    margin-top: 11;
-    margin-left: 1;
+    margin-top: 4;
+    margin-left: 0;
 }
 
 ChoiceListModal #dropdown-container {
@@ -288,15 +305,22 @@ Input {
 Input:focus {
     background: $accent-darken-3;
 }
+
+/* ── Detail screen ────────────────────────── */
+#detail-scroll {
+    height: 1fr;
+}
+
+.detail-action-bar {
+    height: 3;
+    align: right middle;
+    padding: 0 1;
+}
 """
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _sanitize_mac(mac: str) -> str:
-    """
-    Remove non-printable and non-ASCII characters from MAC address strings.
-    Textual's DataTable can render garbage if a MAC contains unexpected bytes.
-    """
     if not mac:
         return "Unknown"
     return "".join(c for c in mac if c.isprintable() and ord(c) < 128)
@@ -318,6 +342,8 @@ def _fmt_elapsed(seconds: float) -> str:
     if h: return f"{h}h {m:02d}m {s:02d}s"
     return f"{m:02d}m {s:02d}s"
 
+
+# ── Panel Widgets ──────────────────────────────────────────────────────────────
 
 class PanelDataTable(DataTable):
     BINDINGS = [
@@ -351,7 +377,6 @@ class PanelDataTable(DataTable):
 
 class PanelLog(Log):
     BINDINGS = [
-        Binding("enter", "toggle_content_mode", show=False, priority=True),
         Binding("left", "previous_panel", show=False, priority=True),
         Binding("right", "next_panel", show=False, priority=True),
         Binding("up", "panel_up", show=False, priority=True),
@@ -387,6 +412,9 @@ class FormInput(Input):
         Binding("tab", "ignore_focus_key", show=False, priority=True),
         Binding("shift+tab", "ignore_focus_key", show=False, priority=True),
     ]
+
+    def on_click(self, event):
+        self.focus()
 
     def action_confirm_field(self):
         self.app.screen.action_confirm_field()
@@ -446,6 +474,10 @@ class ChoiceField(Static, can_focus=True):
     def set_value(self, value: str):
         self.value = value
         self.update(value)
+
+    def on_click(self, event):
+        self.focus()
+        self.action_confirm_field()
 
     def action_confirm_field(self):
         self.app.screen.action_confirm_field()
@@ -559,7 +591,6 @@ class DropdownModal(ModalScreen):
                     yield Button(label, id=action_id)
 
     def on_mount(self):
-        # Auto-focus first button for immediate keyboard use
         buttons = self.query("Button")
         if buttons:
             buttons.first().focus()
@@ -567,6 +598,15 @@ class DropdownModal(ModalScreen):
     @on(Button.Pressed)
     def select(self, event: Button.Pressed):
         self.dismiss(event.button.id)
+
+    def on_click(self, event):
+        container = self.query_one("#dropdown-container")
+        region = container.region
+        if not (
+            region.x <= event.screen_x < region.right
+            and region.y <= event.screen_y < region.bottom
+        ):
+            self.dismiss(None)
 
     def action_dismiss(self):
         self.dismiss(None)
@@ -777,6 +817,150 @@ class FileAnalysisModal(SetupModalMixin, ModalScreen):
             self.dismiss({"mode": "file", "filepath": filepath})
 
 
+# ── Detail Screen ──────────────────────────────────────────────────────────────
+
+class DetailScreen(ModalScreen):
+    """Full-page asset detail view — does NOT pause capture."""
+    BINDINGS = [
+        Binding("escape", "close", "Close", show=False),
+        Binding("q", "close", show=False),
+        Binding("e", "export_asset", "Export", show=False),
+    ]
+
+    def __init__(self, asset_ip: str, inventory: AssetInventory, engine: CaptureEngine):
+        super().__init__()
+        self._asset_ip = asset_ip
+        self._inventory = inventory
+        self._engine = engine
+
+    def compose(self) -> ComposeResult:
+        asset = self._inventory.get(self._asset_ip)
+        if not asset:
+            yield Label("Asset not found")
+            return
+
+        # Top action bar with keybind hints
+        with Horizontal(classes="dialog-actions"):
+            yield Button("Close (Esc/Q)", id="close-btn", variant="default")
+            yield Button("Export asset (E)", id="export-btn", variant="primary")
+
+        # Scrollable content
+        with ScrollableContainer(id="detail-scroll"):
+            lines = []
+
+            lines.append(f"[bold]Asset Details: {asset.ip}[/bold]")
+            lines.append("")
+            lines.append(f"MAC: {asset.mac}    Vendor: {asset.vendor}")
+            lines.append("")
+
+            class_color = "green" if asset.classification_type == "OT" else "yellow" if asset.classification_type == "IT" else "cyan"
+            lines.append(f"[bold]Classification:[/bold] [{class_color}]{asset.classification_type}[/{class_color}]")
+            lines.append(f"Domain: {asset.domain}")
+            lines.append(f"Role: {asset.role}")
+            lines.append(f"Confidence: {asset.classification_confidence_pct}%")
+            lines.append("")
+
+            if asset.os_hints:
+                lines.append("[bold]OS Hints:[/bold]")
+                for hint in asset.os_hints:
+                    lines.append(f"  • {hint}")
+                lines.append("")
+
+            if asset.evidence:
+                lines.append("[bold]Evidence:[/bold]")
+                for ev in asset.evidence[:15]:
+                    color = "green" if ev.weight >= 20 else "yellow" if ev.weight >= 10 else "dim white"
+                    lines.append(f"  +{ev.weight:2d}  [{color}]{ev.type}: {ev.value}[/{color}]")
+                    if ev.detail:
+                        lines.append(f"       {ev.detail}")
+                if len(asset.evidence) > 15:
+                    lines.append(f"  ... and {len(asset.evidence) - 15} more")
+                lines.append("")
+
+            if self._engine and self._engine.topology_edges:
+                related = []
+                for (src, dst), info in self._engine.topology_edges.items():
+                    if src == asset.ip or dst == asset.ip:
+                        peer = dst if src == asset.ip else src
+                        count = info.get("count", 0)
+                        proto = ", ".join(info.get("protocols", [])) or "unknown"
+                        related.append(f"{peer} ({proto}) {count} packets")
+                if related:
+                    lines.append("[bold]Connections:[/bold]")
+                    for rel in related[:10]:
+                        lines.append(f"  • {rel}")
+                    if len(related) > 10:
+                        lines.append(f"  ... and {len(related) - 10} more")
+                    lines.append("")
+
+            content = "\n".join(lines)
+            yield Static(content)
+
+    def on_mount(self):
+        # Focus the scroll container so arrow keys work
+        scroll = self.query_one("#detail-scroll")
+        scroll.focus()
+
+    @on(Button.Pressed, "#close-btn")
+    def close(self):
+        self.dismiss()
+
+    @on(Button.Pressed, "#export-btn")
+    def export_asset(self):
+        asset = self._inventory.get(self._asset_ip)
+        if not asset:
+            self.app.notify("Asset not found", severity="error")
+            return
+        # Determine output directory
+        session_dir = getattr(self.app, '_session_dir', None)
+        if not session_dir:
+            session_dir = "."
+            self.app.notify("No session directory set, saving to current directory", severity="warning")
+        # Build full export data
+        export_data = {
+            "ip": asset.ip,
+            "mac": asset.mac,
+            "vendor": asset.vendor,
+            "protocols": asset.protocols,
+            "role": asset.role,
+            "classification_type": asset.classification_type,
+            "domain": asset.domain,
+            "confidence": asset.classification_confidence_pct,
+            "os_hints": asset.os_hints,
+            "first_seen": asset.first_seen,
+            "last_seen": asset.last_seen,
+            "packet_count": asset.packet_count,
+            "evidence": [ev.to_dict() for ev in asset.evidence],
+            "observed_services": asset.observed_services,
+            "connections": []
+        }
+        # Add connections if engine available
+        if self._engine and self._engine.topology_edges:
+            for (src, dst), info in self._engine.topology_edges.items():
+                if src == asset.ip or dst == asset.ip:
+                    peer = dst if src == asset.ip else src
+                    export_data["connections"].append({
+                        "peer": peer,
+                        "count": info.get("count", 0),
+                        "protocols": list(info.get("protocols", [])),
+                        "first_seen": info.get("first_seen"),
+                        "last_seen": info.get("last_seen"),
+                    })
+        # Write JSON
+        filename = f"asset_{asset.ip.replace('.', '_')}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        filepath = os.path.join(session_dir, filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(export_data, f, indent=2, default=str)
+        self.app.notify(f"Asset exported to {filepath}", severity="information")
+
+    def action_close(self):
+        self.dismiss()
+
+    def action_export_asset(self):
+        """Keyboard shortcut for Export Asset."""
+        self.export_asset()
+
+
 # ── Main Application ───────────────────────────────────────────────────────────
 
 class ScruticsApp(App):
@@ -795,9 +979,10 @@ class ScruticsApp(App):
         Binding("right",      "next_panel",      show=False),
         Binding("up",         "panel_up",        show=False),
         Binding("down",       "panel_down",      show=False),
-        Binding("enter",      "toggle_content_mode", show=False),
+        Binding("enter",      "toggle_content_mode", "Toggle", show=False),
         Binding("tab",        "ignore_focus_key", show=False),
         Binding("shift+tab",  "ignore_focus_key", show=False),
+        Binding("escape",     "close_all", "Close", show=False),
     ]
 
     status_text = reactive("Passive OT/ICS asset discovery ready.")
@@ -814,20 +999,47 @@ class ScruticsApp(App):
         self._active_panel = "assets"
         self._content_mode = False
         self._status_style = "dim white"
+        self._status_override_until = 0.0
+        self._status_generation = 0
+        self._checkpoint_lock = threading.Lock()
+
+    def action_view_detail(self):
+        """Open detail screen for selected asset."""
+        if self._active_panel != "assets":
+            return
+        table = self.query_one("#asset-table", DataTable)
+        if table.row_count == 0:
+            return
+        row = getattr(table.cursor_coordinate, "row", 0)
+        if row >= table.row_count:
+            return
+        try:
+            row_data = table.get_row_at(row)
+            ip = row_data[0]
+        except Exception:
+            return
+        if not self.inventory:
+            return
+        asset = self.inventory.get(ip)
+        if not asset:
+            return
+        self.push_screen(DetailScreen(ip, self.inventory, self.engine))
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
-        yield Static(f"{BANNER_ART}\n{VERSION}  .  {TAGLINE}", id="banner")
+        with Horizontal(id="app-header"):
+            yield Static(self.TITLE, id="header-title")
+            yield Static(datetime.datetime.now().strftime("%X"), id="header-clock")
+        yield Static(f"SCRUTICS {VERSION}  •  {TAGLINE}", id="banner")
 
         with Horizontal(id="toolbar"):
-            yield Button("Start Analysis =1", id="btn-start")
-            yield Button("File Options =2",   id="btn-file-opts")
-            yield Button("Toggle Panels =3",  id="btn-panels")
-            yield Button("Reload Rules =R",   id="btn-reload")
-            yield Button("Pause =P",          id="btn-pause")
-            yield Button("Quit =Q",           id="btn-quit")
+            yield Button("Start Analysis (1)", id="btn-start")
+            yield Button("File Options (2)",   id="btn-file-opts")
+            yield Button("Toggle Panels (3)",  id="btn-panels")
+            yield Button("Reload Rules (R)",   id="btn-reload")
+            yield Button("Pause (P)",          id="btn-pause")
+            yield Button("Quit (Q)",           id="btn-quit")
 
         with Horizontal(id="main-layout"):
             with Vertical(id="table-panel"):
@@ -862,7 +1074,6 @@ class ScruticsApp(App):
         signals.set_reload_callback(lambda: self.call_from_thread(self.action_reload_rules))
         signals.start_file_watch()
 
-        # Auto-start from CLI env vars
         auto_live = os.environ.get("SCRUTICS_AUTO_LIVE")
         auto_file = os.environ.get("SCRUTICS_AUTO_FILE")
         if auto_live:
@@ -898,7 +1109,9 @@ class ScruticsApp(App):
     def btn_pause(self):     self.action_pause_resume()
 
     @on(Button.Pressed, "#btn-quit")
-    def btn_quit(self):      self.action_quit()
+    def btn_quit(self, event: Button.Pressed):
+        event.stop()
+        self.exit()
 
     # ── Dropdown menus ────────────────────────────────────────────────────────
 
@@ -986,9 +1199,17 @@ class ScruticsApp(App):
                 if errors:
                     raise ValueError("; ".join(errors))
             ts = datetime.datetime.now().strftime("%H:%M:%S")
-            self._set_status(f"✓ Rules reloaded at {ts}", "green")
+            self._set_status(
+                f"Rules and sinks reloaded successfully at {ts}",
+                "green",
+                duration=10.0,
+            )
         except Exception as e:
-            self._set_status(f"Reload failed: {e}", "bold red")
+            self._set_status(
+                f"Rules and sinks reload failed: {e}",
+                "bold red",
+                duration=10.0,
+            )
         self._focus_active_panel()
 
     # ── Reactive ──────────────────────────────────────────────────────────────
@@ -996,9 +1217,28 @@ class ScruticsApp(App):
     def action_ignore_focus_key(self):
         self._focus_active_panel()
 
+    def action_close_all(self):
+        """Close detail screen and exit content mode if active."""
+        if self.screen and isinstance(self.screen, DetailScreen):
+            self.screen.dismiss()
+            if self._content_mode:
+                self._content_mode = False
+                self._focus_active_panel()
+            return
+
+        if self._content_mode:
+            self._content_mode = False
+            self._focus_active_panel()
+
     def action_toggle_content_mode(self):
+        """Toggle content mode, or open detail if on assets panel."""
         if not self._visible_panels():
             return
+
+        if self._content_mode and self._active_panel == "assets":
+            self.action_view_detail()
+            return
+
         self._content_mode = not self._content_mode
         self._focus_active_panel()
 
@@ -1076,7 +1316,7 @@ class ScruticsApp(App):
             "anomalies": ("#anomaly-title", " Anomaly Feed"),
         }
         for name, (selector, label) in titles.items():
-            marker = " *" if self._content_mode and name == self._active_panel else ""
+            marker = " * (esc to switch)" if self._content_mode and name == self._active_panel else ""
             try:
                 self.query_one(selector, Label).update(f"{label}{marker}")
             except Exception:
@@ -1152,16 +1392,47 @@ class ScruticsApp(App):
             self.set_timer(0.01, action)
         return True
 
-    def _set_status(self, value: str, style: str = "dim white"):
+    def _set_status(self, value: str, style: str = "dim white", duration: float | None = None):
         self._status_style = style
         self.status_text = value
-        # Errors stay visible longer so users can read them
-        timeout = 12.0 if style == "bold red" else 4.0
-        self.set_timer(timeout, self._clear_status)
+        self._status_generation += 1
 
-    def _clear_status(self):
+        if duration is None:
+            self._status_override_until = 0.0
+            return
+
+        import time
+        self._status_override_until = time.monotonic() + duration
+        generation = self._status_generation
+        self.set_timer(duration, lambda: self._clear_status(generation))
+
+    def _clear_status(self, generation: int | None = None):
+        if generation is not None and generation != self._status_generation:
+            return
+
+        import time
+        if self._status_override_until and time.monotonic() < self._status_override_until:
+            return
+
+        self._status_override_until = 0.0
         self._status_style = "dim white"
-        self.status_text = "Passive OT/ICS asset discovery ready."
+        if self._capture_running.is_set():
+            self._update_live_status()
+        else:
+            self.status_text = "Passive OT/ICS asset discovery ready."
+
+    def _update_live_status(self):
+        if not self._capture_running.is_set():
+            return
+        import time
+        elapsed = _fmt_elapsed(time.time() - self._capture_start) if self._capture_start else "0s"
+        self._status_style = "dim white"
+        self.status_text = (
+            f"Capturing  |  packets: {self.engine._packet_count}  |  "
+            f"assets: {self.inventory.count()}  |  "
+            f"anomalies: {len(self.engine.baseline.get_anomalies())}  |  "
+            f"elapsed: {elapsed}"
+        )
 
     def watch_status_text(self, value: str):
         try:
@@ -1186,7 +1457,6 @@ class ScruticsApp(App):
                 f"Capturing on {config['iface']}  |  "
                 f"duration: {dur_str}  |  baseline: {config['baseline']}s"
             )
-            import time
             self._capture_start = time.time()
 
             def run():
@@ -1211,6 +1481,7 @@ class ScruticsApp(App):
                 return
             self._start_session()
             self._set_status(f"Analyzing: {os.path.basename(filepath)}")
+            self._capture_start = time.time()
 
             def run():
                 try:
@@ -1270,6 +1541,9 @@ class ScruticsApp(App):
         self._content_mode = False
         self._sync_panel_layout()
 
+        # Start periodic checkpointing (every 15 seconds)
+        self.set_interval(SESSION_FLUSH_INTERVAL, self._checkpoint_session)
+
     def _save_session(self):
         if self.inventory and self.inventory.count() > 0 and self._session_dir:
             self._export_session()
@@ -1278,13 +1552,87 @@ class ScruticsApp(App):
             self.notify("No data to save", severity="warning")
 
     def _export_session(self):
+        """Final export of all session data."""
         if not self._session_dir or not self.inventory:
             return
+        # Export assets CSV
         self.inventory.export_csv(os.path.join(self._session_dir, "assets.csv"))
+
+        # Export evidence as JSON
+        evidence_path = os.path.join(self._session_dir, "evidence.json")
+        evidence_data = {}
+        for asset in self.inventory.get_all():
+            if asset.evidence:
+                evidence_data[asset.ip] = [ev.to_dict() for ev in asset.evidence]
+        if evidence_data:
+            with open(evidence_path, "w", encoding="utf-8") as f:
+                json.dump(evidence_data, f, indent=2)
+
+        if self.engine:
+            from scrutics.topology import export_topology
+            export_topology(self.inventory, self.engine.topology_edges, self._session_dir)
+
+    def _checkpoint_session(self):
+        """Periodic checkpoint – writes all session data + topology."""
+        if not self._capture_running.is_set():
+            return
+        if not self._session_dir or not self.inventory:
+            return
+        with self._checkpoint_lock:
+            try:
+                # 1. Write standard inventory & evidence files
+                self.inventory.export_csv(os.path.join(self._session_dir, "assets.csv"))
+
+                # Evidence JSON
+                evidence_path = os.path.join(self._session_dir, "evidence.json")
+                evidence_data = {}
+                for asset in self.inventory.get_all():
+                    if asset.evidence:
+                        evidence_data[asset.ip] = [ev.to_dict() for ev in asset.evidence]
+                if evidence_data:
+                    with open(evidence_path, "w", encoding="utf-8") as f:
+                        json.dump(evidence_data, f, indent=2)
+
+                # Events & anomalies (if engine exists)
+                if self.engine:
+                    events_path = os.path.join(self._session_dir, "events.csv")
+                    with open(events_path, "w", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(["timestamp", "message", "type"])
+                        for ts, msg, typ in self.engine.event_log:
+                            writer.writerow([ts, msg, typ])
+
+                    anomalies_path = os.path.join(self._session_dir, "anomalies.csv")
+                    with open(anomalies_path, "w", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(["timestamp", "ip", "severity", "type", "detail"])
+                        for anom in self.engine.baseline.get_anomalies():
+                            writer.writerow([
+                                datetime.datetime.fromtimestamp(anom.get("timestamp", 0)).isoformat(),
+                                anom.get("ip", ""),
+                                anom.get("severity", ""),
+                                anom.get("type", ""),
+                                anom.get("detail", ""),
+                            ])
+
+                # 2. Now call export_topology for topology.json, topology.html, connections.csv
+                from scrutics.topology import export_topology
+                export_topology(self.inventory, self.engine.topology_edges if self.engine else None, self._session_dir)
+
+            except Exception:
+                # Silently ignore to avoid disrupting the UI
+                pass
 
     # ── Display refresh ───────────────────────────────────────────────────────
 
     def _refresh_display(self):
+        try:
+            self.query_one("#header-clock", Static).update(
+                datetime.datetime.now().strftime("%X")
+            )
+        except Exception:
+            pass
+
         if self.inventory is None or self.engine is None:
             return
         if self._paused:
@@ -1294,13 +1642,8 @@ class ScruticsApp(App):
         self._drain_anomaly_log()
         if self._capture_running.is_set():
             import time
-            elapsed = _fmt_elapsed(time.time() - self._capture_start) if self._capture_start else "0s"
-            self._set_status(
-                f"Capturing  |  packets: {self.engine._packet_count}  |  "
-                f"assets: {self.inventory.count()}  |  "
-                f"anomalies: {len(self.engine.baseline.get_anomalies())}  |  "
-                f"elapsed: {elapsed}"
-            )
+            if time.monotonic() >= self._status_override_until:
+                self._update_live_status()
 
     def _refresh_table(self):
         table = self.query_one("#asset-table", DataTable)
@@ -1360,6 +1703,12 @@ class ScruticsApp(App):
                 alog.write_line(f"{ts}  [{sev}]  {ip}  {atype} — {detail}")
             self._last_anomaly_count = new_count
 
+    def on_exit(self):
+        """Final checkpoint before exit."""
+        if self._capture_running.is_set() and self.inventory:
+            self._checkpoint_session()
+        super().on_exit()
+
     # ── Load last session ─────────────────────────────────────────────────────
 
     def _load_last_results(self):
@@ -1375,19 +1724,83 @@ class ScruticsApp(App):
             return
 
         session = sessions[0]
+        self._session_dir = session
+
         table = self.query_one("#asset-table", DataTable)
         table.clear()
 
+        # Rebuild inventory
+        self.inventory = AssetInventory()
         assets_csv = os.path.join(session, "assets.csv")
         if os.path.exists(assets_csv):
             with open(assets_csv, newline="") as f:
-                for row in csv.DictReader(f):
-                    table.add_row(
-                        row.get("ip",""), row.get("mac",""),
-                        row.get("vendor","")[:20], row.get("protocol","")[:18],
-                        row.get("role","")[:26], f"{row.get('confidence_pct','?')}%",
-                        row.get("baseline_status",""), "--", row.get("type",""),
+                reader = csv.DictReader(f)
+                for row in reader:
+                    asset = Asset(
+                        ip=row.get("ip", ""),
+                        mac=row.get("mac", ""),
+                        vendor=row.get("vendor", "Unknown"),
+                        is_ot_vendor=row.get("is_ot_vendor", "False").lower() == "true",
+                        protocols=row.get("protocol", "").split(", ") if row.get("protocol") else [],
+                        ports_seen=set(),
+                        contacted_ports=set(),
+                        role=row.get("role", "Unclassified"),
+                        is_ot="OT" if row.get("type") == "OT" else "IT" if row.get("type") == "IT" else None,
+                        confidence=row.get("confidence", "LOW"),
+                        oui_score=int(row.get("oui_score", 0)),
+                        protocol_score=int(row.get("protocol_score", 0)),
+                        behavioral_score=int(row.get("behavioral_score", 0)),
+                        directionality_score=int(row.get("directionality_score", 0)),
+                        confidence_pct=int(row.get("confidence_pct", 0)),
+                        baseline_status=row.get("baseline_status", "no_data"),
+                        packet_count=int(row.get("packet_count", 0)),
+                        peer_ips=set(),
+                        initiates=row.get("initiates", "False").lower() == "true",
+                        first_seen=row.get("first_seen", ""),
+                        last_seen=row.get("last_seen", ""),
+                        classification_type=row.get("classification_type", "Unknown"),
+                        classification_confidence_pct=int(row.get("classification_confidence", 0)),
+                        domain=row.get("domain", "Unknown"),
+                        os_hints=row.get("os_hints", "").split("|") if row.get("os_hints") else [],
+                        evidence=[],
+                        observed_services=[],
+                        dns_names=[],
                     )
+                    self.inventory._assets[asset.ip] = asset
+
+            # Load evidence from JSON if present
+            evidence_path = os.path.join(session, "evidence.json")
+            if os.path.exists(evidence_path):
+                with open(evidence_path, "r", encoding="utf-8") as f:
+                    evidence_data = json.load(f)
+                for ip, ev_list in evidence_data.items():
+                    asset = self.inventory.get(ip)
+                    if asset:
+                        for ev_dict in ev_list:
+                            ev = Evidence(
+                                type=ev_dict.get("type", ""),
+                                value=ev_dict.get("value", ""),
+                                weight=ev_dict.get("weight", 0),
+                                source=ev_dict.get("source", ""),
+                                confidence=ev_dict.get("confidence", "LOW"),
+                                detail=ev_dict.get("detail", ""),
+                            )
+                            asset.evidence.append(ev)
+
+            # Populate table — exactly 9 cells
+            for asset in sorted(self.inventory.get_all(), key=lambda x: x.ip):
+                table.add_row(
+                    asset.ip,
+                    asset.mac[:17],
+                    asset.vendor[:16],
+                    ", ".join(asset.protocols)[:14] or "?",
+                    asset.role[:16],
+                    f"{asset.classification_confidence_pct}%",
+                    _baseline_display(asset.baseline_status),
+                    str(len(asset.evidence)),
+                    asset.classification_type[:8],
+                    key=asset.ip,
+                )
 
         elog = self.query_one("#event-log", Log)
         elog.clear()

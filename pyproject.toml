@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scrutics"
-version = "0.4.0"
+version = "0.5.0"
 description = "Passive OT/ICS network asset discovery — zero packet injection"
 readme = "README.md"
 license = {text = "MIT"}
@@ -34,10 +34,10 @@ dependencies = [
 scrutics = "scrutics.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/AhmedQazafy/Scrutics"
-Repository = "https://github.com/AhmedQazafy/Scrutics"
-Issues = "https://github.com/AhmedQazafy/Scrutics/issues"
-Changelog = "https://github.com/AhmedQazafy/Scrutics/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/AhmedQazafy/Scrutics-Lightweight-OT-ICS-asset-discovery-and-industrial-network-visibility-tool"
+Repository = "https://github.com/AhmedQazafy/Scrutics-Lightweight-OT-ICS-asset-discovery-and-industrial-network-visibility-tool"
+Issues = "https://github.com/AhmedQazafy/Scrutics-Lightweight-OT-ICS-asset-discovery-and-industrial-network-visibility-tool/issues"
+Changelog = "https://github.com/AhmedQazafy/Scrutics-Lightweight-OT-ICS-asset-discovery-and-industrial-network-visibility-tool/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 include = ["scrutics*"]
@@ -47,4 +47,5 @@ scrutics = [
     "config/*.yaml",
     "classifier/ics_oui.txt",
     "classifier/oui.txt",
+    "web/*.js",
 ]
