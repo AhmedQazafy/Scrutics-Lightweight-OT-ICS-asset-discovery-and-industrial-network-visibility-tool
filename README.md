@@ -144,7 +144,12 @@ python3 -m scrutics ask --session output/scrutics_20260914_120000
 
 **Supported providers** : Ollama (local, offline), Google Gemini, OpenAI, Anthropic. Configure via `scrutics/config/ai.yaml` or the built-in onboarding prompts.
 
-The AI assistant only reads session data — it never modifies assets, injects packets, or writes to the network.
+The AI assistant only reads session data, it never modifies assets, injects packets, or writes to the network.
+
+Note: AI assistant can be configured to run from a different server on the network. it works completely separately from Scrutics either way.
+
+![Scrutics AI assitant](docs/screenshots/Scrutics_Assistant.png)
+*AI Assitant in can be Run in both CLI and TUI, Topology HTML assitant is currently broken but will be fixed soon*
 
 ---
 
