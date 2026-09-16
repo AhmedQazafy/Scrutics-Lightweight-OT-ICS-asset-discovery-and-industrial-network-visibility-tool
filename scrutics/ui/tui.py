@@ -27,8 +27,10 @@ from textual.widgets import (
     DataTable, Label, Log,
     Button, Input, Static
 )
-from textual import on
+from textual import on, work
+from textual.strip import Strip
 from rich.text import Text
+from rich.style import Style
 
 from scrutics.db.inventory import AssetInventory, Asset, Evidence
 from scrutics.capture.engine import CaptureEngine
@@ -120,6 +122,17 @@ Screen {
     background: $error !important;
 }
 
+#btn-start.running {
+    background: $error-darken-1 !important;
+    color: $text;
+}
+#btn-start.running:focus {
+    background: $error !important;
+}
+#btn-start.running:hover {
+    background: $error-lighten-1 !important;
+}
+
 /* ── Main split ──────────────────────────── */
 #main-layout {
     height: 1fr;
@@ -154,11 +167,31 @@ Screen {
     border: solid $accent;
 }
 
+#status-container {
+    height: 1;
+    background: $accent-darken-3;
+}
+
 #status-bar {
+    width: 1fr;
     height: 1;
     background: $accent-darken-3;
     color: $text-muted;
     padding: 0 1;
+}
+
+#btn-ai-assistant {
+    height: 1;
+    border: none;
+    background: $accent-darken-2;
+    color: $text;
+    padding: 0 1;
+    margin: 0;
+}
+
+#btn-ai-assistant:hover, #btn-ai-assistant:focus {
+    background: $accent;
+    color: $text;
 }
 
 .panel-title {
@@ -207,7 +240,9 @@ ChoiceListModal {
 }
 
 ChoiceListModal #dropdown-container {
-    width: 62;
+    width: 72;
+    max-height: 24;
+    overflow-y: auto;
     margin-top: 0;
     margin-left: 0;
 }
@@ -237,8 +272,13 @@ ChoiceListModal #dropdown-container {
 }
 
 /* ── Setup modals ────────────────────────── */
-LiveCaptureModal, FileAnalysisModal {
+LiveCaptureModal, FileAnalysisModal, AIOnboardingModal, AIModelSelectionModal {
     align: center middle;
+}
+
+AIAssistantModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.4);
 }
 
 #setup-dialog {
@@ -249,10 +289,159 @@ LiveCaptureModal, FileAnalysisModal {
     padding: 1 2;
 }
 
+#ai-dialog {
+    width: 90%;
+    max-width: 110;
+    height: 90%;
+    background: $surface;
+    border: solid $accent-darken-2;
+    padding: 1 2;
+}
+
+#ai-header-bar {
+    height: 1;
+    margin-bottom: 0;
+    align: left middle;
+}
+
+#ai-subheader-bar {
+    height: 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+#ai-btn-reconfigure {
+    height: 1;
+    min-width: 14;
+    background: transparent;
+    color: #bb86fc;  /* purple for better visibility */
+    border: none;
+    padding: 0 0;
+    margin: 0;
+    text-style: italic;
+}
+
+#ai-btn-reconfigure:hover, #ai-btn-reconfigure:focus {
+    background: transparent;
+    color: #e1bee7;  /* lighter purple on hover */
+    text-style: bold;
+}
+
+#ai-btn-disable, #ai-btn-reset {
+    height: 1;
+    min-width: 14;
+    background: transparent;
+    color: #ff6b6b;  /* red for destructive actions */
+    border: none;
+    padding: 0 0;
+    margin: 0 1;
+    text-style: italic;
+}
+
+#ai-btn-disable:hover, #ai-btn-disable:focus,
+#ai-btn-reset:hover, #ai-btn-reset:focus {
+    background: transparent;
+    color: #ff9999;  /* lighter red on hover */
+    text-style: bold;
+}
+
 #setup-title {
+    width: auto;
     text-style: bold;
     color: $accent;
+    margin-right: 2;
+}
+
+#ai-session-badge {
+    width: 1fr;
+    color: $text-muted;
+    text-style: italic;
+}
+
+#ai-btn-browse-session {
+    height: 1;
+    min-width: 10;
+    background: $accent-darken-2;
+    color: $text;
+    border: none;
+    padding: 0 1;
+    margin: 0;
+}
+
+#ai-btn-browse-session:hover, #ai-btn-browse-session:focus {
+    background: $accent;
+    color: $text;
+}
+
+#ai-history {
+    height: 1fr;
+    border: solid $accent-darken-3;
+    background: $panel;
+    margin: 0 0 1 0;
+    padding: 0 1;
+}
+
+#ai-status-label {
+    height: 1;
+    color: $text-muted;
+    text-style: italic;
     margin-bottom: 1;
+}
+
+#onboard-info {
+    color: $text-muted;
+    margin-bottom: 1;
+    height: auto;
+}
+
+#onboard-key-label {
+    color: $text-muted;
+    height: 1;
+    margin-top: 1;
+}
+
+#onboard-url-label {
+    color: $accent-darken-2;
+    height: 1;
+    text-style: italic;
+    margin-bottom: 1;
+}
+
+#ai-input-row {
+    height: 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+#ai-query-input {
+    width: 1fr;
+    height: 1;
+    border: none;
+    padding: 0 1;
+    background: $surface-lighten-1;
+    color: $text;
+    margin-right: 1;
+}
+
+#ai-query-input:focus {
+    background: $surface-lighten-2;
+    color: $text;
+}
+
+#ai-send-btn {
+    width: 8;
+    min-width: 8;
+    height: 1;
+    background: $accent-darken-2;
+    color: $text;
+    border: none;
+    padding: 0 1;
+    margin: 0;
+}
+
+#ai-send-btn:hover, #ai-send-btn:focus {
+    background: $accent;
+    color: $text;
 }
 
 .field-label {
@@ -402,6 +591,34 @@ class PanelLog(Log):
 
     def action_ignore_focus_key(self):
         self.app.action_ignore_focus_key()
+
+    def _render_line_strip(self, y: int, rich_style: Style) -> Strip:
+        selection = self.text_selection
+        if y in self._render_line_cache and selection is None:
+            return self._render_line_cache[y]
+
+        _line = self._process_line(self._lines[y])
+        try:
+            line_text = Text.from_markup(_line)
+        except Exception:
+            line_text = Text(_line, no_wrap=True)
+
+        line_text.stylize(rich_style)
+
+        if self.highlight:
+            line_text = self.highlighter(line_text)
+        if selection is not None:
+            if (select_span := selection.get_span(y - self._clear_y)) is not None:
+                start, end = select_span
+                if end == -1:
+                    end = len(line_text)
+                selection_style = self.screen.get_component_rich_style("screen--selection")
+                line_text.stylize(selection_style, start, end)
+
+        line = Strip(line_text.render(self.app.console), line_text.cell_len)
+        if selection is not None:
+            self._render_line_cache[y] = line
+        return line
 
 
 class FormInput(Input):
@@ -810,17 +1027,823 @@ class FileAnalysisModal(SetupModalMixin, ModalScreen):
     @on(Button.Pressed, "#cancel-btn")
     def cancel(self): self.dismiss(None)
 
+    @staticmethod
+    def _normalize_windows_path(filepath: str) -> str:
+        """
+        Detect a Windows-style path (e.g. pasted from Windows Explorer or
+        a browser) and convert it to a usable Linux path. On WSL, a
+        drive-letter path like C:\\Users\\... becomes /mnt/c/Users/....
+        Outside WSL, backslashes are just converted to forward slashes
+        as a best effort, since there's no real drive-letter mapping.
+        """
+        import re
+        if not filepath:
+            return filepath
+
+        drive_match = re.match(r"^([A-Za-z]):\\(.*)$", filepath)
+        looks_windows = drive_match is not None or ("\\" in filepath and "/" not in filepath)
+        if not looks_windows:
+            return filepath
+
+        is_wsl = False
+        try:
+            with open("/proc/version", "r") as f:
+                is_wsl = "microsoft" in f.read().lower()
+        except Exception:
+            is_wsl = False
+
+        if drive_match and is_wsl:
+            drive_letter = drive_match.group(1).lower()
+            rest = drive_match.group(2).replace("\\", "/")
+            return f"/mnt/{drive_letter}/{rest}"
+
+        return filepath.replace("\\", "/")
+
     @on(Button.Pressed, "#start-btn")
     def start(self):
         filepath = self.query_one("#filepath-input", FormInput).value.strip()
         if filepath:
+            filepath = self._normalize_windows_path(filepath)
             self.dismiss({"mode": "file", "filepath": filepath})
 
 
-# ── Detail Screen ──────────────────────────────────────────────────────────────
+# ── AI Onboarding Modal ────────────────────────────────────────────────────────
+
+_ONBOARDING_PROVIDERS = [
+    ("gemini",    "Google Gemini",  "gemini-3.8-flash",  "GEMINI_API_KEY",    "https://aistudio.google.com/app/apikey  (free tier)"),
+    ("openai",    "OpenAI",         "gpt-4o-mini",       "OPENAI_API_KEY",    "https://platform.openai.com/api-keys"),
+    ("anthropic", "Anthropic",      "claude-haiku-4-5",  "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
+    ("ollama",    "Ollama (local)", "qwen3.5:4b",        None,                "No key needed -- install from https://ollama.com"),
+]
+
+
+class AIOnboardingModal(SetupModalMixin, ModalScreen):
+    """AI setup wizard - two steps: 1) provider+key, 2) model selection."""
+    BINDINGS = [
+        Binding("escape", "dismiss", show=False),
+        Binding("up", "previous_field", show=False),
+        Binding("down", "next_field", show=False),
+        Binding("left", "previous_field", show=False),
+        Binding("right", "next_field", show=False),
+        Binding("tab", "ignore_focus_key", show=False),
+        Binding("shift+tab", "ignore_focus_key", show=False),
+    ]
+
+    def __init__(self):
+        super().__init__()
+        self._providers = [p[1] for p in _ONBOARDING_PROVIDERS]
+        self._provider_data = {p[1]: p for p in _ONBOARDING_PROVIDERS}
+        self._selected_provider = self._providers[0]
+        self._step = 1  # Start at step 1
+        self._fetched_models = []
+        # Instance attributes for dynamic step switching
+        self.FIELD_IDS = ["#onboard-provider", "#onboard-key", "#onboard-next-btn"]
+        self.BUTTON_IDS = ["#onboard-cancel-btn", "#onboard-next-btn"]
+
+    def compose(self) -> ComposeResult:
+        with Container(id="setup-dialog"):
+            yield Label("AI Assistant Setup - Step 1 of 2", id="setup-title")
+            yield Label("Provider", classes="field-label")
+            yield ChoiceField(self._providers, self._providers[0], id="onboard-provider")
+            yield Label("", id="onboard-url-hint")
+            yield Label("API Key", classes="field-label", id="onboard-key-label")
+            yield FormInput(placeholder="Paste your API key here", password=True, id="onboard-key")
+            with Horizontal(classes="dialog-actions"):
+                yield FormButton("Cancel", id="onboard-cancel-btn")
+                yield FormButton("Next →", id="onboard-next-btn", variant="primary")
+
+    def on_mount(self):
+        super().on_mount()
+        self._update_provider_ui()
+
+    def _update_provider_ui(self):
+        """Update URL hint and key field when provider changes."""
+        try:
+            provider_choice = self.query_one("#onboard-provider", ChoiceField)
+            self._selected_provider = provider_choice.value
+            provider_id, label, default_model, var_name, url = self._provider_data[self._selected_provider]
+            
+            self.query_one("#onboard-url-hint", Label).update(url)
+            key_label = self.query_one("#onboard-key-label", Label)
+            key_input = self.query_one("#onboard-key", FormInput)
+            
+            if var_name is None:
+                key_label.update("API Key (not required for Ollama)")
+                key_input.placeholder = "Not required"
+                key_input.disabled = True
+            else:
+                key_label.update(f"{label} API Key")
+                key_input.placeholder = "Paste your API key here"
+                key_input.disabled = False
+        except Exception:
+            pass
+
+    def action_confirm_field(self):
+        """Enter on provider/model opens dropdown, elsewhere moves to next field."""
+        focused = self.app.focused
+        
+        # Step 1: provider dropdown
+        try:
+            provider_choice = self.query_one("#onboard-provider", ChoiceField)
+            if focused is provider_choice:
+                def handle(value):
+                    if value:
+                        provider_choice.set_value(value)
+                        self._selected_provider = value
+                        self._update_provider_ui()
+                        self._focus_field(1)
+                    else:
+                        provider_choice.focus()
+                self.app.push_screen(
+                    ChoiceListModal("Select Provider", self._providers),
+                    handle,
+                )
+                return
+        except Exception:
+            pass
+        
+        # Step 2: model dropdown
+        try:
+            model_choice = self.query_one("#onboard-model", ChoiceField)
+            if focused is model_choice:
+                def handle(value):
+                    if value:
+                        model_choice.set_value(value)
+                        self._focus_field(1)  # Move to confirm button
+                    else:
+                        model_choice.focus()
+                self.app.push_screen(
+                    ChoiceListModal("Select Model", self._fetched_models),
+                    handle,
+                )
+                return
+        except Exception:
+            pass
+        
+        # Default: move to next field
+        self.action_next_field()
+
+    @on(Button.Pressed, "#onboard-cancel-btn")
+    def cancel(self):
+        self.dismiss(None)
+
+    @on(Button.Pressed, "#onboard-next-btn")
+    def next_step(self):
+        """Step 1 -> Step 2: fetch models and show selection screen."""
+        provider_id, label, default_model, var_name, url = self._provider_data[self._selected_provider]
+        
+        key_input = self.query_one("#onboard-key", FormInput)
+        api_key = key_input.value.strip() if not key_input.disabled else ""
+        
+        if var_name and not api_key:
+            self.notify("Please paste your API key first.", severity="warning")
+            key_input.focus()
+            return
+        
+        # Show loading state instead of dismissing
+        next_btn = self.query_one("#onboard-next-btn", FormButton)
+        next_btn.disabled = True
+        next_btn.label = "Fetching models..."
+        
+        # Disable all inputs during fetch
+        self.query_one("#onboard-provider", ChoiceField).disabled = True
+        if not key_input.disabled:
+            key_input.disabled = True
+        self.query_one("#onboard-cancel-btn", FormButton).disabled = True
+        
+        # Fetch models in background
+        import threading
+        from scrutics.ai.model_discovery import fetch_models
+        
+        def _fetch():
+            try:
+                base_url = "http://localhost:11434" if provider_id == "ollama" else ""
+                models = fetch_models(provider_id, api_key, base_url, timeout=10.0, max_results=20)
+                
+                if not models:
+                    # Fetch failed - show error and offer fallback
+                    from scrutics.ai.model_discovery import _FALLBACK_MODELS
+                    fallback = _FALLBACK_MODELS.get(provider_id, [])
+                    
+                    error_msg = f"Failed to fetch models from {label}. "
+                    if provider_id == "ollama":
+                        error_msg += "Is Ollama running?"
+                    elif not api_key:
+                        error_msg += "Check your API key."
+                    else:
+                        error_msg += "Network issue or invalid key?"
+                    
+                    self.app.call_from_thread(
+                        self.notify,
+                        error_msg,
+                        severity="error",
+                        timeout=8,
+                    )
+                    
+                    if fallback:
+                        # Offer fallback but make it clear it's a guess
+                        models = fallback
+                        self.app.call_from_thread(
+                            self.notify,
+                            f"Using fallback list ({len(fallback)} common models). Your model may not be listed.",
+                            severity="warning",
+                            timeout=8,
+                        )
+                    else:
+                        # No fallback available - use default only
+                        models = [default_model]
+                        self.app.call_from_thread(
+                            self.notify,
+                            f"No models available. Proceeding with default: {default_model}",
+                            severity="warning",
+                            timeout=8,
+                        )
+                
+                # Ensure default is in the list
+                if default_model not in models:
+                    models.insert(0, default_model)
+                    
+            except Exception as e:
+                models = [default_model]
+                self.app.call_from_thread(
+                    self.notify,
+                    f"Error during fetch: {str(e)[:80]}",
+                    severity="error",
+                    timeout=8,
+                )
+            
+            # Dismiss step 1 and open step 2 with fetched models
+            step1_data = {
+                "action": "fetch_and_select_model",
+                "provider_id": provider_id,
+                "provider_label": label,
+                "default_model": default_model,
+                "var_name": var_name,
+                "api_key": api_key,
+                "models": models,  # Pass models directly
+            }
+            self.app.call_from_thread(self.dismiss, step1_data)
+        
+        threading.Thread(target=_fetch, daemon=True).start()
+
+
+# ──AI Model Selection Modal (Step 2) ───────────────────────────────────────────
+
+class AIModelSelectionModal(SetupModalMixin, ModalScreen):
+    """Step 2 of AI setup: select model from fetched list."""
+    BINDINGS = [
+        Binding("escape", "dismiss", show=False),
+        Binding("up", "previous_field", show=False),
+        Binding("down", "next_field", show=False),
+        Binding("left", "previous_field", show=False),
+        Binding("right", "next_field", show=False),
+        Binding("tab", "ignore_focus_key", show=False),
+        Binding("shift+tab", "ignore_focus_key", show=False),
+    ]
+    
+    def __init__(self, step1_data: dict, models: list):
+        super().__init__()
+        self._step1_data = step1_data
+        self._models = models
+        self.FIELD_IDS = ["#model-choice", "#model-confirm-btn"]
+        self.BUTTON_IDS = ["#model-back-btn", "#model-confirm-btn"]
+    
+    def compose(self) -> ComposeResult:
+        with Container(id="setup-dialog"):
+            yield Label("AI Assistant Setup - Step 2 of 2", id="setup-title")
+            yield Label("Select Model", classes="field-label")
+            yield ChoiceField(self._models, self._models[0], id="model-choice")
+            yield Label(
+                "Don't see your model? Edit ~/.scrutics/ai.yaml after setup.",
+                classes="hint",
+                id="manual-model-hint"
+            )
+            with Horizontal(classes="dialog-actions"):
+                yield FormButton("← Back", id="model-back-btn")
+                yield FormButton("Set up AI", id="model-confirm-btn", variant="primary")
+    
+    def action_confirm_field(self):
+        """Enter on model opens dropdown, elsewhere moves to next field."""
+        focused = self.app.focused
+        try:
+            model_choice = self.query_one("#model-choice", ChoiceField)
+            if focused is model_choice:
+                def handle(value):
+                    if value:
+                        model_choice.set_value(value)
+                        self.query_one("#model-confirm-btn").focus()
+                    else:
+                        model_choice.focus()
+                self.app.push_screen(
+                    ChoiceListModal("Select Model", self._models),
+                    handle,
+                )
+                return
+        except Exception:
+            pass
+        self.action_next_field()
+    
+    @on(Button.Pressed, "#model-back-btn")
+    def back(self):
+        """Go back to step 1."""
+        self.dismiss({"action": "back_to_step1"})
+    
+    @on(Button.Pressed, "#model-confirm-btn")
+    def confirm(self):
+        """Final step: save config and dismiss."""
+        import re as _re
+        
+        model = self.query_one("#model-choice", ChoiceField).value
+        provider_id = self._step1_data["provider_id"]
+        var_name = self._step1_data["var_name"]
+        api_key = self._step1_data["api_key"]
+        
+        # Save key to ~/.bashrc and environment
+        if var_name and api_key:
+            bashrc = os.path.join(os.path.expanduser("~"), ".bashrc")
+            try:
+                content = open(bashrc, encoding="utf-8").read() if os.path.exists(bashrc) else ""
+                content = _re.sub(rf"^export {var_name}=.*\n?", "", content, flags=_re.MULTILINE)
+                with open(bashrc, "a", encoding="utf-8") as f:
+                    if content and not content.endswith("\n"):
+                        f.write("\n")
+                    f.write(f'export {var_name}="{api_key}"\n')
+                os.environ[var_name] = api_key
+            except Exception:
+                pass
+        
+        # Write ~/.scrutics/ai.yaml
+        try:
+            user_dir = os.path.join(os.path.expanduser("~"), ".scrutics")
+            os.makedirs(user_dir, exist_ok=True)
+            yaml_path = os.path.join(user_dir, "ai.yaml")
+            timeout = 180 if provider_id == "ollama" else 60
+            lines = [
+                "# Scrutics AI Configuration\n",
+                "# Configured via TUI onboarding.\n",
+                "enabled: true\n",
+                f"provider: {provider_id}\n",
+                f"model: {model}\n",
+            ]
+            if var_name:
+                lines.append(f"api_key: ${{{var_name}}}\n")
+            lines += ["temperature: 0.3\n", "max_tokens: 1024\n", f"timeout: {timeout}\n"]
+            if provider_id == "ollama":
+                lines += ["base_url: http://localhost:11434\n", "reasoning_effort: low\n"]
+            with open(yaml_path, "w", encoding="utf-8") as f:
+                f.writelines(lines)
+            self.notify(f"✓ AI configured: {provider_id} / {model}", severity="information")
+        except Exception as e:
+            self.notify(f"Failed to save config: {e}", severity="error")
+        
+        cfg = {
+            "enabled": True,
+            "provider": provider_id,
+            "model": model,
+            "temperature": 0.3,
+            "max_tokens": 1024,
+            "timeout": timeout,
+        }
+        if var_name:
+            cfg["api_key"] = f"${{{var_name}}}"
+        self.dismiss(cfg)
+
+
+# ── AI Assistant Modal ─────────────────────────────────────────────────────────
+
+class AIAssistantModal(SetupModalMixin, ModalScreen):
+    """Interactive AI Assistant modal panel backed by Scrutics agentic loop."""
+
+    # All four arrow keys cycle through the main interactive elements
+    FIELD_IDS = [
+        "#ai-query-input",
+        "#ai-send-btn",
+        "#ai-btn-browse-session",
+        "#ai-close-btn",
+    ]
+    BUTTON_IDS = ["#ai-close-btn", "#ai-btn-browse-session", "#ai-send-btn"]
+
+    BINDINGS = [
+        Binding("escape",     "dismiss",        "Close", show=False),
+        Binding("r",          "reconfigure",    "Reconfigure", show=False, priority=True),
+        Binding("d",          "disable_ai",     "Disable AI",  show=False, priority=True),
+        Binding("up",         "previous_field", show=False),
+        Binding("down",       "next_field",     show=False),
+        Binding("left",       "previous_field", show=False),
+        Binding("right",      "next_field",     show=False),
+        Binding("tab",        "ignore_focus_key", show=False),
+        Binding("shift+tab",  "ignore_focus_key", show=False),
+    ]
+
+    _THINKING_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+    def __init__(self, session_dir: str | None, is_live_active: bool = False):
+        super().__init__()
+        self._session_dir = session_dir
+        self._is_live_active = is_live_active
+        self._conversation_history: list[tuple[str, str]] = []
+        self._is_processing = False
+        self._anim_timer = None
+        self._anim_frame_idx = 0
+        self._thinking_text = "Thinking..."
+
+    def _auto_detect_session(self) -> str | None:
+        """Return the most recent valid session directory, or None if none exist."""
+        base = _resolve_output_base()
+        if not os.path.exists(base):
+            return None
+        candidates = sorted(
+            [os.path.join(base, d) for d in os.listdir(base)
+             if d.startswith("scrutics_") and os.path.isdir(os.path.join(base, d))],
+            reverse=True,
+        )
+        for path in candidates:
+            if os.path.exists(os.path.join(path, "manifest.json")):
+                return path
+        # Fallback: any scrutics_ dir even without manifest
+        return candidates[0] if candidates else None
+
+    def _get_session_display_name(self) -> str:
+        if self._session_dir:
+            name = os.path.basename(os.path.normpath(self._session_dir))
+            tag = " [Live Capture]" if self._is_live_active else ""
+            return f"Session: {name}{tag}"
+        return "Session: None (Capture not started)"
+
+    def compose(self) -> ComposeResult:
+        with Container(id="ai-dialog"):
+            with Horizontal(id="ai-header-bar"):
+                yield Label("✦ Scrutics AI Assistant", id="setup-title")
+                yield Label(self._get_session_display_name(), id="ai-session-badge")
+                yield FormButton("Switch Session", id="ai-btn-browse-session")
+
+            with Horizontal(id="ai-subheader-bar"):
+                yield FormButton("Reconfigure (R)", id="ai-btn-reconfigure")
+                yield FormButton("Disable AI (D)", id="ai-btn-disable")
+                yield FormButton("Reset Config", id="ai-btn-reset")
+
+            if self._is_live_active:
+                freshness_msg = (
+                    f"Data as of last checkpoint (≤{int(SESSION_FLUSH_INTERVAL)}s old during live capture)"
+                )
+            else:
+                freshness_msg = "Completed session evidence package"
+
+            yield Label(freshness_msg, id="ai-status-label")
+
+            yield PanelLog(id="ai-history", auto_scroll=True, max_lines=1000)
+
+            with Horizontal(id="ai-input-row"):
+                yield FormInput(placeholder="Ask a question about the network...", id="ai-query-input")
+                yield FormButton("Send", id="ai-send-btn", variant="primary")
+
+            with Horizontal(classes="dialog-actions"):
+                yield FormButton("Close (Esc)", id="ai-close-btn")
+
+    def on_mount(self):
+        super().on_mount()
+        history = self.query_one("#ai-history", PanelLog)
+
+        # Auto-detect a session if none was passed in
+        if not self._session_dir:
+            self._session_dir = self._auto_detect_session()
+            self._is_live_active = False
+            self.query_one("#ai-session-badge", Label).update(self._get_session_display_name())
+
+        history.write_line("[bold green]Scrutics AI Assistant[/bold green] ready.")
+        history.write_line("Ask questions about discovered assets, protocols, connections, and security anomalies.\n")
+
+        if not self._session_dir:
+            history.write_line("[yellow]No session loaded.[/yellow] Run a capture first, then re-open the assistant.")
+            history.write_line("  e.g.  [bold]sudo scrutics --live <interface> --duration 60 --headless[/bold]\n")
+
+        # Check AI config immediately
+        from scrutics.ai.config import load_ai_config
+        cfg = load_ai_config()
+        if not cfg or cfg.get("enabled") is False:
+            history.write_line("[bold red][!] AI features are currently disabled.[/bold red]")
+            history.write_line("    Enable them by setting 'enabled: true' in ~/.scrutics/ai.yaml,")
+            history.write_line("    or provide --provider in CLI.")
+            self.query_one("#ai-query-input", FormInput).disabled = True
+            self.query_one("#ai-send-btn", FormButton).disabled = True
+
+    def action_confirm_field(self):
+        focused = self.app.focused
+        if focused is self.query_one("#ai-query-input"):
+            self.action_submit_query()
+        else:
+            super().action_confirm_field()
+
+    @on(Button.Pressed, "#ai-close-btn")
+    def action_close(self):
+        self._stop_thinking_anim()
+        self.dismiss()
+
+    @on(Button.Pressed, "#ai-btn-reconfigure")
+    def action_reconfigure(self):
+        """Re-run onboarding to change provider or model without closing the assistant."""
+        def _after_step1(result):
+            if not result:
+                return  # User cancelled
+            
+            if result.get("action") == "fetch_and_select_model":
+                # Models already fetched in step 1 - show step 2 immediately
+                models = result.get("models", [result["default_model"]])
+                
+                def _after_step2(step2_result):
+                    if not step2_result:
+                        # User clicked back - reopen step 1
+                        self.app.push_screen(AIOnboardingModal(), _after_step1)
+                        return
+                    
+                    if step2_result.get("action") == "back_to_step1":
+                        # Back button - reopen step 1
+                        self.app.push_screen(AIOnboardingModal(), _after_step1)
+                    elif step2_result.get("action") == "complete":
+                        # Reconfiguration complete
+                        self.notify("AI reconfigured. New settings apply from the next message.", severity="information")
+                
+                self.app.push_screen(AIModelSelectionModal(result, models), _after_step2)
+        
+        self.app.push_screen(AIOnboardingModal(), _after_step1)
+
+    @on(Button.Pressed, "#ai-btn-disable")
+    def action_disable_ai(self):
+        """Disable AI by setting enabled: false in ai.yaml."""
+        yaml_path = os.path.join(os.path.expanduser("~"), ".scrutics", "ai.yaml")
+        if not os.path.exists(yaml_path):
+            self.notify("AI config not found. Nothing to disable.", severity="warning")
+            return
+        
+        try:
+            import re
+            content = open(yaml_path, encoding="utf-8").read()
+            content = re.sub(r"^enabled:\s*true", "enabled: false", content, flags=re.MULTILINE)
+            with open(yaml_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            self.notify("✓ AI assistant disabled. Delete ai.yaml or run setup again to re-enable.", severity="information")
+            self.dismiss()
+        except Exception as e:
+            self.notify(f"Failed to disable AI: {e}", severity="error")
+    
+    @on(Button.Pressed, "#ai-btn-reset")
+    def action_reset_config(self):
+        """Delete ai.yaml and close the assistant."""
+        yaml_path = os.path.join(os.path.expanduser("~"), ".scrutics", "ai.yaml")
+        if not os.path.exists(yaml_path):
+            self.notify("AI config not found. Nothing to reset.", severity="warning")
+            return
+        
+        try:
+            os.remove(yaml_path)
+            self.notify("✓ AI config reset. Run setup again to configure.", severity="information")
+            self.dismiss()
+        except Exception as e:
+            self.notify(f"Failed to reset config: {e}", severity="error")
+
+    @on(Button.Pressed, "#ai-btn-browse-session")
+    def action_browse_session(self):
+        """Open ChoiceListModal to select an existing session or paste a path."""
+        base = _resolve_output_base()
+        saved_sessions = []
+        if os.path.exists(base):
+            for d in sorted(os.listdir(base), reverse=True):
+                full_p = os.path.join(base, d)
+                if os.path.isdir(full_p) and d.startswith("scrutics_") and os.path.exists(full_p):
+                    saved_sessions.append(d)
+
+        options = []
+        app_sess_name = None
+        if self.app and getattr(self.app, "_session_dir", None) and os.path.exists(self.app._session_dir):
+            app_sess_name = os.path.basename(self.app._session_dir)
+            is_live = self.app._capture_running.is_set()
+            label = (
+                f"★ Live: {app_sess_name}"
+                if is_live
+                else f"★ Loaded: {app_sess_name}"
+            )
+            options.append(label)
+
+        for name in saved_sessions:
+            if name != app_sess_name:
+                # Mark the currently selected session in the modal
+                prefix = "→ " if (self._session_dir and os.path.basename(self._session_dir) == name) else "   "
+                options.append(f"{prefix}{name}")
+
+        options.append("   Enter custom path...")
+
+        def _on_session_chosen(choice: str | None):
+            if not choice:
+                return
+            choice = choice.strip()
+            if choice.startswith("★"):
+                # App's own session
+                self._session_dir = self.app._session_dir
+                self._is_live_active = self.app._capture_running.is_set()
+                self._update_session_display()
+            elif choice == "Enter custom path...":
+                self._prompt_custom_session_path()
+            else:
+                # Strip any prefix markers
+                name = choice.lstrip("→ ").strip()
+                chosen_dir = os.path.join(base, name)
+                if not os.path.isdir(chosen_dir):
+                    self.notify(f"Session directory not found: {name}", severity="error")
+                    return
+                self._session_dir = chosen_dir
+                self._is_live_active = False
+                self._update_session_display()
+
+        self.app.push_screen(ChoiceListModal("Select Evidence Session", options), _on_session_chosen)
+
+    def _prompt_custom_session_path(self):
+        class PathInputModal(SetupModalMixin, ModalScreen):
+            FIELD_IDS = ["#custom-path-input"]
+            BUTTON_IDS = ["#path-cancel-btn", "#path-ok-btn"]
+            BINDINGS = [Binding("escape", "dismiss", show=False)]
+
+            def compose(self) -> ComposeResult:
+                with Container(id="setup-dialog"):
+                    yield Label("Enter Session Directory Path", id="setup-title")
+                    yield FormInput(placeholder="/path/to/scrutics_YYYYMMDD_HHMMSS", id="custom-path-input")
+                    with Horizontal(classes="dialog-actions"):
+                        yield FormButton("Cancel", id="path-cancel-btn")
+                        yield FormButton("Load", id="path-ok-btn", variant="primary")
+
+            def action_confirm_field(self):
+                self.action_ok()
+
+            @on(Button.Pressed, "#path-cancel-btn")
+            def action_cancel(self):
+                self.dismiss(None)
+
+            @on(Button.Pressed, "#path-ok-btn")
+            def action_ok(self):
+                val = self.query_one("#custom-path-input", FormInput).value.strip()
+                from scrutics.ui.tui import FileAnalysisModal
+                val = FileAnalysisModal._normalize_windows_path(val)
+                self.dismiss(val if val else None)
+
+        def _handle_path(path: str | None):
+            if path:
+                if not os.path.exists(path):
+                    self.notify(f"Directory not found: {path}", severity="error")
+                    return
+                self._session_dir = path
+                self._is_live_active = False
+                self._update_session_display()
+
+        self.app.push_screen(PathInputModal(), _handle_path)
+
+    def _update_session_display(self):
+        try:
+            self.query_one("#ai-session-badge", Label).update(self._get_session_display_name())
+            if self._is_live_active:
+                freshness_msg = (
+                    f"Data as of last checkpoint (≤{int(SESSION_FLUSH_INTERVAL)}s old during live capture)"
+                )
+            elif self._session_dir:
+                freshness_msg = "Completed session evidence package"
+            else:
+                freshness_msg = "No session selected"
+            self.query_one("#ai-status-label", Label).update(freshness_msg)
+        except Exception:
+            pass
+
+    def _start_thinking_anim(self, initial_text: str = "Thinking..."):
+        self._thinking_text = initial_text
+        self._anim_frame_idx = 0
+        if self._anim_timer is None:
+            self._anim_timer = self.set_interval(0.12, self._tick_thinking_anim)
+
+    def _tick_thinking_anim(self):
+        if not self._is_processing:
+            self._stop_thinking_anim()
+            return
+        frame = self._THINKING_FRAMES[self._anim_frame_idx % len(self._THINKING_FRAMES)]
+        self._anim_frame_idx += 1
+        try:
+            self.query_one("#ai-status-label", Label).update(f"{frame} {self._thinking_text}")
+        except Exception:
+            pass
+
+    def _stop_thinking_anim(self):
+        if self._anim_timer is not None:
+            try:
+                self._anim_timer.stop()
+            except Exception:
+                pass
+            self._anim_timer = None
+
+    @on(Button.Pressed, "#ai-send-btn")
+    def action_submit_query(self):
+        if self._is_processing:
+            return
+
+        query_input = self.query_one("#ai-query-input", FormInput)
+        query = query_input.value.strip()
+        if not query:
+            return
+
+        query_input.value = ""
+        self._last_submitted_query = query
+        history = self.query_one("#ai-history", PanelLog)
+        history.write_line(f"[bold cyan]You:[/bold cyan] {query}")
+
+        if self._is_live_active:
+            history.write_line(
+                f"[italic dim white](Note: live session results reflect data up to the last 15s checkpoint)[/italic dim white]"
+            )
+
+        self._is_processing = True
+        self.query_one("#ai-send-btn", FormButton).disabled = True
+        self._start_thinking_anim("Thinking...")
+
+        self._run_query_worker(query)
+
+    @work(thread=True)
+    def _run_query_worker(self, query: str) -> None:
+        from scrutics.ai.config import load_ai_config, build_provider
+        from scrutics.ai.tools import SessionContext
+        from scrutics.ai.agent import run_agent_loop
+        from scrutics.ai.provider import LLMProviderError
+
+        cfg = load_ai_config()
+        if not cfg or cfg.get("enabled") is False:
+            self.app.call_from_thread(self._on_query_complete, None, "AI features are disabled.")
+            return
+
+        if not self._session_dir or not os.path.exists(self._session_dir):
+            self.app.call_from_thread(
+                self._on_query_complete,
+                None,
+                "No active session directory found. Start a capture first or wait for the first checkpoint."
+            )
+            return
+
+        try:
+            provider = build_provider(cfg)
+            ctx = SessionContext(self._session_dir)
+
+            if self._conversation_history:
+                prior = "\n".join(
+                    f"User: {q}\nAssistant: {a}"
+                    for q, a in self._conversation_history
+                )
+                full_question = (
+                    f"[Previous conversation]\n{prior}\n\n"
+                    f"[New question]\n{query}"
+                )
+            else:
+                full_question = query
+
+            def status_cb(msg: str):
+                self.app.call_from_thread(self._update_worker_status, msg)
+
+            answer = run_agent_loop(
+                provider=provider,
+                ctx=ctx,
+                user_message=full_question,
+                status_callback=status_cb,
+            )
+            self.app.call_from_thread(self._on_query_complete, answer, None)
+
+        except LLMProviderError as e:
+            self.app.call_from_thread(self._on_query_complete, None, f"LLM error: {e}")
+        except FileNotFoundError as e:
+            self.app.call_from_thread(self._on_query_complete, None, f"Session error: {e}")
+        except Exception as e:
+            self.app.call_from_thread(self._on_query_complete, None, f"Error: {e}")
+
+    def _update_worker_status(self, msg: str):
+        self._thinking_text = msg
+
+    def _on_query_complete(self, answer: str | None, error: str | None):
+        self._is_processing = False
+        self._stop_thinking_anim()
+        try:
+            self.query_one("#ai-send-btn", FormButton).disabled = False
+            self.query_one("#ai-query-input", FormInput).focus()
+            status_label = self.query_one("#ai-status-label", Label)
+            if self._is_live_active:
+                status_label.update(
+                    f"Data as of last checkpoint (≤{int(SESSION_FLUSH_INTERVAL)}s old during live capture)"
+                )
+            else:
+                status_label.update("Completed session evidence package")
+
+            history = self.query_one("#ai-history", PanelLog)
+            if error:
+                history.write_line(f"[bold red]{error}[/bold red]\n")
+            elif answer:
+                history.write_line(f"[bold green]Assistant:[/bold green] {answer}\n")
+                last_q = getattr(self, "_last_submitted_query", None)
+                self._conversation_history.append((last_q or "query", answer))
+        except Exception:
+            pass
 
 class DetailScreen(ModalScreen):
-    """Full-page asset detail view — does NOT pause capture."""
+    """Full-page asset detail view -- does NOT pause capture."""
     BINDINGS = [
         Binding("escape", "close", "Close", show=False),
         Binding("q", "close", show=False),
@@ -853,6 +1876,12 @@ class DetailScreen(ModalScreen):
             lines.append(f"MAC: {asset.mac}    Vendor: {asset.vendor}")
             lines.append("")
 
+            # Liveness status (Tier 1)
+            is_offline = asset.is_stale(timeout=30.0)
+            status_text = "[bold red]OFFLINE[/bold red] (No traffic seen in >30s)" if is_offline else "[bold green]ONLINE[/bold green] (Active)"
+            lines.append(f"Status: {status_text}    Last Seen: {asset.last_seen or 'Never'}")
+            lines.append("")
+
             class_color = "green" if asset.classification_type == "OT" else "yellow" if asset.classification_type == "IT" else "cyan"
             lines.append(f"[bold]Classification:[/bold] [{class_color}]{asset.classification_type}[/{class_color}]")
             lines.append(f"Domain: {asset.domain}")
@@ -879,12 +1908,17 @@ class DetailScreen(ModalScreen):
 
             if self._engine and self._engine.topology_edges:
                 related = []
+                pk = asset.primary_key
                 for (src, dst), info in self._engine.topology_edges.items():
-                    if src == asset.ip or dst == asset.ip:
-                        peer = dst if src == asset.ip else src
+                    if src == pk or dst == pk:
+                        # Display peer IP from edge metadata for readability
+                        if src == pk:
+                            peer_display = info.get("destination_ip", dst)
+                        else:
+                            peer_display = info.get("source_ip", src)
                         count = info.get("count", 0)
                         proto = ", ".join(info.get("protocols", [])) or "unknown"
-                        related.append(f"{peer} ({proto}) {count} packets")
+                        related.append(f"{peer_display} ({proto}) {count} packets")
                 if related:
                     lines.append("[bold]Connections:[/bold]")
                     for rel in related[:10]:
@@ -936,11 +1970,16 @@ class DetailScreen(ModalScreen):
         }
         # Add connections if engine available
         if self._engine and self._engine.topology_edges:
+            pk = asset.primary_key
             for (src, dst), info in self._engine.topology_edges.items():
-                if src == asset.ip or dst == asset.ip:
-                    peer = dst if src == asset.ip else src
+                if src == pk or dst == pk:
+                    # Export peer IP from edge metadata for readability
+                    if src == pk:
+                        peer_display = info.get("destination_ip", dst)
+                    else:
+                        peer_display = info.get("source_ip", src)
                     export_data["connections"].append({
-                        "peer": peer,
+                        "peer": peer_display,
                         "count": info.get("count", 0),
                         "protocols": list(info.get("protocols", [])),
                         "first_seen": info.get("first_seen"),
@@ -961,6 +2000,21 @@ class DetailScreen(ModalScreen):
         self.export_asset()
 
 
+def _resolve_output_base() -> str:
+    """Resolve the output directory to an absolute path."""
+    env_val = os.environ.get("SCRUTICS_AUTO_OUTPUT")
+    # Project root is two levels up from scrutics/ui/tui.py
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if env_val:
+        if os.path.isabs(env_val):
+            return env_val
+        return os.path.join(project_root, env_val)
+    return os.path.join(project_root, "output")
+
+
+_resolve_output_base_static = _resolve_output_base
+
+
 # ── Main Application ───────────────────────────────────────────────────────────
 
 class ScruticsApp(App):
@@ -974,6 +2028,7 @@ class ScruticsApp(App):
         Binding("3",          "toggle_panels",   "3:Panels",         show=False),
         Binding("r",          "reload_rules",    "R:Reload Rules",   show=False),
         Binding("p",          "pause_resume",    "P:Pause/Resume",   show=False),
+        Binding("a",          "ai_assistant",    "A:AI Assistant",   show=False),
         Binding("q",          "quit",            "Q:Quit",           show=False),
         Binding("left",       "previous_panel",  show=False),
         Binding("right",      "next_panel",      show=False),
@@ -995,6 +2050,7 @@ class ScruticsApp(App):
         self._paused = False
         self._session_dir: str | None = None
         self._capture_start: float | None = None
+        self._capture_started: str | None = None
         self._last_anomaly_count = 0
         self._active_panel = "assets"
         self._content_mode = False
@@ -1002,6 +2058,7 @@ class ScruticsApp(App):
         self._status_override_until = 0.0
         self._status_generation = 0
         self._checkpoint_lock = threading.Lock()
+        self._is_loaded_session = False
 
     def action_view_detail(self):
         """Open detail screen for selected asset."""
@@ -1058,7 +2115,9 @@ class ScruticsApp(App):
             yield Label(" Anomaly Feed", id="anomaly-title", classes="panel-title")
             yield PanelLog(id="anomaly-log", auto_scroll=True, max_lines=200)
 
-        yield Static("", id="status-bar")
+        with Horizontal(id="status-container"):
+            yield Static("", id="status-bar")
+            yield Button("✦ AI Assistant (A)", id="btn-ai-assistant", variant="default")
 
     def on_mount(self):
         table = self.query_one("#asset-table", DataTable)
@@ -1113,12 +2172,54 @@ class ScruticsApp(App):
         event.stop()
         self.exit()
 
+    @on(Button.Pressed, "#btn-ai-assistant")
+    def btn_ai_assistant(self, event: Button.Pressed):
+        event.stop()
+        self.action_ai_assistant()
+
+    def action_ai_assistant(self):
+        """Open the AI assistant, running first-time onboarding if not yet configured."""
+        from scrutics.ai.config import load_ai_config
+        cfg = load_ai_config()
+        is_configured = bool(cfg and cfg.get("enabled") and cfg.get("provider"))
+
+        if not is_configured:
+            def _after_step1(result):
+                if not result:
+                    return  # User cancelled
+                
+                if result.get("action") == "fetch_and_select_model":
+                    # Models already fetched in step 1 - show step 2 immediately
+                    models = result.get("models", [result["default_model"]])
+                    
+                    def _after_step2(step2_result):
+                        if not step2_result:
+                            # User clicked back - reopen step 1
+                            self.push_screen(AIOnboardingModal(), _after_step1)
+                            return
+                        
+                        if step2_result.get("action") == "back_to_step1":
+                            # Back button - reopen step 1
+                            self.push_screen(AIOnboardingModal(), _after_step1)
+                        elif step2_result.get("action") == "complete":
+                            # Setup complete - open assistant
+                            is_live = self._capture_running.is_set()
+                            self.push_screen(
+                                AIAssistantModal(session_dir=self._session_dir, is_live_active=is_live)
+                            )
+                    
+                    self.push_screen(AIModelSelectionModal(result, models), _after_step2)
+            
+            self.push_screen(AIOnboardingModal(), _after_step1)
+        else:
+            is_live = self._capture_running.is_set()
+            self.push_screen(AIAssistantModal(session_dir=self._session_dir, is_live_active=is_live))
+
     # ── Dropdown menus ────────────────────────────────────────────────────────
 
     def action_start_analysis(self):
         if self._capture_running.is_set():
-            self.notify("Capture already running. Stop it first.", severity="warning")
-            self._focus_active_panel()
+            self.action_stop_analysis()
             return
         items = [
             ("  Live Traffic Capture",  "opt-live"),
@@ -1134,6 +2235,14 @@ class ScruticsApp(App):
             else:
                 self._focus_active_panel()
         self.push_screen(DropdownModal(items), handle)
+
+    def action_stop_analysis(self):
+        """Stop active capture analysis and save results."""
+        if not self._capture_running.is_set():
+            return
+        self._set_status("Stopping analysis...", "bold yellow")
+        if self.engine:
+            self.engine.request_stop()
 
     def action_file_options(self):
         items = [
@@ -1450,6 +2559,9 @@ class ScruticsApp(App):
         mode = config.get("mode")
 
         if mode == "live":
+            btn_start = self.query_one("#btn-start", Button)
+            btn_start.label = "Stop Analysis (1)"
+            btn_start.add_class("running")
             self._start_session(baseline_window=config["baseline"])
             dur = config["duration"]
             dur_str = "infinite (stop with Q)" if dur == 0 else f"{dur}s"
@@ -1479,6 +2591,9 @@ class ScruticsApp(App):
             if not os.path.exists(filepath):
                 self.notify(f"File not found: {filepath}", severity="error")
                 return
+            btn_start = self.query_one("#btn-start", Button)
+            btn_start.label = "Stop Analysis (1)"
+            btn_start.add_class("running")
             self._start_session()
             self._set_status(f"Analyzing: {os.path.basename(filepath)}")
             self._capture_start = time.time()
@@ -1496,21 +2611,32 @@ class ScruticsApp(App):
             self._capture_running.set()
 
     def _on_capture_done(self):
+        btn_start = self.query_one("#btn-start", Button)
+        btn_start.label = "Start Analysis (1)"
+        btn_start.remove_class("running")
         self._export_session()
-        anomaly_count = len(self.engine.baseline.get_anomalies()) if self.engine else 0
-        self._set_status(
-            f"Complete  |  {self.inventory.count()} assets  |  "
-            f"{anomaly_count} anomalies  |  session: {self._session_dir}"
-        )
+        self._set_status(f"Session terminated and saved as {self._session_dir}")
+        self.notify(f"Session saved to {self._session_dir}", severity="information")
         self.query_one("#btn-pause", Button).label = "Pause =P"
         self._paused = False
 
     # ── Session ───────────────────────────────────────────────────────────────
 
+    def _resolve_output_base(self) -> str:
+        """Resolve the output directory to an absolute path."""
+        return _resolve_output_base()
+
     def _start_session(self, baseline_window: int = 60):
-        base = os.environ.get("SCRUTICS_AUTO_OUTPUT", "output")
+        base = self._resolve_output_base()
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self._session_dir = os.path.join(base, f"scrutics_{ts}")
+        candidate = os.path.join(base, f"scrutics_{ts}")
+        counter = 1
+        while os.path.exists(candidate):
+            candidate = os.path.join(base, f"scrutics_{ts}_{counter}")
+            counter += 1
+        self._session_dir = candidate
+        self._is_loaded_session = False
+        self._capture_started = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         os.makedirs(self._session_dir, exist_ok=True)
 
         self.inventory = AssetInventory()
@@ -1541,10 +2667,16 @@ class ScruticsApp(App):
         self._content_mode = False
         self._sync_panel_layout()
 
+        # Start capture
+        self._capture_running.set()
+
         # Start periodic checkpointing (every 15 seconds)
         self.set_interval(SESSION_FLUSH_INTERVAL, self._checkpoint_session)
 
     def _save_session(self):
+        if getattr(self, "_is_loaded_session", False):
+            self.notify("Loaded session is read-only. Start a new analysis to capture new data.", severity="warning")
+            return
         if self.inventory and self.inventory.count() > 0 and self._session_dir:
             self._export_session()
             self.notify(f"Session saved to {self._session_dir}", severity="information")
@@ -1569,11 +2701,23 @@ class ScruticsApp(App):
                 json.dump(evidence_data, f, indent=2)
 
         if self.engine:
-            from scrutics.topology import export_topology
+            from scrutics.topology import export_topology, write_manifest
             export_topology(self.inventory, self.engine.topology_edges, self._session_dir)
+            write_manifest(self._session_dir, metadata={
+                "inventory": self.inventory,
+                "edges": self.engine.topology_edges,
+                "engine": self.engine,
+                "capture_started": getattr(self, "_capture_started", None),
+            })
+        else:
+            from scrutics.topology import write_manifest
+            write_manifest(self._session_dir, metadata={
+                "inventory": self.inventory,
+                "capture_started": getattr(self, "_capture_started", None),
+            })
 
     def _checkpoint_session(self):
-        """Periodic checkpoint – writes all session data + topology."""
+        """Periodic checkpoint - writes all session data + topology."""
         if not self._capture_running.is_set():
             return
         if not self._session_dir or not self.inventory:
@@ -1593,14 +2737,10 @@ class ScruticsApp(App):
                     with open(evidence_path, "w", encoding="utf-8") as f:
                         json.dump(evidence_data, f, indent=2)
 
-                # Events & anomalies (if engine exists)
+                # Events are written continuously by RollingWriter during capture --
+                # do NOT overwrite events.csv here or drained events will be lost.
+                # Only checkpoint anomalies (held in BaselineEngine, not the draining deque).
                 if self.engine:
-                    events_path = os.path.join(self._session_dir, "events.csv")
-                    with open(events_path, "w", newline="", encoding="utf-8") as f:
-                        writer = csv.writer(f)
-                        writer.writerow(["timestamp", "message", "type"])
-                        for ts, msg, typ in self.engine.event_log:
-                            writer.writerow([ts, msg, typ])
 
                     anomalies_path = os.path.join(self._session_dir, "anomalies.csv")
                     with open(anomalies_path, "w", newline="", encoding="utf-8") as f:
@@ -1616,8 +2756,16 @@ class ScruticsApp(App):
                             ])
 
                 # 2. Now call export_topology for topology.json, topology.html, connections.csv
-                from scrutics.topology import export_topology
+                from scrutics.topology import export_topology, write_manifest
                 export_topology(self.inventory, self.engine.topology_edges if self.engine else None, self._session_dir)
+
+                # 3. Write manifest
+                write_manifest(self._session_dir, metadata={
+                    "inventory": self.inventory,
+                    "edges": self.engine.topology_edges if self.engine else None,
+                    "engine": self.engine,
+                    "capture_started": getattr(self, "_capture_started", None),
+                })
 
             except Exception:
                 # Silently ignore to avoid disrupting the UI
@@ -1700,7 +2848,7 @@ class ScruticsApp(App):
                 ip     = anomaly.get("ip", "?")
                 atype  = anomaly.get("type", "?")
                 detail = anomaly.get("detail", "")
-                alog.write_line(f"{ts}  [{sev}]  {ip}  {atype} — {detail}")
+                alog.write_line(f"{ts}  [{sev}]  {ip}  {atype} -- {detail}")
             self._last_anomaly_count = new_count
 
     def on_exit(self):
@@ -1712,7 +2860,7 @@ class ScruticsApp(App):
     # ── Load last session ─────────────────────────────────────────────────────
 
     def _load_last_results(self):
-        base = os.environ.get("SCRUTICS_AUTO_OUTPUT", "output")
+        base = _resolve_output_base()
         sessions = sorted(
             [os.path.join(base, d) for d in os.listdir(base)
              if os.path.isdir(os.path.join(base, d)) and d.startswith("scrutics_")]
@@ -1725,6 +2873,7 @@ class ScruticsApp(App):
 
         session = sessions[0]
         self._session_dir = session
+        self._is_loaded_session = True
 
         table = self.query_one("#asset-table", DataTable)
         table.clear()
@@ -1740,6 +2889,7 @@ class ScruticsApp(App):
                         ip=row.get("ip", ""),
                         mac=row.get("mac", ""),
                         vendor=row.get("vendor", "Unknown"),
+                        vendor_class=row.get("vendor_class", "UNKNOWN"),
                         is_ot_vendor=row.get("is_ot_vendor", "False").lower() == "true",
                         protocols=row.get("protocol", "").split(", ") if row.get("protocol") else [],
                         ports_seen=set(),
@@ -1767,6 +2917,9 @@ class ScruticsApp(App):
                         dns_names=[],
                     )
                     self.inventory._assets[asset.ip] = asset
+                    norm_mac = self.inventory._normalize_mac(asset.mac)
+                    if norm_mac:
+                        self.inventory._by_mac[norm_mac] = asset
 
             # Load evidence from JSON if present
             evidence_path = os.path.join(session, "evidence.json")
@@ -1787,7 +2940,7 @@ class ScruticsApp(App):
                             )
                             asset.evidence.append(ev)
 
-            # Populate table — exactly 9 cells
+            # Populate table -- exactly 9 cells
             for asset in sorted(self.inventory.get_all(), key=lambda x: x.ip):
                 table.add_row(
                     asset.ip,

@@ -34,6 +34,10 @@ Passive operation is enforced at runtime by patching Scapy’s transmit function
 - **SIEM forwarding** : syslog (JSON, CEF, LEEF, plain) and Splunk HEC
 - **Zeek & Suricata log ingestion** : discover assets from existing Zeek and Suricata logs
 - **Crash-safe checkpointing** : session data checkpointed every 15 seconds using atomic file replacement
+- **AI assistant** : ask questions about captured sessions using natural language. Supports Gemini, OpenAI, Anthropic, and Ollama (local/offline)
+- **MAC-based asset identity** : persistent device tracking by MAC address with IP history
+- **Passive DHCP enrichment** : extracts hostname and vendor class from observed DHCPv4 traffic
+- **OUI database management** : `scrutics oui status|update|import` with air-gapped workflow support
 
 ---
 
@@ -123,6 +127,24 @@ The HTML topology includes an **Export to .xlsx** button that downloads a spread
 The export is 100% client-side : no data is sent to any server. The SheetJS library is bundled locally so no internet connection is required.
 
 > **Note:** Very large graphs may become slower to render.
+
+---
+
+## AI assistant
+
+Scrutics includes an optional AI assistant that can answer questions about captured sessions using natural language.
+
+**CLI**
+
+```bash
+python3 -m scrutics ask --session output/scrutics_20260914_120000
+```
+
+**TUI** : press the AI Assistant button in the toolbar.
+
+**Supported providers** : Ollama (local, offline), Google Gemini, OpenAI, Anthropic. Configure via `scrutics/config/ai.yaml` or the built-in onboarding prompts.
+
+The AI assistant only reads session data — it never modifies assets, injects packets, or writes to the network.
 
 ---
 
@@ -228,6 +250,11 @@ sudo python3 -m scrutics --live <interface> --duration 0 --headless
 | `--headless`         | off        | Run without the TUI                              |
 | `--no-baseline`      | off        | Skip anomaly detection : inventory only          |
 | `doctor`             | :          | Print diagnostic information                     |
+| `ask`                | :          | Interactive AI assistant (alias: `ai`)           |
+| `oui status`         | :          | Show OUI database status and freshness           |
+| `oui update`         | :          | Download latest OUI database from IEEE            |
+| `oui import FILE`    | :          | Import an offline OUI database file               |
+| `list-models PROVIDER`| :         | List available models for a provider              |
 
 **TUI shortcuts:** `1` Start · `2` File Options · `3` Toggle Panels · `R` Reload Rules · `P` Pause · `Q` Quit · `←→` Switch Panels · `Enter` Scroll Mode
 

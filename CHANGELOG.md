@@ -4,6 +4,111 @@ All notable changes to Scrutics are documented here.
 
 ---
 
+## [0.6.0] — 2026-09-16
+
+> **Unstable release.** Core features are functional and passing tests, but some
+> integrations (Topology AI panel, end-to-end LLM flows) have not been validated
+> in production. Gemini API compatibility may require updates.
+
+### Added — AI Intelligence Layer
+- **LLM Provider abstraction** (`scrutics/ai/`) with pluggable providers:
+  Ollama (local, offline), OpenAI (gpt-4o-mini), Anthropic (claude-haiku-4-5),
+  Gemini (gemini-2.0-flash). Shared HTTP layer via `_openai_compat.OpenAICompatMixin`
+  for OpenAI-shaped endpoints; native translators for Anthropic and Gemini
+  (`tool_use`/`tool_result` and `functionCall`/`functionResponse` respectively)
+- **`thought_signature` preservation** for Gemini 3+ multi-turn function calling —
+  required field otherwise causes HTTP 400 on follow-up turns
+- **Semantic Tool API** (`scrutics/ai/tools.py`): `SessionContext` + 5 read-only tools
+  (`get_statistics`, `get_assets`, `get_asset`, `get_connections`, `get_anomalies`)
+  + OpenAI-style tool schema via `get_tool_definitions()`
+- **Agent loop** (`scrutics/ai/agent.py`): `run_agent_loop()` with up to 5 tool-call
+  iterations, `OT_SYSTEM_PROMPT` (anti-hallucination guardrails)
+- **`scrutics ask` / `scrutics ai` CLI** with interactive REPL, session browser,
+  `--provider` / `--model` overrides, `--reconfigure` / `--disable` / `--reset`
+- **`scrutics list-models <provider>`** — queries provider model discovery API
+- **TUI AI Assistant panel** (`AIAssistantModal` + onboarding modals) with
+  background `@work(thread=True)` execution, session browser, freshness badge
+- **Topology HTML AI sidebar** — BYOK client-side chat, API key in browser memory
+  only, disclaimer, provider selector (Gemini / OpenAI / Anthropic)
+- **WSL2 diagnostics** (`diagnose_gemini.py`) for DNS / HTTPS / API-key issues
+
+### Added — Vendor & OUI Foundation
+- **Vendor classification taxonomy** `vendor_class ∈ {OT, IT, NEUTRAL, UNKNOWN}`.
+  `classification_type` remains canonical; `is_ot` is now a derived property.
+  Cisco reclassified from OT to IT
+- **IEEE MA-L / MA-M / MA-S prefix support** with longest-prefix matching
+  (9→7→6 hex nibbles). Universal MAC normalization (colon/hyphen/dot/case)
+- **Passive DHCPv4 enrichment** — options 12 (hostname), 55 (fingerprint),
+  60 (vendor class, two-layer evidence), 81 (FQDN, E-bit aware). Client identity
+  via `BOOTP.chaddr`. Bounded pending buffer (1,000 entries) with FIFO eviction
+- **Curated OUI metadata** (`curated_oui.yaml`, 30 industrial prefixes) with
+  `device_family_hint` as low-weight `os_hint` evidence. User override via
+  `~/.scrutics/curated_oui.yaml`
+- **OUI lifecycle commands** — `scrutics oui status|validate|update|import`.
+  Atomic install with `.bak` rollback; SHA-256 checksum; MA-L/M/S tier counts.
+  Freshness policy < 180d / 180–364d / ≥ 365d. Doctor + startup warnings
+  (non-blocking)
+
+### Added — Identity & Topology
+- **MAC-based primary asset identity** with IP fallback. `Asset.primary_key`,
+  `Asset.ip_history` chronological episodes
+- **`AssetInventory.get_or_create()`** with 5-branch resolution: known MAC,
+  MAC-change (creates separate Asset), MAC-less, learning MAC, brand new
+- **`DEVICE_MOVED` (MEDIUM) and `MAC_CHANGED` (HIGH) anomalies**
+- **Asset-centric topology edges** keyed by `primary_key`
+
+### Added — Evidence Package v1
+- **`manifest.json`** in every session directory via `write_manifest()` /
+  `read_manifest()`. Atomic write, required-field validation, graceful defaults
+
+### Changed
+- `Asset.is_ot` converted from stored field to derived property (with setter
+  for backward compat)
+- `chat()` return type: `str | Iterator[str]` → `ChatResult | Iterator[str]`
+  to support tool-call responses
+- Default Ollama timeout 30s → 180s (real CPU-inference turns measured at 53s+)
+- `valid_efforts` set: added `"max"`
+- Default model: `gemini-2.0-flash`
+- `fetch_models()` no longer silently falls back; returns empty list on failure
+- Cisco reclassified from `vendor_class=OT` to `IT`
+- `classification_type` now has 4 values: `OT | IT | Infrastructure | Unknown`
+
+### Fixed
+- `KeyboardInterrupt` during `scrutics ask` no longer produces raw traceback
+- Gemini 3+ function-calling HTTP 400 (`thought_signature` preservation)
+- TUI onboarding modal no longer dismisses mid-fetch
+- `AIModelSelectionModal` now centered
+- DHCP `chaddr` used for client identity (not Ethernet `src_mac`)
+- OUI parser handles dotted MACs and non-string input safely
+- 8-second timeout on TUI error notifications (was instant-dismiss)
+
+### Known Issues
+- Topology AI panel button may not respond to click in some browsers
+- Interactive `scrutics ai` end-to-end flow not fully tested with valid API key
+- Gemini API may require model name updates as Google releases new versions
+- `Asset.add_evidence()` still calls `_update_classification_type()` on every
+  evidence addition (Phase 1 observation, deferred)
+- Session directory naming uses local time, not UTC
+
+### Deferred to v0.7+
+- Firmware active querying (`--query-firmware`)
+- True LLM-backed topology sidebar (requires local HTTP server)
+- Multi-turn CLI chat persistence
+- Streaming for Anthropic / Gemini providers
+- Software self-update (`scrutics update`)
+- Phase C (Modbus DPI), D (behavioral), E (baselines), F (Purdue), G (protocols)
+- ML anomaly detection
+- Fixes for already documented bugs
+
+### Tests
+- 245 → 299 passing, 0 failures
+- New test files: `test_tier2_asset_identity.py`, `test_tier2_topology.py`,
+  `test_ai_agent.py`, `test_ai_provider.py`, `test_cli_ask.py`, `test_cli_ask_ux.py`,
+  `test_phase6_providers.py`, `test_tui_ai_assistant.py`, `test_phase_b1_vendor.py`,
+  `test_phase_b2_oui.py`, `test_phase_b3_dhcp.py`, `test_phase_b4_b5_oui.py`
+
+---
+
 ## [0.5.0] - 2026-08-30
 
 ### Added

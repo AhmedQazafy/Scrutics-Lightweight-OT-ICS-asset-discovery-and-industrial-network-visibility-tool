@@ -10,7 +10,7 @@ import platform
 import shutil
 
 
-VERSION = "v0.5.0"
+VERSION = "v0.6.0"
 _PKG_DIR = os.path.dirname(__file__)
 
 
@@ -249,6 +249,43 @@ def check_output_dir(output_dir: str = "output") -> dict:
     }
 
 
+# ── OUI database check ─────────────────────────────────────────────────────────
+
+def check_oui_db() -> dict:
+    """Check active OUI database status, count, and freshness."""
+    from scrutics.classifier.oui import get_oui_freshness
+    try:
+        info = get_oui_freshness()
+        return {
+            "path": info["path"],
+            "db_type": info["db_type"],
+            "entry_count": info["entry_count"],
+            "tiers": info["tiers"],
+            "age_days": info["age_days"],
+            "freshness": info["freshness"],
+            "sha256": info["sha256"],
+            "source": info["source"],
+            "source_date": info["source_date"],
+            "exists": bool(info["path"]),
+            "ok": True,
+        }
+    except Exception as e:
+        return {
+            "path": "",
+            "db_type": "none",
+            "entry_count": 0,
+            "tiers": {"ma_l": 0, "ma_m": 0, "ma_s": 0},
+            "age_days": 9999,
+            "freshness": "Outdated",
+            "sha256": "",
+            "source": "none",
+            "source_date": None,
+            "exists": False,
+            "ok": True,
+            "error": str(e),
+        }
+
+
 # ── Full report ────────────────────────────────────────────────────────────────
 
 def full_report(headless: bool = True, output_dir: str = "output") -> dict:
@@ -262,6 +299,7 @@ def full_report(headless: bool = True, output_dir: str = "output") -> dict:
         "interfaces":  list_interfaces(),
         "config":      check_config(),
         "output_dir":  check_output_dir(output_dir),
+        "oui":         check_oui_db(),
     }
 
 
@@ -298,3 +336,7 @@ def print_startup_info(interface: str = None, filepath: str = None,
         print(f"[!] Output dir   : {out['path']} — {out['detail']}")
     else:
         print(f"[*] Output       : {out['path']}")
+
+    oui_info = check_oui_db()
+    if oui_info.get("exists") and oui_info.get("freshness") != "Current":
+        print(f"[!] OUI database is {oui_info['age_days']} days old ({oui_info['freshness']}) — run 'scrutics oui update'")

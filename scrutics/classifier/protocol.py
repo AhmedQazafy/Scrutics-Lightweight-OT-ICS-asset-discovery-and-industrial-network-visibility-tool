@@ -154,7 +154,7 @@ def classify_by_ports(ports_seen: set, mac: str = None) -> dict:
     }
 
 
-# ── Phase 2: Evidence generation ──────────────────────────────────────────────
+# ── Evidence generation from matched port classifications ─────────────────────
 
 def classification_evidence_from_ports(ports_seen: set, mac: str = None) -> list:
     """Generate evidence objects from observed ports and MAC."""
@@ -183,14 +183,18 @@ def classification_evidence_from_ports(ports_seen: set, mac: str = None) -> list
 
     # Check MAC vendor (if provided)
     if mac:
-        from scrutics.classifier.oui import lookup_vendor, is_ot_vendor
+        from scrutics.classifier.oui import (
+            lookup_vendor, classify_vendor,
+            VENDOR_CLASS_OT, VENDOR_CLASS_IT, VENDOR_CLASS_NEUTRAL
+        )
         # Load OUI DB (lazy import to avoid circular dependency)
         try:
             from scrutics.classifier.oui import load_oui_db
             oui_db = load_oui_db()
             vendor = lookup_vendor(mac, oui_db)
             if vendor and vendor != "Unknown":
-                if is_ot_vendor(vendor):
+                vclass = classify_vendor(vendor)
+                if vclass == VENDOR_CLASS_OT:
                     evidence.append({
                         "type": "vendor",
                         "value": vendor,
@@ -199,11 +203,29 @@ def classification_evidence_from_ports(ports_seen: set, mac: str = None) -> list
                         "confidence": "HIGH",
                         "detail": f"OT vendor: {vendor}"
                     })
-                else:
+                elif vclass == VENDOR_CLASS_IT:
+                    evidence.append({
+                        "type": "vendor",
+                        "value": vendor,
+                        "weight": 15,
+                        "source": "OUI",
+                        "confidence": "MEDIUM",
+                        "detail": f"IT/networking vendor: {vendor}"
+                    })
+                elif vclass == VENDOR_CLASS_NEUTRAL:
                     evidence.append({
                         "type": "vendor",
                         "value": vendor,
                         "weight": 10,
+                        "source": "OUI",
+                        "confidence": "MEDIUM",
+                        "detail": f"Dual-use vendor: {vendor}"
+                    })
+                else:
+                    evidence.append({
+                        "type": "vendor",
+                        "value": vendor,
+                        "weight": 5,
                         "source": "OUI",
                         "confidence": "LOW",
                         "detail": f"Vendor: {vendor}"

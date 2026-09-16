@@ -13,7 +13,7 @@ def main():
     import scrutics.signals as signals
     signals.setup()
 
-    from scrutics.cli import build_parser, run_headless, run_doctor, should_use_tui
+    from scrutics.cli import build_parser, run_headless, run_doctor, run_ai, run_ask, run_oui, should_use_tui
 
     # No arguments and interactive terminal → TUI
     if len(sys.argv) == 1:
@@ -34,6 +34,19 @@ def main():
     # doctor subcommand
     if getattr(args, "command", None) == "doctor":
         sys.exit(run_doctor(output_dir=getattr(args, "output", "output")))
+
+    # oui subcommand
+    if getattr(args, "command", None) == "oui":
+        sys.exit(run_oui(args))
+
+    # ai subcommand (and its backward-compat alias 'ask')
+    if getattr(args, "command", None) in ("ai", "ask"):
+        sys.exit(run_ai(args))
+    
+    # list-models subcommand
+    if getattr(args, "command", None) == "list-models":
+        from scrutics.cli import run_list_models
+        sys.exit(run_list_models(args))
 
     headless = not should_use_tui(args)
     deps = check_dependencies(headless=headless)

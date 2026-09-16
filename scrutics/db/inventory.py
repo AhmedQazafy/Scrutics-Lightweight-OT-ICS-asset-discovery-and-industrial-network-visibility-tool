@@ -1,10 +1,11 @@
 """In-memory asset inventory with multi-factor confidence scoring."""
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass, field, InitVar
+from typing import Optional, Any, Union
 import csv
 import datetime
 import ipaddress
+import time
 
 # Evidence weights (moved here for central definition)
 EVIDENCE_WEIGHT_OT_VENDOR = 30
@@ -78,12 +79,14 @@ class Asset:
     ip: str
     mac: str
     vendor: str = "Unknown"
+    vendor_class: str = "UNKNOWN"
     is_ot_vendor: bool = False
+    hostname: str = ""
     protocols: list = field(default_factory=list)
     ports_seen: set = field(default_factory=set)
     contacted_ports: set = field(default_factory=set)
     role: str = "Unclassified"
-    is_ot: Optional[bool] = None
+    is_ot: InitVar[Optional[Union[bool, str]]] = None
     confidence: str = "LOW"
     oui_score: int = 0
     protocol_score: int = 0
@@ -96,6 +99,7 @@ class Asset:
     initiates: bool = False
     first_seen: str = ""
     last_seen: str = ""
+    last_seen_epoch: float = 0.0
     behavioral_constraints: dict = field(default_factory=dict)
     peer_first_seen: dict = field(default_factory=dict)   # peer_ip -> epoch float
     _constraint_anomaly_ts: dict = field(default_factory=dict)  # type -> epoch float
@@ -108,6 +112,51 @@ class Asset:
     classification_type: str = "Unknown"                   # "OT" | "IT" | "Infrastructure" | "Unknown"
     classification_confidence_pct: int = 0                 # Overall confidence based on evidence
     domain: str = "Unknown"                                # "Industrial" | "Building_Automation" | "Utility" | "Enterprise" | "Unknown"
+    ip_history: list = field(default_factory=list)         # List[dict] - chronological IP episodes: [{"ip": str, "first_seen": float, "last_seen": float}]
+
+    def __post_init__(self, is_ot: Optional[Union[bool, str]] = None):
+        # Sync vendor_class and is_ot_vendor
+        if self.vendor_class != "UNKNOWN" and not self.is_ot_vendor:
+            self.is_ot_vendor = (self.vendor_class == "OT")
+        elif self.is_ot_vendor and self.vendor_class == "UNKNOWN":
+            self.vendor_class = "OT"
+        elif self.vendor != "Unknown" and self.vendor_class == "UNKNOWN":
+            try:
+                from scrutics.classifier.oui import classify_vendor
+                self.vendor_class = classify_vendor(self.vendor)
+                self.is_ot_vendor = (self.vendor_class == "OT")
+            except Exception:
+                pass
+
+        # If is_ot was supplied on creation, use it to initialize classification_type
+        if is_ot is not None and self.classification_type == "Unknown":
+            if is_ot is True or is_ot == "OT":
+                self.classification_type = "OT"
+            elif is_ot is False or is_ot == "IT":
+                self.classification_type = "IT"
+            elif isinstance(is_ot, str):
+                self.classification_type = is_ot
+
+    @property
+    def is_ot(self) -> Optional[bool]:
+        """Backward-compatible / derived representation of canonical classification_type."""
+        if self.classification_type == "OT":
+            return True
+        elif self.classification_type in ("IT", "Infrastructure"):
+            return False
+        return None
+
+    @is_ot.setter
+    def is_ot(self, val: Any) -> None:
+        """Setting is_ot updates canonical classification_type for backward compatibility."""
+        if val is True or val == "OT":
+            self.classification_type = "OT"
+        elif val is False or val == "IT":
+            self.classification_type = "IT"
+        elif val is None or val == "Unknown":
+            self.classification_type = "Unknown"
+        else:
+            self.classification_type = str(val)
 
     def add_evidence(self, evidence_type: str, value: str, weight: int,
                      source: str, confidence: str = "MEDIUM", detail: str = ""):
@@ -194,6 +243,56 @@ class Asset:
             "last_seen": last_seen
         })
 
+    def is_stale(self, now_epoch: float | None = None, timeout: float = 30.0) -> bool:
+        """Check if asset has not sent traffic in > timeout seconds (online/offline liveness)."""
+        if not self.last_seen_epoch:
+            return False
+        current = time.time() if now_epoch is None else now_epoch
+        return (current - self.last_seen_epoch) > timeout
+
+    @property
+    def primary_key(self) -> str:
+        """
+        Primary identity key for the asset.
+
+        Invariant note:
+        MAC is the best passive signal available, not a guaranteed hardware identity --
+        spoofable, and Tier 2's own MAC_CHANGED detection exists precisely because it can lie.
+        If MAC is unavailable or Unknown, falls back to IP.
+        """
+        if self.mac and self.mac.strip() and self.mac.strip().lower() != "unknown":
+            return self.mac.strip().lower()
+        return self.ip
+
+    def record_ip(self, ip: str, timestamp: float) -> None:
+        """
+        Record chronological IP-assignment episodes.
+
+        ip_history represents chronological assignment episodes, not a deduplicated
+        set of unique IPs. If the device was at A, moved to B, and returned to A,
+        this produces [A, B, A] in order.
+        - If ip matches the most recent episode's IP, updates last_seen.
+        - If ip differs from the most recent episode, appends a new episode.
+        Never collapses or deduplicates episodes.
+        """
+        if not ip:
+            return
+        if self.ip_history and self.ip_history[-1].get("ip") == ip:
+            self.ip_history[-1]["last_seen"] = timestamp
+        else:
+            self.ip_history.append({
+                "ip": ip,
+                "first_seen": timestamp,
+                "last_seen": timestamp,
+            })
+        self.ip = ip
+        self.last_seen_epoch = timestamp
+        try:
+            self.last_seen = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+
+
     def to_dict(self) -> dict:
         proto_str = ", ".join(self.protocols) if self.protocols else "Unknown"
         type_str = self.classification_type if self.classification_type != "Unknown" else (
@@ -209,6 +308,7 @@ class Asset:
             "ip": self.ip,
             "mac": self.mac,
             "vendor": self.vendor,
+            "vendor_class": self.vendor_class,
             "protocol": proto_str,
             "role": self.role,
             "confidence_pct": self.confidence_pct,
@@ -219,6 +319,7 @@ class Asset:
             "domain": self.domain,
             "os_hints": "|".join(self.os_hints) if self.os_hints else "",
             "dns_names": "|".join(self.dns_names) if self.dns_names else "",
+            "hostname": self.hostname,
         }
         right = {
             "oui_score": self.oui_score,
@@ -240,7 +341,10 @@ class Asset:
 
 class AssetInventory:
     def __init__(self, inventory_config: dict | None = None):
-        self._assets: dict = {}
+        # Current-IP lookup table: ip -> Asset (represents the device CURRENTLY active at this IP)
+        self._assets: dict[str, Asset] = {}
+        # Primary physical identity index: normalized_mac -> Asset
+        self._by_mac: dict[str, Asset] = {}
         if inventory_config is None:
             try:
                 from scrutics.config.loader import load_inventory_config
@@ -259,16 +363,26 @@ class AssetInventory:
             cidrs=self._cidrs,
         )
 
-    def update(self, ip: str, mac: str = None, dst_ip: str = None, dst_port: int = None):
+    def update(
+        self,
+        ip: str,
+        mac: str = None,
+        dst_ip: str = None,
+        dst_port: int = None,
+        timestamp: float | None = None,
+    ) -> Optional[Asset]:
+        """
+        Update inventory from observed traffic flow.
+        Resolves asset identity via get_or_create(), tracks packet count, peer IPs,
+        and contacted ports.
+        """
         if not self.is_asset_ip(ip):
-            return
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if ip not in self._assets:
-            self._assets[ip] = Asset(ip=ip, mac=mac or "Unknown", first_seen=now)
-        elif mac:
-            self._assets[ip].mac = mac
-        asset = self._assets[ip]
-        asset.last_seen = now
+            return None
+        if timestamp is None:
+            timestamp = time.time()
+        asset = self.get_or_create(ip=ip, mac=mac, timestamp=timestamp)
+        if not asset:
+            return None
         asset.packet_count += 1
 
         # Track peers and initiates
@@ -287,25 +401,190 @@ class AssetInventory:
         # Track contacted ports
         if dst_port:
             asset.contacted_ports.add(dst_port)
-            # We add evidence in engine.py separately, so we don't duplicate here.
-            # But if we ever want to add here, ensure dedup prevents duplicates.
 
-    def credit_listener_port(self, ip: str, port: int):
+        return asset
+
+    def credit_listener_port(self, ip: str, port: int, timestamp: float | None = None):
+        """Credit a listening port to an asset, creating it if not already known."""
         if not self.is_asset_ip(ip) or not port:
             return
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if ip not in self._assets:
-            self._assets[ip] = Asset(ip=ip, mac="Unknown", first_seen=now)
-        self._assets[ip].ports_seen.add(port)
+        asset = self.get_or_create(ip=ip, mac=None, timestamp=timestamp)
+        if asset:
+            asset.ports_seen.add(port)
+
+    @staticmethod
+    def _normalize_mac(mac: str | None) -> str | None:
+        """
+        Normalize a MAC address to lowercase colon-separated format.
+        Follows existing convention in engine.py (strip + lower) and handles
+        hyphenated Windows-style MACs by converting '-' to ':'.
+        Returns None if mac is empty, None, 'unknown', or broadcast/zero.
+        """
+        if not mac:
+            return None
+        s = mac.strip().lower().replace("-", ":")
+        if not s or s == "unknown" or s in ("00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"):
+            return None
+        return s
+
+    def get_or_create(
+        self,
+        ip: str,
+        mac: str | None = None,
+        timestamp: float | None = None,
+    ) -> Optional[Asset]:
+        """
+        Resolve or create an Asset according to Tier 2 MAC-based device identity rules.
+
+        Identity invariants:
+        1. MAC is the primary physical identity key when known.
+           There must never be two simultaneously active _by_mac entries for the same normalized MAC.
+        2. The IP index (self._assets) represents the CURRENT device active at that IP.
+           When an asset moves from IP A to IP B, self._assets[A] is removed so lookups for A
+           do not falsely return the moved asset.
+        3. Historical IP assignments live exclusively in Asset.ip_history as chronological episodes.
+           A device moving A -> B -> A accumulates [A, B, A] in order; episodes are never collapsed.
+        4. When a new MAC claims an IP previously occupied by a different known MAC (MAC_CHANGED),
+           a separate Asset is created. Old and new assets are NEVER merged. The old Asset remains
+           in _by_mac and can naturally become stale based on its last_seen timestamp.
+        5. When MAC is unknown/empty, fallback to pure IP-based identity semantics.
+        """
+        if not self.is_asset_ip(ip):
+            return None
+
+        if timestamp is None:
+            timestamp = time.time()
+        now_str = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+
+        norm_mac = self._normalize_mac(mac)
+        existing_at_ip = self._assets.get(ip)
+
+        # ── Rule 1: Known MAC already exists in _by_mac ───────────────────────
+        # Same physical asset re-observed. It may be at the same IP or a new IP.
+        if norm_mac and norm_mac in self._by_mac:
+            asset = self._by_mac[norm_mac]
+            old_ip = asset.ip
+
+            # If the device moved to a new IP, update current-IP index:
+            # remove old IP key so an innocent lookup of old IP does not return this device.
+            if old_ip and old_ip != ip:
+                if self._assets.get(old_ip) is asset:
+                    del self._assets[old_ip]
+
+            # If another device was previously recorded at this new IP in _assets,
+            # evict its current-IP pointer (that device is no longer at this IP).
+            if existing_at_ip and existing_at_ip is not asset:
+                pass
+
+            self._assets[ip] = asset
+            asset.record_ip(ip, timestamp)
+            if mac and asset.mac != mac and mac != "Unknown":
+                asset.mac = mac
+            return asset
+
+        # ── Rule 2: Known MAC is new, but IP currently belongs to a DIFFERENT known MAC ──
+        # Device replacement / MAC_CHANGED scenario.
+        # DO NOT merge. Create a separate Asset for the new MAC.
+        # The old asset is removed from the current-IP index, but preserved in _by_mac
+        # where its historical state remains intact and it naturally becomes stale.
+        if norm_mac and existing_at_ip:
+            old_asset_mac = self._normalize_mac(existing_at_ip.mac)
+            if old_asset_mac and old_asset_mac != norm_mac:
+                # Evict old asset from current-IP index
+                del self._assets[ip]
+
+                # Create brand-new Asset for the new physical device
+                new_asset = Asset(
+                    ip=ip,
+                    mac=mac or "Unknown",
+                    first_seen=now_str,
+                    last_seen=now_str,
+                    last_seen_epoch=timestamp,
+                )
+                new_asset.record_ip(ip, timestamp)
+                self._by_mac[norm_mac] = new_asset
+                self._assets[ip] = new_asset
+                return new_asset
+
+        # ── Rule 3: MAC is unknown / empty / "Unknown" ────────────────────────
+        # Pure IP-based fallback. Preserves existing IP-based semantics.
+        if not norm_mac:
+            if existing_at_ip:
+                existing_at_ip.record_ip(ip, timestamp)
+                return existing_at_ip
+            else:
+                asset = Asset(
+                    ip=ip,
+                    mac="Unknown",
+                    first_seen=now_str,
+                    last_seen=now_str,
+                    last_seen_epoch=timestamp,
+                )
+                asset.record_ip(ip, timestamp)
+                self._assets[ip] = asset
+                return asset
+
+        # ── Rule 4: Learning MAC for an existing MAC-less asset at IP ─────────
+        if existing_at_ip and not self._normalize_mac(existing_at_ip.mac):
+            existing_at_ip.mac = mac or "Unknown"
+            self._by_mac[norm_mac] = existing_at_ip
+            existing_at_ip.record_ip(ip, timestamp)
+            return existing_at_ip
+
+        # ── Rule 5: Brand-new IP + Brand-new MAC ──────────────────────────────
+        new_asset = Asset(
+            ip=ip,
+            mac=mac or "Unknown",
+            first_seen=now_str,
+            last_seen=now_str,
+            last_seen_epoch=timestamp,
+        )
+        new_asset.record_ip(ip, timestamp)
+        self._by_mac[norm_mac] = new_asset
+        self._assets[ip] = new_asset
+        return new_asset
+
+    def get_by_mac(self, mac: str | None) -> Optional[Asset]:
+        """
+        Lookup asset by MAC address in the primary physical identity index.
+        """
+        norm = self._normalize_mac(mac)
+        if not norm:
+            return None
+        return self._by_mac.get(norm)
 
     def get_all(self) -> list:
-        return list(self._assets.values())
+        """
+        Return all unique assets in inventory.
+        Includes both active assets (indexed by current IP) and any historical assets
+        (indexed by MAC) whose IP was reassigned to another device.
+        """
+        seen_ids = set()
+        result = []
+        for asset in self._by_mac.values():
+            aid = id(asset)
+            if aid not in seen_ids:
+                seen_ids.add(aid)
+                result.append(asset)
+        for asset in self._assets.values():
+            aid = id(asset)
+            if aid not in seen_ids:
+                seen_ids.add(aid)
+                result.append(asset)
+        return result
 
     def get(self, ip: str) -> Optional[Asset]:
+        """
+        Lookup current asset at IP.
+        Represents the CURRENT device active at that IP.
+        """
         return self._assets.get(ip)
 
     def count(self) -> int:
-        return len(self._assets)
+        """
+        Return count of unique assets in inventory.
+        """
+        return len(self.get_all())
 
     def export_csv(self, path: str):
         assets = self.get_all()

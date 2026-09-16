@@ -1,10 +1,11 @@
 """
-BACnet/IP stub listener — Phase 1 (OUI fingerprinting only).
+"""BACnet/IP stub listener for the OT simulation environment.
 Listens on UDP 47808 (standard BACnet/IP port).
 
 NOTE: Real BACnet broadcast behavior requires BBMD (BACnet Broadcast
 Management Device) setup or bacpypes3 foreign device configuration.
-This stub produces visible UDP traffic on the correct port for Phase 1
+This stub produces visible UDP traffic on the correct port so Scrutics
+can observe and classify it during simulation runs.
 OUI-based fingerprinting only. Flagged for proper BACnet/IP implementation
 in a later phase.
 """

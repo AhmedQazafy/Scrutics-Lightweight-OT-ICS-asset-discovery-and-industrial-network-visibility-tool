@@ -1,0 +1,156 @@
+# Scrutics Curated OUI Metadata (B4)
+# Maps normalized MAC OUI prefixes (MA-L: 6 hex, MA-M: 7 hex, MA-S: 9 hex)
+# to device family hints and contextual metadata.
+#
+# INVARIANT: Device family hints are supporting identification evidence (os_hint).
+# They NEVER independently establish or overwrite classification_type.
+
+"0080F4":
+  vendor: "Schneider Electric"
+  device_family_hint: "Modicon / Quantum PLC"
+  notes: "Commonly used on Modicon M340/M580 and Quantum automation platforms"
+
+"001B1B":
+  vendor: "Siemens AG"
+  device_family_hint: "SIMATIC S7 / SCALANCE"
+  notes: "Commonly used on SIMATIC S7-300/400/1200/1500 and SCALANCE network gear"
+
+"0000BC":
+  vendor: "Rockwell Automation"
+  device_family_hint: "ControlLogix / CompactLogix"
+  notes: "Allen-Bradley ControlLogix/CompactLogix 1756-ENBT/EN2T modules"
+
+"006035":
+  vendor: "Contemporary Controls"
+  device_family_hint: "Contemporary Controls BACnet Router"
+  notes: "BASrouter and Skorpion industrial Ethernet products"
+
+"000E8C":
+  vendor: "Moxa Technologies Co., Ltd."
+  device_family_hint: "Moxa NPort / EDS Series"
+  notes: "Industrial Ethernet switches and serial device servers"
+
+"0001C6":
+  vendor: "Moxa Technologies Co., Ltd."
+  device_family_hint: "Moxa NPort / EDS Series"
+  notes: "Industrial Ethernet switches and serial device servers"
+
+"009027":
+  vendor: "Beckhoff Automation GmbH"
+  device_family_hint: "Beckhoff CX / EtherCAT Controller"
+  notes: "Embedded PCs and EtherCAT fieldbus couplers"
+
+"0050C2":
+  vendor: "Phoenix Contact"
+  device_family_hint: "Phoenix Contact FL SWITCH / ILC"
+  notes: "Industrial Ethernet switches and Inline controllers"
+
+"003011":
+  vendor: "Advantech Co., Ltd."
+  device_family_hint: "Advantech ADAM / UNO Series"
+  notes: "ADAM remote I/O and UNO embedded automation computers"
+
+"0030DE":
+  vendor: "Wago Kontakttechnik GmbH"
+  device_family_hint: "WAGO 750 Series PFC"
+  notes: "Programmable Fieldbus Controllers (PFC200) and I/O modules"
+
+"0002A5":
+  vendor: "Hilscher GmbH"
+  device_family_hint: "Hilscher netX / cifX"
+  notes: "Multi-protocol fieldbus communication controllers"
+
+"00204E":
+  vendor: "Red Lion Controls"
+  device_family_hint: "Red Lion Crimson / G3 HMI"
+  notes: "Human Machine Interfaces and Data Station Plus"
+
+"000DF1":
+  vendor: "GE Automation & Controls"
+  device_family_hint: "GE PACSystems / RX3i"
+  notes: "PACSystems RX3i and RX7i controllers"
+
+"0090E8":
+  vendor: "GE Fanuc Automation"
+  device_family_hint: "GE Fanuc Series 90-30"
+  notes: "Legacy PLC systems and Ethernet interface modules"
+
+"00007A":
+  vendor: "Honeywell Inc."
+  device_family_hint: "Honeywell Experion / C300"
+  notes: "Distributed Control System (DCS) controller hardware"
+
+"00504A":
+  vendor: "ABB Automation"
+  device_family_hint: "ABB AC500 / Freelance"
+  notes: "AC500 scalable PLC series and process control systems"
+
+"0030A9":
+  vendor: "Emerson Network Power"
+  device_family_hint: "Emerson DeltaV / Ovation"
+  notes: "Process automation and power/water DCS controllers"
+
+"00504B":
+  vendor: "Yokogawa Electric Corporation"
+  device_family_hint: "Yokogawa CENTUM / STARDOM"
+  notes: "CENTUM VP DCS and STARDOM autonomous controllers"
+
+"000CF1":
+  vendor: "Mitsubishi Electric Corporation"
+  device_family_hint: "Mitsubishi MELSEC-Q / iQ-R"
+  notes: "Programmable automation controllers and network modules"
+
+"00004C":
+  vendor: "Omron Corporation"
+  device_family_hint: "Omron CJ2 / NJ / NX Series"
+  notes: "Sysmac automation controllers and EtherNet/IP units"
+
+"0040AE":
+  vendor: "Delta Electronics Inc."
+  device_family_hint: "Delta DVP / AH Series PLC"
+  notes: "Industrial automation controllers"
+
+"00D060":
+  vendor: "Eaton Corporation"
+  device_family_hint: "Eaton easyE4 / XC Series"
+  notes: "Control relays and modular PLCs"
+
+"00D0C9":
+  vendor: "Pilz GmbH & Co. KG"
+  device_family_hint: "Pilz PNOZmulti / PSS 4000"
+  notes: "Configurable safety controllers"
+
+"000677":
+  vendor: "Sick AG"
+  device_family_hint: "SICK Flexi Soft / Sensor"
+  notes: "Safety controllers and optical sensors"
+
+"000A14":
+  vendor: "Turck Inc."
+  device_family_hint: "Turck BL20 / TBEN Series"
+  notes: "Modular I/O systems and block I/O stations"
+
+"0004A3":
+  vendor: "Lantronix"
+  device_family_hint: "Lantronix CoBox / XPort"
+  notes: "Serial-to-Ethernet device servers"
+
+"0040D0":
+  vendor: "Digi International"
+  device_family_hint: "Digi One / PortServer TS"
+  notes: "Device servers and industrial cellular routers"
+
+"003048":
+  vendor: "Supermicro"
+  device_family_hint: "Supermicro Industrial Server"
+  notes: "OT/SCADA servers and industrial workstations"
+
+"005056":
+  vendor: "VMware"
+  device_family_hint: "VMware ESXi / vSphere VM"
+  notes: "Virtual machine network adapter"
+
+"000C29":
+  vendor: "VMware"
+  device_family_hint: "VMware Workstation / Fusion VM"
+  notes: "Virtual machine network adapter"

@@ -1,8 +1,8 @@
 """
-EtherNet/IP stub listener — Phase 1 (OUI fingerprinting only).
+EtherNet/IP stub listener for the OT simulation environment.
 Listens on TCP 44818 (standard EtherNet/IP port) and accepts connections.
 Does NOT implement CIP — flagged for replacement when protocol banner
-fingerprinting is added in a later phase.
+fingerprinting is added.
 """
 import socket
 import time

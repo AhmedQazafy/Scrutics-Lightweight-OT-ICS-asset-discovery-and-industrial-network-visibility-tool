@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scrutics"
-version = "0.5.0"
+version = "0.6.0"
 description = "Passive OT/ICS network asset discovery — zero packet injection"
 readme = "README.md"
 license = {text = "MIT"}
@@ -30,6 +30,9 @@ dependencies = [
     "pyyaml>=6.0,<7",
 ]
 
+[project.optional-dependencies]
+ai = ["requests>=2.31,<3"]
+
 [project.scripts]
 scrutics = "scrutics.__main__:main"
 
@@ -47,5 +50,6 @@ scrutics = [
     "config/*.yaml",
     "classifier/ics_oui.txt",
     "classifier/oui.txt",
+    "classifier/curated_oui.yaml",
     "web/*.js",
 ]

@@ -32,6 +32,10 @@ class CaptureEngine:
         self.sink_manager = None  # SinkManager   — attached by caller before capture
         self.no_baseline  = False  # skip anomaly detection (e.g. large PCAP files)
         self.topology_edges: dict = {}
+        self._mac_to_ip: dict[str, str] = {}
+        self._mac_anomaly_ts: dict[str, float] = {}
+        self._pending_dhcp: dict[str, dict] = {}
+        self._MAX_PENDING_DHCP = 1000
         self._stop_event = threading.Event()
         self._get_oui_db()         # preload at startup — avoids silent delay on first packet
 
@@ -87,6 +91,10 @@ class CaptureEngine:
             src_ip  = pkt[ARP].psrc
             src_mac = pkt[ARP].hwsrc
 
+        # Passive DHCPv4 identification enrichment BEFORE asset-IP validation gate
+        if proto == "UDP" and (src_port in (67, 68) or dst_port in (67, 68)):
+            self._process_dhcp_packet(pkt, now_ts)
+
         if not src_ip or not src_mac:
             return
         if not self.inventory.is_asset_ip(src_ip):
@@ -94,11 +102,11 @@ class CaptureEngine:
         if src_mac in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"):
             return
 
-        # ── Phase 4: Extract TTL for OS hints ───────────────────────────────
+        # Extract TTL for OS fingerprinting hints
         if ttl is not None:
             self._process_ttl(src_ip, ttl, now_ts)
 
-        # ── Phase 4: mDNS / WS-Discovery detection ──────────────────────────
+        # mDNS (5353) and WS-Discovery (3702) — passive device discovery protocols
         if proto == "UDP" and dst_port in (5353, 3702):
             self._process_discovery_packet(src_ip, dst_ip, dst_port, pkt, now_ts)
 
@@ -202,6 +210,214 @@ class CaptureEngine:
                 )
                 self._log(f"{src_ip} -> Discovery: {service_name} ({service_type})", "green")
 
+    def _process_dhcp_packet(self, pkt, ts: float):
+        """
+        Passive DHCPv4 identification enrichment (UDP 67/68).
+        Extracts BOOTP chaddr as client MAC, parses options 12, 55, 60, 81.
+        Enriches existing asset or retains in bounded in-memory buffer until asset is created.
+        Never creates assets by itself; never directly determines classification_type.
+        """
+        try:
+            from scapy.layers.dhcp import BOOTP, DHCP
+        except ImportError:
+            return
+
+        bootp = None
+        if BOOTP in pkt:
+            bootp = pkt[BOOTP]
+        elif hasattr(pkt, "haslayer") and pkt.haslayer("Raw"):
+            try:
+                bootp = BOOTP(bytes(pkt["Raw"].load))
+            except Exception:
+                bootp = None
+        if not bootp:
+            return
+
+        chaddr = getattr(bootp, "chaddr", None)
+        if not chaddr:
+            return
+
+        client_mac = None
+        if isinstance(chaddr, (bytes, bytearray)):
+            if len(chaddr) >= 6:
+                client_mac = ":".join(f"{b:02x}" for b in chaddr[:6])
+        elif isinstance(chaddr, str):
+            client_mac = chaddr.strip()
+
+        norm_mac = self.inventory._normalize_mac(client_mac)
+        if not norm_mac:
+            return
+
+        dhcp = None
+        if DHCP in pkt:
+            dhcp = pkt[DHCP]
+        elif bootp and hasattr(bootp, "haslayer") and bootp.haslayer(DHCP):
+            dhcp = bootp[DHCP]
+
+        raw_options = getattr(dhcp, "options", []) if dhcp else []
+        if not raw_options:
+            return
+
+        from scrutics.classifier.dhcp_fingerprints import parse_option_81
+
+        enrichment = {}
+        for item in raw_options:
+            if not isinstance(item, tuple) or len(item) < 2:
+                continue
+            opt_key, opt_val = item[0], item[1]
+
+            # Option 12: Host Name
+            if opt_key in ("hostname", 12):
+                try:
+                    if isinstance(opt_val, (bytes, bytearray)):
+                        h = opt_val.decode("utf-8", errors="ignore")
+                    else:
+                        h = str(opt_val)
+                    clean_h = h.replace("\x00", "").strip()
+                    if clean_h:
+                        enrichment["hostname"] = clean_h
+                except Exception:
+                    pass
+
+            # Option 55: Parameter Request List
+            elif opt_key in ("param_req_list", 55):
+                try:
+                    prl = []
+                    if isinstance(opt_val, (bytes, bytearray)):
+                        prl = [int(b) for b in opt_val]
+                    elif isinstance(opt_val, (list, tuple)):
+                        prl = [int(x) for x in opt_val]
+                    if prl:
+                        enrichment["param_req_list"] = prl
+                except Exception:
+                    pass
+
+            # Option 60: Vendor Class Identifier
+            elif opt_key in ("vendor_class_id", 60):
+                try:
+                    if isinstance(opt_val, (bytes, bytearray)):
+                        v = opt_val.decode("utf-8", errors="ignore")
+                    else:
+                        v = str(opt_val)
+                    clean_v = v.replace("\x00", "").strip()
+                    if clean_v:
+                        enrichment["vendor_class_id"] = clean_v
+                except Exception:
+                    pass
+
+            # Option 81: Client FQDN
+            elif opt_key in ("client_FQDN", 81):
+                try:
+                    clean_fqdn = parse_option_81(opt_val)
+                    if clean_fqdn:
+                        enrichment["fqdn"] = clean_fqdn
+                except Exception:
+                    pass
+
+        if not enrichment:
+            return
+
+        # Attempt to enrich resolved Asset by client MAC
+        asset = self.inventory.get_by_mac(norm_mac)
+        if asset:
+            self._apply_dhcp_enrichment(asset, enrichment)
+        else:
+            # Buffer pending enrichment for when Asset is subsequently created/resolved
+            if len(self._pending_dhcp) >= self._MAX_PENDING_DHCP and norm_mac not in self._pending_dhcp:
+                oldest = next(iter(self._pending_dhcp))
+                del self._pending_dhcp[oldest]
+            if norm_mac in self._pending_dhcp:
+                self._pending_dhcp[norm_mac].update(enrichment)
+            else:
+                self._pending_dhcp[norm_mac] = enrichment
+
+    def _apply_dhcp_enrichment(self, asset, enrichment: dict):
+        """
+        Apply parsed DHCP enrichment data to an existing Asset.
+        Does not modify OUI vendor fields or directly alter classification_type.
+        """
+        if not asset or not enrichment:
+            return
+
+        # Option 12: Host Name
+        if "hostname" in enrichment:
+            host = enrichment["hostname"]
+            asset.hostname = host
+            asset.add_evidence(
+                evidence_type="hostname",
+                value=host,
+                weight=5,
+                source="DHCP",
+                confidence="LOW",
+                detail=f"DHCP Option 12 Host Name: {host}"
+            )
+            self._log(f"{asset.ip} -> DHCP Host Name: {host}", "dim white")
+
+        # Option 55: Parameter Request List
+        if "param_req_list" in enrichment:
+            from scrutics.classifier.dhcp_fingerprints import lookup_dhcp_fingerprint
+            os_match = lookup_dhcp_fingerprint(enrichment["param_req_list"])
+            if os_match:
+                asset.add_evidence(
+                    evidence_type="os_hint",
+                    value=os_match,
+                    weight=10,
+                    source="DHCP",
+                    confidence="MEDIUM",
+                    detail=f"DHCP Option 55 fingerprint match: {os_match}"
+                )
+                asset.add_os_hint(f"DHCP fingerprint: {os_match}", confidence="MEDIUM")
+                self._log(f"{asset.ip} -> DHCP OS fingerprint: {os_match}", "dim white")
+
+        # Option 60: Vendor Class Identifier
+        if "vendor_class_id" in enrichment:
+            vci = enrichment["vendor_class_id"]
+            # Raw Option 60 evidence
+            asset.add_evidence(
+                evidence_type="vendor",
+                value=vci,
+                weight=5,
+                source="DHCP",
+                confidence="LOW",
+                detail=f"DHCP Option 60 Vendor Class Identifier: {vci}"
+            )
+            from scrutics.classifier.dhcp_fingerprints import classify_option60
+            rec = classify_option60(vci)
+            if rec:
+                asset.add_evidence(
+                    evidence_type="vendor",
+                    value=rec,
+                    weight=10,
+                    source="DHCP",
+                    confidence="MEDIUM",
+                    detail=f"DHCP Option 60 recognized pattern: {rec}"
+                )
+                self._log(f"{asset.ip} -> DHCP Option 60: {rec}", "dim white")
+
+        # Option 81: Client FQDN
+        if "fqdn" in enrichment:
+            fqdn = enrichment["fqdn"]
+            asset.add_evidence(
+                evidence_type="dns",
+                value=fqdn,
+                weight=5,
+                source="DHCP",
+                confidence="LOW",
+                detail=f"DHCP Option 81 Client FQDN: {fqdn}"
+            )
+            if fqdn not in asset.dns_names:
+                asset.dns_names.append(fqdn)
+            self._log(f"{asset.ip} -> DHCP FQDN: {fqdn}", "dim white")
+
+    def _check_pending_dhcp(self, asset):
+        """If asset has pending DHCP enrichment, apply it and remove from buffer."""
+        if not asset or not asset.mac:
+            return
+        norm = self.inventory._normalize_mac(asset.mac)
+        if norm and norm in self._pending_dhcp:
+            enrichment = self._pending_dhcp.pop(norm)
+            self._apply_dhcp_enrichment(asset, enrichment)
+
     def _process_flow_data(self, src_ip, src_mac, dst_ip, dst_port, proto, ts,
                            src_port=None, alert=None, trust_dst_port=True):
         if not self.inventory.is_asset_ip(src_ip):
@@ -209,43 +425,95 @@ class CaptureEngine:
         if not self.inventory.is_asset_ip(dst_ip):
             dst_ip = None
 
-        from scrutics.classifier.oui import lookup_vendor, is_ot_vendor
+        from scrutics.classifier.oui import (
+            lookup_vendor, is_ot_vendor, classify_vendor, lookup_oui_metadata,
+            VENDOR_CLASS_OT, VENDOR_CLASS_IT, VENDOR_CLASS_NEUTRAL, VENDOR_CLASS_UNKNOWN,
+        )
         from scrutics.classifier.protocol import classify_by_ports, known_service_ports
         from scrutics.classifier.signatures import get_signature
 
-        self.inventory.update(ip=src_ip, mac=src_mac, dst_ip=dst_ip, dst_port=dst_port)
-        service_ports = known_service_ports()
-        self._record_topology_edge(src_ip, dst_ip, src_port, dst_port, proto, service_ports, ts)
+        # ── Tier 1: Check for MAC change / Device mobility anomalies ──
+        if src_mac and src_mac.strip().lower() != "unknown":
+            norm_mac = src_mac.strip().lower()
+            existing_asset = self.inventory.get(src_ip)
+            if existing_asset and existing_asset.mac and existing_asset.mac.strip().lower() != "unknown":
+                old_mac = existing_asset.mac.strip().lower()
+                if old_mac != norm_mac:
+                    key = f"MAC_CHANGED_{src_ip}_{norm_mac}"
+                    last_ts = self._mac_anomaly_ts.get(key)
+                    if last_ts is None or (ts - last_ts) >= 300:
+                        self._mac_anomaly_ts[key] = ts
+                        anomaly = {
+                            "ip": src_ip,
+                            "timestamp": ts,
+                            "type": "MAC_CHANGED",
+                            "severity": "HIGH",
+                            "detail": f"Device MAC changed from {existing_asset.mac} to {src_mac}",
+                        }
+                        self.baseline.anomaly_log.append(anomaly)
+                        self._log(f"! {src_ip} [MAC_CHANGED] {anomaly['detail']}", "bold red")
+                        if self.writer:
+                            self.writer.write_anomaly(anomaly)
+                        if self.sink_manager:
+                            self.sink_manager.emit_anomaly(anomaly)
 
-        # ── Phase 4: Add port signature evidence ────────────────────────────
+            # Check if this MAC was previously associated with another IP (DEVICE_MOVED)
+            existing_by_mac = self.inventory.get_by_mac(norm_mac)
+            prior_ip = existing_by_mac.ip if (existing_by_mac and existing_by_mac.ip) else self._mac_to_ip.get(norm_mac)
+            if prior_ip and prior_ip != src_ip:
+                key = f"DEVICE_MOVED_{norm_mac}_{src_ip}"
+                last_ts = self._mac_anomaly_ts.get(key)
+                if last_ts is None or (ts - last_ts) >= 300:
+                    self._mac_anomaly_ts[key] = ts
+                    anomaly = {
+                        "ip": src_ip,
+                        "timestamp": ts,
+                        "type": "DEVICE_MOVED",
+                        "severity": "MEDIUM",
+                        "detail": f"Device with MAC {src_mac} moved from {prior_ip} to {src_ip}",
+                    }
+                    self.baseline.anomaly_log.append(anomaly)
+                    self._log(f"! {src_ip} [DEVICE_MOVED] {anomaly['detail']}", "yellow")
+                    if self.writer:
+                        self.writer.write_anomaly(anomaly)
+                    if self.sink_manager:
+                        self.sink_manager.emit_anomaly(anomaly)
+
+            self._mac_to_ip[norm_mac] = src_ip
+
+        # Resolve asset identity via AssetInventory.get_or_create (called by inventory.update)
+        asset = self.inventory.update(ip=src_ip, mac=src_mac, dst_ip=dst_ip, dst_port=dst_port, timestamp=ts)
+        if asset:
+            self._check_pending_dhcp(asset)
+        service_ports = known_service_ports()
+
+        # Add evidence for each port matched against the signature database
         for port in (src_port, dst_port):
             if port and port > 0:
                 sig = get_signature(port, proto)
-                if sig:
-                    asset = self.inventory.get(src_ip)
-                    if asset:
-                        # Add port evidence
-                        existing = any(
-                            e.type == "port" and e.value == str(port)
-                            for e in asset.evidence
+                if sig and asset:
+                    # Add port evidence
+                    existing = any(
+                        e.type == "port" and e.value == str(port)
+                        for e in asset.evidence
+                    )
+                    if not existing:
+                        asset.add_evidence(
+                            evidence_type="port",
+                            value=str(port),
+                            weight=sig.weight,
+                            source="traffic",
+                            confidence=sig.confidence,
+                            detail=f"Observed {sig.name} on port {port} ({sig.category})"
                         )
-                        if not existing:
-                            asset.add_evidence(
-                                evidence_type="port",
-                                value=str(port),
-                                weight=sig.weight,
-                                source="traffic",
-                                confidence=sig.confidence,
-                                detail=f"Observed {sig.name} on port {port} ({sig.category})"
-                            )
-                            if sig.category == "OT":
-                                self._log(f"{src_ip} -> OT port: {port} ({sig.name})", "cyan")
+                        if sig.category == "OT":
+                            self._log(f"{src_ip} -> OT port: {port} ({sig.name})", "cyan")
 
         if src_port in service_ports:
-            self.inventory.credit_listener_port(src_ip, src_port)
+            self.inventory.credit_listener_port(src_ip, src_port, timestamp=ts)
 
         if dst_ip and dst_port and (trust_dst_port or dst_port in service_ports):
-            self.inventory.credit_listener_port(dst_ip, dst_port)
+            self.inventory.credit_listener_port(dst_ip, dst_port, timestamp=ts)
             dst_asset = self.inventory.get(dst_ip)
             if dst_asset and dst_asset.ports_seen:
                 self._classify_and_score(dst_asset)
@@ -255,14 +523,31 @@ class CaptureEngine:
                     if dst_port not in seen:
                         seen.add(dst_port)
                         self._log(f"{dst_ip} <- port {dst_port} ({proto or '?'}) from {src_ip}", "cyan")
+        if asset is None:
+            asset = self.inventory.get(src_ip)
 
-        asset = self.inventory.get(src_ip)
+        # Resolve destination Asset for topology edge creation.
+        # An edge is only created when BOTH endpoints are resolved Assets at capture time.
+        # If dst_ip was credited as a listener port or already known, it is resolved.
+        # Unresolved destinations produce no topology edge — this is deliberate.
+        # topology_edges is an asset relationship aggregate, not a record of
+        # every unresolved communication observation.
+        dst_asset = self.inventory.get(dst_ip) if dst_ip else None
+        if dst_asset:
+            self._check_pending_dhcp(dst_asset)
+        self._record_topology_edge(
+            src_asset=asset, dst_asset=dst_asset,
+            src_ip=src_ip, dst_ip=dst_ip,
+            src_port=src_port, dst_port=dst_port,
+            proto=proto, service_ports=service_ports, ts=ts,
+        )
         if asset:
             if asset.vendor == "Unknown" and src_mac:
                 vendor = lookup_vendor(src_mac, self._get_oui_db())
                 asset.vendor = vendor
-                asset.is_ot_vendor = is_ot_vendor(vendor)
-                if asset.is_ot_vendor:
+                asset.vendor_class = classify_vendor(vendor)
+                asset.is_ot_vendor = (asset.vendor_class == VENDOR_CLASS_OT)
+                if asset.vendor_class == VENDOR_CLASS_OT:
                     self._log(f"{src_ip} -> OUI match: {vendor}", "yellow")
                     # Add vendor evidence
                     asset.add_evidence(
@@ -273,14 +558,46 @@ class CaptureEngine:
                         confidence="HIGH",
                         detail=f"MAC OUI matches OT vendor {vendor}"
                     )
-                elif vendor != "Unknown":
+                elif asset.vendor_class == VENDOR_CLASS_IT:
                     asset.add_evidence(
                         evidence_type="vendor",
                         value=vendor,
                         weight=15,
                         source="OUI",
                         confidence="MEDIUM",
+                        detail=f"MAC OUI matches IT/networking vendor {vendor}"
+                    )
+                elif asset.vendor_class == VENDOR_CLASS_NEUTRAL:
+                    asset.add_evidence(
+                        evidence_type="vendor",
+                        value=vendor,
+                        weight=10,
+                        source="OUI",
+                        confidence="MEDIUM",
+                        detail=f"MAC OUI matches dual-use/infrastructure vendor {vendor}"
+                    )
+                elif vendor != "Unknown":
+                    asset.add_evidence(
+                        evidence_type="vendor",
+                        value=vendor,
+                        weight=5,
+                        source="OUI",
+                        confidence="LOW",
                         detail=f"MAC OUI: {vendor}"
+                    )
+
+            # B4: Enrich with curated OUI metadata (device family hint)
+            if src_mac and src_mac.strip().lower() != "unknown":
+                meta = lookup_oui_metadata(src_mac)
+                if meta and meta.get("device_family_hint"):
+                    hint = meta["device_family_hint"]
+                    asset.add_evidence(
+                        evidence_type="os_hint",
+                        value=hint,
+                        weight=5,
+                        source="OUI_metadata",
+                        confidence="LOW",
+                        detail=f"OUI device family hint: {hint}",
                     )
 
             # Classify asset based on ports it listens on OR contacts
@@ -357,6 +674,7 @@ class CaptureEngine:
         # It might be a client that only talks to OT devices.
         if not asset.ports_seen:
             # Override classification: treat as unknown with special role
+            asset.classification_type = "Unknown"
             asset.is_ot = None
             asset.role = "Possible OT Client"
             asset.confidence = "LOW"
@@ -373,6 +691,12 @@ class CaptureEngine:
         asset.protocols = result["protocols"]
         asset.role = result["role"]
         asset.is_ot = result["is_ot"]
+        if result.get("is_ot") is True:
+            asset.classification_type = "OT"
+        elif result.get("is_ot") is False:
+            asset.classification_type = "IT"
+        else:
+            asset.classification_type = "Unknown"
         asset.confidence = result["confidence"]
 
         if result.get("behavioral_constraints"):
@@ -453,13 +777,35 @@ class CaptureEngine:
 
         return "Unknown"
 
-    def _record_topology_edge(self, src_ip, dst_ip, src_port, dst_port, proto, service_ports, ts):
-        if not src_ip or not dst_ip:
-            return
-        if not self.inventory.is_asset_ip(src_ip) or not self.inventory.is_asset_ip(dst_ip):
+    def _record_topology_edge(self, src_asset, dst_asset, src_ip, dst_ip,
+                               src_port, dst_port, proto, service_ports, ts):
+        """
+        Record a topology edge between two resolved Assets.
+
+        INVARIANT: Both src_asset and dst_asset must be resolved Asset objects.
+        An edge is only created when BOTH endpoints are resolved Assets at
+        capture time. topology_edges is an asset relationship aggregate, not
+        a record of every unresolved communication observation. Unresolved
+        destinations produce no topology edge — this is deliberate and must
+        not be "fixed" later by retrospective IP→Asset reconstruction.
+
+        Edge key uses Asset.primary_key for persistent identity that survives
+        IP changes. source_ip/destination_ip are stored as metadata representing
+        the most-recently-observed IPs for this aggregate edge — NOT identity keys.
+        Asset.ip_history is the authoritative historical IP-assignment timeline.
+        """
+        # Both endpoints must be resolved Assets — no exceptions.
+        if not src_asset or not dst_asset:
             return
 
-        key = (src_ip, dst_ip)
+        src_pk = src_asset.primary_key
+        dst_pk = dst_asset.primary_key
+
+        # Self-loops are not meaningful topology edges.
+        if src_pk == dst_pk:
+            return
+
+        key = (src_pk, dst_pk)
         edge = self.topology_edges.setdefault(key, {
             "protocols": set(),
             "count": 0,
@@ -467,11 +813,19 @@ class CaptureEngine:
             "last_seen": ts,
             "src_port": src_port,
             "dst_port": dst_port,
+            # Edge metadata: most-recently-observed IPs for this aggregate edge.
+            # These are NOT identity keys. Asset.ip_history is authoritative
+            # for historical IP assignments.
+            "source_ip": src_ip,
+            "destination_ip": dst_ip,
         })
         edge["count"] += 1
         edge["last_seen"] = ts
         if edge["first_seen"] is None:
             edge["first_seen"] = ts
+        # Update IP metadata to reflect the most recent observation.
+        edge["source_ip"] = src_ip
+        edge["destination_ip"] = dst_ip
 
         protocol = self._topology_protocol_label(src_port, dst_port, proto, service_ports)
         if protocol:
@@ -627,27 +981,36 @@ class CaptureEngine:
         from scrutics.passive import enforce_passive
         enforce_passive()
         from scapy.all import PcapReader
+        self._stop_event.clear()
         self._log(f"Streaming PCAP: {filepath}", "cyan")
         count = 0
         with PcapReader(filepath) as packets:
             for pkt in packets:
+                if self._stop_event.is_set():
+                    break
                 self._process_packet(pkt)
                 count += 1
         self._log(f"Processed {count} packets", "dim white")
 
     def start_zeek(self, filepath: str):
         from scrutics.parsers.zeek import extract_flows_from_zeek
+        self._stop_event.clear()
         flows = extract_flows_from_zeek(filepath)
         self._log(f"Loaded {len(flows)} flows from Zeek log", "cyan")
         for flow in flows:
+            if self._stop_event.is_set():
+                break
             self._process_flow(flow)
 
     def start_suricata(self, filepath: str):
         from scrutics.parsers.suricata import extract_flows_from_eve
+        self._stop_event.clear()
         flows = extract_flows_from_eve(filepath)
         alert_count = sum(1 for f in flows if "alert" in f)
         self._log(f"Loaded {len(flows)} events ({alert_count} alerts) from EVE", "cyan")
         for flow in flows:
+            if self._stop_event.is_set():
+                break
             self._process_flow(flow)
 
     def start_file(self, filepath: str):

@@ -1,10 +1,8 @@
-"""
-Tests for new Phase 2+ modules:
-  - scrutics.parsers.detector
-  - scrutics.parsers.zeek
-  - scrutics.parsers.suricata
-  - scrutics.baseline.engine
-  - scrutics.baseline.scorer
+"""Tests for parsers and baseline modules.
+
+Covers file-type detection, Zeek conn.log parsing, Suricata EVE JSON
+parsing, baseline engine anomaly detection, confidence scorer, and
+PCAP timestamp handling.
 """
 
 import os
