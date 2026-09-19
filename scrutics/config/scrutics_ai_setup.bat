@@ -27,7 +27,7 @@ if "%CHOICE%"=="1" (
     set "PROVIDER_LABEL=Google Gemini"
     set "KEY_URL=https://aistudio.google.com/app/apikey"
     set "YAML_PROVIDER=gemini"
-    set "YAML_MODEL=gemini-2.0-flash"
+    set "YAML_MODEL=gemini-3.8-flash"
     goto :get_key
 )
 if "%CHOICE%"=="2" (

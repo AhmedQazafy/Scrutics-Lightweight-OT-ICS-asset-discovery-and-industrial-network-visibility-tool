@@ -1690,7 +1690,7 @@ def write_manifest(session_dir: str, metadata: dict | None = None) -> str:
         manifest_data = {
             "format": "scrutics-evidence",
             "version": 1,
-            "scrutics_version": meta.get("scrutics_version", "0.6.0"),
+            "scrutics_version": meta.get("scrutics_version", "0.6.1"),
             "created_at": created_at,
             "capture_started": capture_started,
             "capture_ended": capture_ended,

@@ -187,6 +187,11 @@ config:
             action="store_true",
             help="delete ai.yaml config file (requires re-setup)",
         )
+        sp.add_argument(
+            "--diagnose",
+            action="store_true",
+            help="run 14-stage progressive diagnostics suite on configured AI provider",
+        )
 
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--live", metavar="INTERFACE",
@@ -1037,6 +1042,7 @@ def _ask_one(
     ctx: object,
     question: str,
     conversation_history: list,
+    status_callback: object = None,
 ) -> str | None:
     """
     Submit a single question through the agent loop, using conversation_history
@@ -1064,6 +1070,7 @@ def _ask_one(
         provider=provider,
         ctx=ctx,
         user_message=full_question,
+        status_callback=status_callback,
     )
 
 
@@ -1099,6 +1106,17 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
     conversation_history: list[tuple[str, str]] = []
     spinner = Spinner("Thinking...")
 
+    def _cli_retry_callback(attempt: int, total: int, delay: float) -> None:
+        if delay > 0:
+            spinner.set_message(f"Waiting {int(round(delay))}s before retry (attempt {attempt} of {total})...")
+        else:
+            spinner.set_message(f"Retrying (attempt {attempt} of {total})...")
+
+    if hasattr(provider, "set_retry_callback"):
+        provider.set_retry_callback(_cli_retry_callback)
+    elif hasattr(provider, "retry_callback"):
+        provider.retry_callback = _cli_retry_callback
+
     def _do_question(question: str) -> int | None:
         """Ask one question. Returns non-zero exit code on fatal error, else None."""
         nonlocal conversation_history, ctx
@@ -1110,9 +1128,16 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
             except Exception:
                 pass
 
+            spinner.set_message("Thinking...")
             spinner.start()
             try:
-                answer = _ask_one(provider, ctx, question, conversation_history)
+                answer = _ask_one(
+                    provider,
+                    ctx,
+                    question,
+                    conversation_history,
+                    status_callback=spinner.set_message,
+                )
             finally:
                 spinner.stop()
         except KeyboardInterrupt:
@@ -1185,7 +1210,7 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
 
 
 _CLI_ONBOARDING_PROVIDERS = [
-    ("gemini",    "Google Gemini  (free tier — recommended)", "gemini-2.0-flash",  "GEMINI_API_KEY",    "https://aistudio.google.com/app/apikey"),
+    ("gemini",    "Google Gemini  (free tier — recommended)", "gemini-3.8-flash",  "GEMINI_API_KEY",    "https://aistudio.google.com/app/apikey"),
     ("openai",    "OpenAI                                   ", "gpt-4o-mini",       "OPENAI_API_KEY",    "https://platform.openai.com/api-keys"),
     ("anthropic", "Anthropic                                ", "claude-haiku-4-5",  "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
     ("ollama",    "Ollama (local, no key needed)            ", "qwen3.5:4b",        None,                None),
@@ -1330,6 +1355,15 @@ def run_ai(args) -> int:
     One-shot:    scrutics ai "What PLCs were on the network?"
     Interactive: scrutics ai                  (prompts for questions)
     """
+    # ── Diagnose command ───────────────────────────────────────────────────────
+    raw_question = getattr(args, "question", [])
+    q_tokens = [raw_question] if isinstance(raw_question, str) else list(raw_question)
+    is_diagnose = getattr(args, "diagnose", False) or (q_tokens and str(q_tokens[0]).strip().lower() == "diagnose")
+    if is_diagnose:
+        from scrutics.ai.diagnostics import run_ai_diagnostics
+        provider_override = getattr(args, "provider", None)
+        return run_ai_diagnostics(provider_name=provider_override)
+
     session_arg = getattr(args, "session", None)
     output_base = getattr(args, "output", "output")
 

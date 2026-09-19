@@ -1800,6 +1800,23 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
             def status_cb(msg: str):
                 self.app.call_from_thread(self._update_worker_status, msg)
 
+            def retry_cb(attempt: int, total: int, delay: float):
+                if delay > 0:
+                    self.app.call_from_thread(
+                        self._update_worker_status,
+                        f"Waiting {int(round(delay))}s before retry (attempt {attempt} of {total})..."
+                    )
+                else:
+                    self.app.call_from_thread(
+                        self._update_worker_status,
+                        f"Retrying (attempt {attempt} of {total})..."
+                    )
+
+            if hasattr(provider, "set_retry_callback"):
+                provider.set_retry_callback(retry_cb)
+            elif hasattr(provider, "retry_callback"):
+                provider.retry_callback = retry_cb
+
             answer = run_agent_loop(
                 provider=provider,
                 ctx=ctx,

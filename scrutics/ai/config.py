@@ -7,7 +7,6 @@ from typing import Any
 import yaml
 
 from scrutics.ai.provider import LLMProvider, LLMProviderError
-from scrutics.ai.ollama_provider import OllamaProvider
 
 _PKG_DIR = os.path.dirname(os.path.dirname(__file__))
 _DEFAULT_PKG_AI_CONFIG = os.path.join(_PKG_DIR, "config", "ai.yaml")
@@ -97,6 +96,7 @@ def build_provider(config: dict[str, Any] | None = None) -> LLMProvider:
     provider_name = str(cfg.get("provider", "ollama")).strip().lower()
 
     if provider_name == "ollama":
+        from scrutics.ai.ollama_provider import OllamaProvider
         model = str(cfg.get("model", "qwen3.5:4b"))
         base_url = str(cfg.get("base_url", "http://localhost:11434"))
         temperature = float(cfg.get("temperature", 0.3))
@@ -142,7 +142,7 @@ def build_provider(config: dict[str, Any] | None = None) -> LLMProvider:
         from scrutics.ai.gemini_provider import GeminiProvider
         api_key = _resolve_env_var(str(cfg.get("api_key", "")))
         return GeminiProvider(
-            model=str(cfg.get("model", "gemini-2.0-flash")),
+            model=str(cfg.get("model", "gemini-3.8-flash")),
             api_key=api_key,
             temperature=float(cfg.get("temperature", 0.3)),
             max_tokens=int(cfg.get("max_tokens", 1024)),

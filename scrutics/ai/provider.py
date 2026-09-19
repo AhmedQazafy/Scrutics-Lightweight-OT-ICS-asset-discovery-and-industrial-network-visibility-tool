@@ -1,7 +1,40 @@
 """LLM Provider abstraction and exception hierarchy for Scrutics."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Iterator
+
+
+class ChatResult(str):
+    """Plain text response from an LLM provider, preserving optional thought signature."""
+
+    def __new__(cls, content: str, thought_signature: str | None = None):
+        obj = super().__new__(cls, content)
+        obj.thought_signature = thought_signature
+        return obj
+
+
+@dataclass
+class ToolCall:
+    """Represents a normalized tool call invocation from an LLM provider."""
+
+    id: str = ""
+    name: str = ""
+    arguments: str = ""
+    thought_signature: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "id": self.id,
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "arguments": self.arguments,
+            },
+        }
+        if self.thought_signature is not None:
+            d["thought_signature"] = self.thought_signature
+        return d
 
 
 class LLMProviderError(Exception):

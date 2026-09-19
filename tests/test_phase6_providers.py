@@ -288,7 +288,7 @@ class TestAnthropicProvider(unittest.TestCase):
 # ── Google Gemini generateContent provider ───────────────────────────────────
 
 class TestGeminiProvider(unittest.TestCase):
-    def _make_provider(self, model="gemini-2.0-flash"):
+    def _make_provider(self, model="gemini-3.8-flash"):
         from scrutics.ai.gemini_provider import GeminiProvider
         return GeminiProvider(model=model, api_key="gemini-test-key")
 
@@ -345,7 +345,7 @@ class TestGeminiProvider(unittest.TestCase):
         with patch.dict(os.environ, {"MY_GEMINI_KEY": "gemini-test"}):
             p = build_provider({
                 "provider": "gemini",
-                "model": "gemini-2.0-flash",
+                "model": "gemini-3.8-flash",
                 "api_key": "${MY_GEMINI_KEY}",
             })
         from scrutics.ai.gemini_provider import GeminiProvider
@@ -353,7 +353,7 @@ class TestGeminiProvider(unittest.TestCase):
 
     def test_api_key_absent_from_error_message(self):
         from scrutics.ai.gemini_provider import GeminiProvider
-        provider = GeminiProvider(model="gemini-2.0-flash", api_key="super-secret-gemini-ABCDEF")
+        provider = GeminiProvider(model="gemini-3.8-flash", api_key="super-secret-gemini-ABCDEF")
         with patch("requests.post", return_value=_make_response(403, {})):
             with self.assertRaises(LLMResponseError) as ctx:
                 provider.chat([{"role": "user", "content": "hi"}])

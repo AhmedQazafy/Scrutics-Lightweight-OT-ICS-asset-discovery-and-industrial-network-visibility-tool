@@ -2,6 +2,42 @@
 
 All notable changes to Scrutics are documented here.
 
+## [0.6.1] — 2026-09-19
+
+### Fixed — AI Reliability & Tool-Calling Protocol
+- **Gemini Wire Protocol Compliance**:
+  - Restored strict FunctionCall ID round-trip preservation without falling back to function names.
+  - Aligned `thoughtSignature` placement to Google Gemini REST specification as a property on `Part` rather than inside `FunctionCall`, preventing HTTP 400 rejection on multi-turn tool replay.
+  - Implemented `ChatResult` (inheriting from `str`) preserving opaque `thought_signature` across plain-text and tool turns without breaking string assertions or agent consumers.
+  - Unified parallel tool calls into single `model` Content blocks with signature on initial call, and grouped all consecutive function responses into a single `user` Content block.
+- **Model Baseline Unification**:
+  - Replaced deprecated/EOL default models across all surfaces (`cli.py`, `config.py`, `gemini_provider.py`, `model_discovery.py`, setup scripts) with GA `gemini-3.8-flash`.
+- **Bounded Exponential Backoff & Error Taxonomy**:
+  - Implemented bounded exponential backoff with full jitter (max 4 attempts, retry on 408/429/500/502/503/504 and transient connection drops).
+  - Added support for Google `google.rpc.RetryInfo.retryDelay` in string (`"30s"`) and protobuf struct formats.
+  - Added sanitized logging and taxonomy mapping for Google RPC status codes (`INVALID_ARGUMENT`, `UNAUTHENTICATED`, `RESOURCE_EXHAUSTED`, `UNAVAILABLE`, etc.) guaranteeing zero leakage of API keys, prompts, IPs, or MAC addresses.
+- **CI & Optional Dependency Boundary**:
+  - Isolated core package from optional `requests` requirement using PEP 562 lazy loading in `scrutics.ai`.
+  - Updated CI test workflow to install `.[ai]` extra ensuring end-to-end coverage.
+
+### Added — Progressive AI Diagnostics
+- **14-Stage Diagnostic Engine** (`scrutics/ai/diagnostics.py`): Progressive verification from configuration and environment to DNS, TLS, authentication, schema handling, function calling, thought signatures, round-trip replay, and full agent execution loop.
+- **Diagnostics CLI**: Integrated `scrutics ai --diagnose` and `scrutics ai diagnose` command with layer-specific remediation guidance.
+
+### Added — Retry Progress Indication
+- **CLI & TUI Backoff Visibility**:
+  - Thread-safe `retry_callback` in `GeminiProvider` reporting attempt number, total attempts, and resolved delay before backoff sleeps.
+  - CLI `Spinner` dynamically updates to reflect retry backoff delays (`Waiting Ns before retry (attempt X of Y)...`) and in-flight retried requests (`Retrying (attempt X of Y)...`) without extra line breaks. Non-TTY invocations remain silent.
+  - TUI `AIAssistantModal` status label displays real-time retry progress across worker thread boundaries.
+
+### Known Limitations
+- **Text-part signatures are now load-bearing**: With `gemini-3.8-flash` as default (GA Flash model; `gemini-2.0-flash` EOL June 2026), Gemini emits a `thoughtSignature` on the final text part of most responses. The C2 preservation path is exercised on every turn, not only tool-calling turns.
+- **Live rate-limit behavior unverified against real API**: Retry logic was built against documented status codes and documented `RetryInfo` schemas. Confirmation of live 429 `RetryInfo.retryDelay` wire population requires active testing (see post-release verification list: `docs/post-release-verification-v0.6.1.md`).
+- **Multi-turn REPL text-part signature loss**: Multi-turn CLI/TUI REPL sessions concatenate prior turns into a contextual prompt string; signatures attached to text parts in earlier turns are not replayed. This does not affect the agent loop's internal tool-calling rounds, which preserve signatures verbatim.
+- **Default model chosen on EOL/GA status, not full cost comparison**: `gemini-3.8-flash` was selected because `gemini-2.0-flash` reached EOL. A full cost/latency comparison across the GA model tier was not performed in v0.6.1 (see Part 2 of the v0.6.1a micro-contract).
+
+Post-release verification checklist: see `docs/post-release-verification-v0.6.1.md`.
+
 ---
 
 ## [0.6.0] — 2026-09-16
