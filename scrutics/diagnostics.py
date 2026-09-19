@@ -78,10 +78,22 @@ def check_libpcap() -> dict:
         }
     try:
         import ctypes
+        import ctypes.util
         if sys.platform == "win32":
             ctypes.cdll.LoadLibrary("wpcap")
         else:
-            ctypes.cdll.LoadLibrary("libpcap.so.1")
+            lib = ctypes.util.find_library("pcap")
+            if lib:
+                ctypes.cdll.LoadLibrary(lib)
+            else:
+                for candidate in ("libpcap.so.0.8", "libpcap.so.1", "libpcap.so"):
+                    try:
+                        ctypes.cdll.LoadLibrary(candidate)
+                        break
+                    except OSError:
+                        continue
+                else:
+                    raise OSError("libpcap not found")
         return {"ok": True, "detail": "libpcap found"}
     except OSError:
         if sys.platform == "win32":

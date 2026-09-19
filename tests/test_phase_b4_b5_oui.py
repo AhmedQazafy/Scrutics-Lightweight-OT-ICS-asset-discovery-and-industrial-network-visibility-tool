@@ -512,8 +512,9 @@ class TestOUICLICommands:
             out = capsys.readouterr().out
             assert "[✗] Update failed:" in out
 
-    def test_doctor_includes_oui_and_remains_non_blocking(self, capsys):
+    def test_doctor_includes_oui_and_remains_non_blocking(self, monkeypatch, capsys):
         """scrutics doctor includes OUI section and outdated OUI does NOT cause doctor failure."""
+        monkeypatch.setattr("scrutics.diagnostics.check_libpcap", lambda: {"ok": True, "detail": "libpcap found"})
         report = full_report()
         assert "oui" in report
         assert report["oui"]["ok"] is True
