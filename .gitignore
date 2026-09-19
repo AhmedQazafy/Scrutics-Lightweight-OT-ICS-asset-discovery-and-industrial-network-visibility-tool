@@ -13,3 +13,5 @@ oui.txt
 .coverage
 output/
 .kiro/
+*.bak
+*.tmp

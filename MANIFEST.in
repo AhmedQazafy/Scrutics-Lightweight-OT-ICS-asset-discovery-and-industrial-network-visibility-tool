@@ -1,0 +1,45 @@
+# MANIFEST.in — Scrutics sdist manifest
+# Controls what goes into the source distribution (sdist).
+# The wheel already uses [tool.setuptools.package-data] in pyproject.toml.
+
+# ── Build metadata ──────────────────────────────────────────────
+include pyproject.toml
+include README.md
+include CHANGELOG.md
+
+# LICENSE will be added by the PEP 639 migration commit
+include LICENSE
+
+# ── Documentation ───────────────────────────────────────────────
+recursive-include docs *.md
+
+# ── Package data (mirrors pyproject.toml [tool.setuptools.package-data]) ──
+include scrutics/classifier/ics_oui.txt
+include scrutics/classifier/curated_oui.yaml
+recursive-include scrutics/config *.yaml *.sh *.bat
+include scrutics/web/*.js
+
+# ── Explicit excludes for runtime-generated files ───────────────
+# oui.txt is written by scripts/download_oui.py — must never ship
+exclude scrutics/classifier/oui.txt
+
+# ── Prune directories that should never ship in an sdist ────────
+prune .kiro
+prune .github
+prune tests
+prune scripts
+prune output
+prune dist
+prune build
+prune .pytest_cache
+prune .eggs
+prune *.egg-info
+
+# ── Global excludes ────────────────────────────────────────────
+global-exclude *.py[cod]
+global-exclude __pycache__
+global-exclude *.bak
+global-exclude *.tmp
+global-exclude *.log
+global-exclude .DS_Store
+global-exclude *.egg-info

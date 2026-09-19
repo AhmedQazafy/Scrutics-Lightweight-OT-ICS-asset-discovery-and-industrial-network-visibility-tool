@@ -48,8 +48,9 @@ include = ["scrutics*"]
 [tool.setuptools.package-data]
 scrutics = [
     "config/*.yaml",
+    "config/*.sh",
+    "config/*.bat",
     "classifier/ics_oui.txt",
-    "classifier/oui.txt",
     "classifier/curated_oui.yaml",
     "web/*.js",
 ]
