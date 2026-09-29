@@ -110,10 +110,15 @@ class CaptureEngine:
         if proto == "UDP" and dst_port in (5353, 3702):
             self._process_discovery_packet(src_ip, dst_ip, dst_port, pkt, now_ts)
 
+        # Modbus TCP payload (port 502), parsed once the source asset is resolved
+        modbus_payload = None
+        if proto == "TCP" and (src_port == 502 or dst_port == 502) and Raw in pkt:
+            modbus_payload = pkt[Raw].load
+
         self._process_flow_data(src_ip=src_ip, src_mac=src_mac,
                                 dst_ip=dst_ip, src_port=src_port,
                                 dst_port=dst_port, proto=proto, ts=now_ts,
-                                trust_dst_port=False)
+                                trust_dst_port=False, modbus_payload=modbus_payload)
 
     def _process_ttl(self, ip: str, ttl: int, ts: float):
         """Extract TTL as OS hint evidence."""
@@ -418,8 +423,99 @@ class CaptureEngine:
             enrichment = self._pending_dhcp.pop(norm)
             self._apply_dhcp_enrichment(asset, enrichment)
 
+    def _process_modbus_payload(self, payload_bytes: bytes, src_ip: str, src_port: int, dst_port: int, ts: float):
+        """
+        Parse Modbus TCP payload and add validated protocol evidence.
+        
+        Handles multiple complete ADUs within a single payload. Each validated
+        Modbus observation adds protocol evidence with higher confidence than
+        port-based identification alone.
+        
+        Args:
+            payload_bytes: Raw TCP payload bytes
+            src_ip: Source IP address
+            src_port: TCP source port
+            dst_port: TCP destination port
+            ts: Packet timestamp
+        """
+        from scrutics.parsers.modbus import parse_modbus_payload
+        
+        # Get the asset for this IP
+        asset = self.inventory.get(src_ip)
+        if not asset:
+            return
+        
+        # Parse the payload
+        observations = parse_modbus_payload(payload_bytes, src_port, dst_port)
+        
+        # Add evidence for each validated observation
+        for obs in observations:
+            # Build detailed description
+            func_name = self._get_modbus_function_name(obs.function_code)
+            
+            if obs.is_exception:
+                from scrutics.parsers.modbus import get_exception_name
+                exception_name = get_exception_name(obs.exception_code)
+                detail = f"Modbus TCP Exception: {func_name}, ExceptionCode=0x{obs.exception_code:02X} ({exception_name}), TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs.direction}"
+            else:
+                detail = f"Modbus TCP: {func_name}, TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs.direction}"
+                
+                # Add address/quantity for function codes 03 and 04
+                if obs.starting_address is not None and obs.quantity is not None:
+                    detail += f", StartAddr=0x{obs.starting_address:04X}, Quantity={obs.quantity}"
+            
+            # Check for existing protocol evidence (avoid duplicates)
+            existing = any(
+                e.type == "protocol" and e.value == "Modbus TCP" and e.source == "modbus_parser"
+                for e in asset.evidence
+            )
+            
+            if not existing:
+                # Add validated protocol evidence
+                # Uses same weight as port-based (20) but with HIGH confidence and modbus_parser source
+                asset.add_evidence(
+                    evidence_type="protocol",
+                    value="Modbus TCP",
+                    weight=20,
+                    source="modbus_parser",
+                    confidence="HIGH",
+                    detail=detail
+                )
+                self._log(f"{src_ip} -> Modbus TCP validated: {func_name}", "cyan")
+    
+    def _get_modbus_function_name(self, func_code: int) -> str:
+        """
+        Get human-readable name for Modbus function code.
+        
+        Args:
+            func_code: Modbus function code (0x01-0xFF)
+            
+        Returns:
+            Human-readable function name
+        """
+        # Check if this is an exception (high bit set)
+        if func_code & 0x80:
+            base_code = func_code & 0x7F
+            base_name = self._get_modbus_function_name(base_code)
+            return f"Exception {base_name}"
+        
+        # Map function codes to names
+        func_names = {
+            0x01: "Function 0x01 (Read Coils)",
+            0x02: "Function 0x02 (Read Discrete Inputs)",
+            0x03: "Function 0x03 (Read Holding Registers)",
+            0x04: "Function 0x04 (Read Input Registers)",
+            0x05: "Function 0x05 (Write Single Coil)",
+            0x06: "Function 0x06 (Write Single Register)",
+            0x0F: "Function 0x0F (Write Multiple Coils)",
+            0x10: "Function 0x10 (Write Multiple Registers)",
+        }
+        
+        return func_names.get(func_code, f"Function 0x{func_code:02X}")
+
     def _process_flow_data(self, src_ip, src_mac, dst_ip, dst_port, proto, ts,
-                           src_port=None, alert=None, trust_dst_port=True):
+                           src_port=None, alert=None, trust_dst_port=True,
+                           modbus_payload=None):
         if not self.inventory.is_asset_ip(src_ip):
             return
         if not self.inventory.is_asset_ip(dst_ip):
@@ -485,6 +581,9 @@ class CaptureEngine:
         asset = self.inventory.update(ip=src_ip, mac=src_mac, dst_ip=dst_ip, dst_port=dst_port, timestamp=ts)
         if asset:
             self._check_pending_dhcp(asset)
+        # Runs after asset resolution so the first packet from a new device keeps its observation
+        if asset and modbus_payload is not None:
+            self._process_modbus_payload(modbus_payload, src_ip, src_port, dst_port, ts)
         service_ports = known_service_ports()
 
         # Add evidence for each port matched against the signature database
