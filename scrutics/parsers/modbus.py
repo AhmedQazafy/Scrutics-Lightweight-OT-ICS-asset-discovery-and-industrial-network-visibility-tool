@@ -60,8 +60,8 @@ class ModbusObservation:
         transaction_id: MBAP Transaction ID field
         unit_id: MBAP Unit ID field (0x00 = broadcast, 0x01-0xF7 = downstream device)
         function_code: Modbus function code (0x01-0x10, or 0x81-0x90 for exceptions)
-        is_exception: True if this is an exception response
-        exception_code: Exception code (0x01-0x08) if is_exception is True
+        is_exception: True if this is an exception response (from_server only)
+        exception_code: Exception code if is_exception is True, otherwise None
         direction: 'to_server' if dst_port==502, 'from_server' if src_port==502
         starting_address: Starting register/coil address (function codes 03/04 only)
         quantity: Number of registers/coils requested (function codes 03/04 only)
@@ -240,11 +240,15 @@ def parse_modbus_payload(payload_bytes: bytes, src_port: int, dst_port: int) -> 
         quantity = None
 
         if is_exception:
-            # Exception codes are carried only by server responses
-            if direction == "from_server":
-                if len(pdu) < _EXCEPTION_PDU_LENGTH:
-                    break
-                exception_code = pdu[1]
+            # Only servers send exception responses; a request with the exception bit set
+            # is not a valid Modbus request, so skip this ADU
+            # Source: Modbus Application Protocol Specification V1.1b3, section 7
+            if direction == "to_server":
+                offset += adu_size
+                continue
+            if len(pdu) < _EXCEPTION_PDU_LENGTH:
+                break
+            exception_code = pdu[1]
         else:
             if direction == "to_server":
                 min_length = _MIN_REQUEST_PDU_LENGTH[func_code]

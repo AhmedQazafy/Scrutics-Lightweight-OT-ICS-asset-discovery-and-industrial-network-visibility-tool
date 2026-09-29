@@ -438,7 +438,7 @@ class CaptureEngine:
             dst_port: TCP destination port
             ts: Packet timestamp
         """
-        from scrutics.parsers.modbus import parse_modbus_payload
+        from scrutics.parsers.modbus import parse_modbus_payload, get_exception_name
         
         # Get the asset for this IP
         asset = self.inventory.get(src_ip)
@@ -452,10 +452,21 @@ class CaptureEngine:
         for obs in observations:
             # Build detailed description
             func_name = self._get_modbus_function_name(obs.function_code)
+            exception_name = get_exception_name(obs.exception_code) if obs.is_exception else None
+            # Undefined exception codes keep their raw value so distinct codes stay distinct
+            summary_exception_name = exception_name
+            if exception_name == "Unknown":
+                summary_exception_name = f"Unknown (0x{obs.exception_code:02X})"
+            
+            # Every valid observation updates the per-protocol summary
+            asset.record_protocol_observation(
+                "Modbus TCP",
+                sends_request=(obs.direction == "to_server"),
+                function_code=obs.function_code,
+                exception_name=summary_exception_name,
+            )
             
             if obs.is_exception:
-                from scrutics.parsers.modbus import get_exception_name
-                exception_name = get_exception_name(obs.exception_code)
                 detail = f"Modbus TCP Exception: {func_name}, ExceptionCode=0x{obs.exception_code:02X} ({exception_name}), TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs.direction}"
             else:
                 detail = f"Modbus TCP: {func_name}, TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs.direction}"

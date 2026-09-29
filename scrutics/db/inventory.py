@@ -75,6 +75,16 @@ class Evidence:
 
 
 @dataclass
+class ProtocolObservationSummary:
+    """Accumulated validated observations of one protocol on one asset."""
+    sends_requests: bool = False       # asset sent at least one request to a server
+    answers_as_server: bool = False    # asset sent at least one response as a server
+    function_codes: dict = field(default_factory=dict)  # function code as observed -> count
+    exceptions: dict = field(default_factory=dict)      # exception name -> count
+    observation_count: int = 0
+
+
+@dataclass
 class Asset:
     ip: str
     mac: str
@@ -113,6 +123,8 @@ class Asset:
     classification_confidence_pct: int = 0                 # Overall confidence based on evidence
     domain: str = "Unknown"                                # "Industrial" | "Building_Automation" | "Utility" | "Enterprise" | "Unknown"
     ip_history: list = field(default_factory=list)         # List[dict] - chronological IP episodes: [{"ip": str, "first_seen": float, "last_seen": float}]
+    # protocol name -> ProtocolObservationSummary; in-memory only, not part of repr or equality
+    protocol_summaries: dict = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self, is_ot: Optional[Union[bool, str]] = None):
         # Sync vendor_class and is_ot_vendor
@@ -212,6 +224,25 @@ class Asset:
             self.classification_type = "Infrastructure"
         else:
             self.classification_type = "Unknown"
+
+    def record_protocol_observation(self, protocol: str, *, sends_request: bool,
+                                    function_code: int, exception_name: str | None = None):
+        """
+        Accumulate one validated protocol observation into the per-protocol summary.
+        Does not add evidence and does not change classification or confidence.
+        """
+        summary = self.protocol_summaries.get(protocol)
+        if summary is None:
+            summary = ProtocolObservationSummary()
+            self.protocol_summaries[protocol] = summary
+        if sends_request:
+            summary.sends_requests = True
+        else:
+            summary.answers_as_server = True
+        summary.function_codes[function_code] = summary.function_codes.get(function_code, 0) + 1
+        if exception_name is not None:
+            summary.exceptions[exception_name] = summary.exceptions.get(exception_name, 0) + 1
+        summary.observation_count += 1
 
     def add_os_hint(self, hint: str, confidence: str = "LOW"):
         """Add a tentative OS hint, deduplicated by value."""
