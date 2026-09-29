@@ -1028,8 +1028,6 @@ class CaptureEngine:
                 ),
                 40
             )
-            # Also set classification_confidence_pct to the same value
-            asset.classification_confidence_pct = asset.confidence_pct
             return
 
         asset.confidence_pct = confidence_pct(
@@ -1038,7 +1036,6 @@ class CaptureEngine:
             behavioral_s=asset.behavioral_score,
             directional_s=asset.directionality_score,
         )
-        asset.classification_confidence_pct = asset.confidence_pct  # Always set
         
     def request_stop(self):
         """Request that a live capture stop at the next capture interval."""
