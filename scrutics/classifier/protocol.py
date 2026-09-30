@@ -52,10 +52,16 @@ def reload_rules():
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def known_service_ports() -> set[int]:
-    """Return ports that are meaningful listener/service signals."""
+    """Return ports that are meaningful listener/service signals.
+
+    Every port signature, plus any port named by a user or builtin rule so that
+    port-based rules can match a listening service.
+    """
+    from scrutics.classifier.signatures import get_listener_ports
+
     with _RULE_LOCK:
         rules = list(_USER_RULES) + list(_BUILTIN_RULES)
-    ports = set(IT_PORTS) | set(ICS_PORTS)
+    ports = get_listener_ports()
     for rule in rules:
         port = rule.get("port")
         if isinstance(port, int):

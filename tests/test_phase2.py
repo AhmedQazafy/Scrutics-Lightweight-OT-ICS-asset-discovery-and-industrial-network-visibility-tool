@@ -239,10 +239,10 @@ class TestBaselineEngine:
         pkt = (
             Ether(src="00:11:22:33:44:55", dst="66:77:88:99:aa:bb")
             / IP(src="192.168.1.10", dst="192.168.1.20")
-            / TCP(sport=40000, dport=55555)
+            / TCP(sport=40000, dport=55556)
         )
         engine._process_packet(pkt)
-        assert 55555 in inventory.get("192.168.1.10").contacted_ports
+        assert 55556 in inventory.get("192.168.1.10").contacted_ports
         assert inventory.get("192.168.1.20") is None
 
     def test_raw_packet_credits_known_destination_port_as_listener(self):

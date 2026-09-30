@@ -120,6 +120,12 @@ OT_PORT_SIGNATURES = [
     # Phoenix Contact
     PortSignature(20547, "TCP", "PCWorx", "ot_port", 14, "HIGH",
                   category="OT", detail="Phoenix Contact PLC communication"),
+    PortSignature(1962, "TCP", "PCWorx", "ot_port", 14, "HIGH",
+                  category="OT", detail="Phoenix Contact PLC communication"),
+
+    # GE
+    PortSignature(18245, "TCP", "GE SRTP", "ot_port", 14, "HIGH",
+                  category="OT", detail="GE PLC communication"),
 ]
 
 # ── IT Service Ports ──────────────────────────────────────────────────────────
@@ -222,7 +228,10 @@ ALL_SIGNATURES: list[PortSignature] = (
 def get_signature(port: int, transport: str = "TCP") -> Optional[PortSignature]:
     """Look up a port signature by port and transport."""
     for sig in ALL_SIGNATURES:
-        if sig.port == port and (sig.transport == "Both" or sig.transport == transport):
+        if sig.port != port:
+            continue
+        # Dual-transport signatures ("TCP/UDP") match both TCP and UDP packets
+        if sig.transport in ("Both", "TCP/UDP") or sig.transport == transport:
             return sig
     return None
 
@@ -250,6 +259,11 @@ def get_infrastructure_ports() -> set[int]:
 def get_discovery_ports() -> set[int]:
     """Get all discovery port numbers."""
     return {s.port for s in DISCOVERY_PORT_SIGNATURES}
+
+
+def get_listener_ports() -> set[int]:
+    """Ports that can be credited as a listening service: every signature port."""
+    return {s.port for s in ALL_SIGNATURES}
 
 
 def get_all_service_ports() -> set[int]:

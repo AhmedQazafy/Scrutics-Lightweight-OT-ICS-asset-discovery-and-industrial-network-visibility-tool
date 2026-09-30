@@ -619,10 +619,11 @@ class CaptureEngine:
                         if sig.category == "OT":
                             self._log(f"{src_ip} -> OT port: {port} ({sig.name})", "cyan")
 
-        if src_port in service_ports:
+        if src_port in service_ports and self._credits_listener(src_port, src_port, dst_port, proto):
             self.inventory.credit_listener_port(src_ip, src_port, timestamp=ts)
 
-        if dst_ip and dst_port and (trust_dst_port or dst_port in service_ports):
+        if (dst_ip and dst_port and (trust_dst_port or dst_port in service_ports)
+                and self._credits_listener(dst_port, src_port, dst_port, proto)):
             self.inventory.credit_listener_port(dst_ip, dst_port, timestamp=ts)
             dst_asset = self.inventory.get(dst_ip)
             if dst_asset and dst_asset.ports_seen:
@@ -773,6 +774,22 @@ class CaptureEngine:
         self._packet_count += 1
         if self.progress_callback:
             self.progress_callback(self._packet_count)
+
+    def _credits_listener(self, port, src_port, dst_port, proto):
+        """
+        Whether a packet shows that `port` is a service offered by its endpoint.
+
+        The DHCP client port 68 is never a service (RFC 2131 section 4.1). When the
+        source and destination ports are equal, either peer could be the server, so
+        the port is credited only if its signature votes OT or IT; then both
+        endpoints are credited.
+        """
+        if port == 68:
+            return False
+        if src_port == dst_port:
+            sig = get_signature(port, proto)
+            return sig is not None and sig.category in ("OT", "IT")
+        return True
 
     def _classify_and_score(self, asset):
         from scrutics.classifier.protocol import classify_by_ports
