@@ -12,6 +12,7 @@ from scrutics.db.inventory import AssetInventory
 from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
 from scrutics.classifier.protocol import classify_by_ports, classification_evidence_from_ports
+from scrutics.classifier.asset_classifier import classify_asset
 from scrutics.classifier.signatures import (
     get_signature, get_all_service_ports, get_ot_ports,
     get_it_ports, get_infrastructure_ports, get_discovery_ports
@@ -414,6 +415,9 @@ class CaptureEngine:
                 asset.dns_names.append(fqdn)
             self._log(f"{asset.ip} -> DHCP FQDN: {fqdn}", "dim white")
 
+        # DHCP evidence never changes the class; refresh the explanation that lists it
+        classify_asset(asset)
+
     def _check_pending_dhcp(self, asset):
         """If asset has pending DHCP enrichment, apply it and remove from buffer."""
         if not asset or not asset.mac:
@@ -628,6 +632,7 @@ class CaptureEngine:
             dst_asset = self.inventory.get(dst_ip)
             if dst_asset and dst_asset.ports_seen:
                 self._classify_and_score(dst_asset)
+                classify_asset(dst_asset)
                 from scrutics.classifier.protocol import ICS_PORTS
                 if dst_port in ICS_PORTS:
                     seen = self._logged_dst_ports.setdefault(dst_ip, set())
@@ -711,27 +716,12 @@ class CaptureEngine:
                         detail=f"OUI device family hint: {hint}",
                     )
 
-            # Classify asset based on ports it listens on OR contacts
+            # Port-based role, protocol names and legacy scores
             if asset.ports_seen or asset.contacted_ports:
                 self._classify_and_score(asset)
 
-                # Add protocol evidence from classification
-                if asset.protocols:
-                    for proto_name in asset.protocols:
-                        if proto_name != "Unknown":
-                            existing = any(
-                                e.type == "protocol" and e.value == proto_name
-                                for e in asset.evidence
-                            )
-                            if not existing:
-                                asset.add_evidence(
-                                    evidence_type="protocol",
-                                    value=proto_name,
-                                    weight=20,
-                                    source="traffic",
-                                    confidence="HIGH",
-                                    detail=f"Observed {proto_name} protocol"
-                                )
+            # Decide the classification from the asset's current state
+            classify_asset(asset)
 
             self._check_behavioral_constraints(asset, dst_ip, dst_port, ts)
 
@@ -800,11 +790,8 @@ class CaptureEngine:
         # If the asset has no listening ports, it cannot be classified as OT/IT by itself.
         # It might be a client that only talks to OT devices.
         if not asset.ports_seen:
-            # Override classification: treat as unknown with special role
-            asset.classification_type = "Unknown"
-            asset.is_ot = None
+            # No listening ports: special role
             asset.role = "Possible OT Client"
-            asset.confidence = "LOW"
             # We'll cap confidence_pct later in _recompute_confidence
             # but we also clear the protocol_score because no listening ports
             asset.protocol_score = 0
@@ -817,14 +804,6 @@ class CaptureEngine:
         # Normal path for assets with listening ports
         asset.protocols = result["protocols"]
         asset.role = result["role"]
-        asset.is_ot = result["is_ot"]
-        if result.get("is_ot") is True:
-            asset.classification_type = "OT"
-        elif result.get("is_ot") is False:
-            asset.classification_type = "IT"
-        else:
-            asset.classification_type = "Unknown"
-        asset.confidence = result["confidence"]
 
         if result.get("behavioral_constraints"):
             asset.behavioral_constraints = result["behavioral_constraints"]

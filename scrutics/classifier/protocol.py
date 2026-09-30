@@ -87,20 +87,35 @@ def _rule_to_result(rule: dict, source: str, confidence: str = None) -> dict:
     return result
 
 
-def classify_by_ports(ports_seen: set, mac: str = None) -> dict:
+def match_user_rule(ports_seen: set, mac: str = None):
+    """
+    Find the user rule that applies to an asset.
+
+    Listening ports are tried in ascending order, then the MAC alone.
+    Returns (rule, matched_port, confidence_override) or (None, None, None);
+    matched_port is None and the confidence is MEDIUM for a MAC-only match.
+    """
     with _RULE_LOCK:
         user_rules = list(_USER_RULES)
-        builtin_rules = list(_BUILTIN_RULES)
-
-    # 1. User rules — single match, early return
-    for port in ports_seen:
+    for port in sorted(ports_seen):
         rule = match_rule(user_rules, port=port, mac=mac)
         if rule:
-            return _rule_to_result(rule, "user")
+            return rule, port, None
     if mac:
         rule = match_rule(user_rules, mac=mac)
         if rule:
-            return _rule_to_result(rule, "user", confidence=CONFIDENCE_MEDIUM)
+            return rule, None, CONFIDENCE_MEDIUM
+    return None, None, None
+
+
+def classify_by_ports(ports_seen: set, mac: str = None) -> dict:
+    with _RULE_LOCK:
+        builtin_rules = list(_BUILTIN_RULES)
+
+    # 1. User rules — single match, early return
+    rule, _, confidence = match_user_rule(ports_seen, mac)
+    if rule:
+        return _rule_to_result(rule, "user", confidence=confidence)
 
     # 2. Builtin YAML rules — collect all matches for multi-protocol detection
     if builtin_rules:

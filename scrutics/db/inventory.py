@@ -125,6 +125,10 @@ class Asset:
     ip_history: list = field(default_factory=list)         # List[dict] - chronological IP episodes: [{"ip": str, "first_seen": float, "last_seen": float}]
     # protocol name -> ProtocolObservationSummary; in-memory only, not part of repr or equality
     protocol_summaries: dict = field(default_factory=dict, repr=False, compare=False)
+    # Explanation of the current classification decision; in-memory only, not part of repr or equality
+    classification_rule: str = field(default="", repr=False, compare=False)
+    classification_reason: str = field(default="", repr=False, compare=False)
+    classification_conflicts: list = field(default_factory=list, repr=False, compare=False)
 
     def __post_init__(self, is_ot: Optional[Union[bool, str]] = None):
         # Sync vendor_class and is_ot_vendor
@@ -197,33 +201,6 @@ class Asset:
         total_weight = sum(e.weight for e in self.evidence)
         max_possible = 100
         self.classification_confidence_pct = min(total_weight, max_possible)
-
-        # Update classification type based on strongest evidence
-        self._update_classification_type()
-
-    def _update_classification_type(self):
-        """Determine classification type from evidence."""
-        # If asset has no listening ports, it cannot be OT/IT – it's a client.
-        if not self.ports_seen:
-            self.classification_type = "Unknown"
-            return
-
-        # Existing logic (only runs if ports_seen is non-empty)
-        ot_evidence = sum(1 for e in self.evidence
-                         if e.type in ["protocol", "port"] and "OT" in str(e.detail))
-        it_evidence = sum(1 for e in self.evidence
-                         if e.type in ["protocol", "port"] and "IT" in str(e.detail))
-        infra_evidence = sum(1 for e in self.evidence
-                            if e.type == "behavior" and "infrastructure" in str(e.detail).lower())
-
-        if ot_evidence > it_evidence and ot_evidence > infra_evidence:
-            self.classification_type = "OT"
-        elif it_evidence > ot_evidence and it_evidence > infra_evidence:
-            self.classification_type = "IT"
-        elif infra_evidence > 0:
-            self.classification_type = "Infrastructure"
-        else:
-            self.classification_type = "Unknown"
 
     def record_protocol_observation(self, protocol: str, *, sends_request: bool,
                                     function_code: int, exception_name: str | None = None):

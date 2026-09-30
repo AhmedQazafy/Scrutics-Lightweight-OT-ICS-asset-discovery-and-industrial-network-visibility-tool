@@ -35,7 +35,7 @@ def test_recompute_confidence_does_not_overwrite_classification_confidence():
     assert asset.classification_confidence_pct != asset.confidence_pct
 
     # More listening services push the evidence weight sum past the cap
-    for i, port in enumerate((102, 44818, 20000), start=1):
+    for i, port in enumerate((102, 2404, 44818, 20000, 1911), start=1):
         engine._process_flow_data(
             src_ip="10.0.0.20", src_mac="02:00:00:00:00:20", dst_ip="10.0.0.5",
             src_port=port, dst_port=40000 + i, proto="TCP", ts=1.0 + i,
