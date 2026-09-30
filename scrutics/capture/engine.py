@@ -12,7 +12,7 @@ from scrutics.db.inventory import AssetInventory
 from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
 from scrutics.classifier.protocol import classify_by_ports, classification_evidence_from_ports
-from scrutics.classifier.asset_classifier import classify_asset
+from scrutics.classifier.asset_classifier import classify_asset, RULE_SENDS_VALIDATED_OT_REQUESTS
 from scrutics.classifier.signatures import (
     get_signature, get_all_service_ports, get_ot_ports,
     get_it_ports, get_infrastructure_ports, get_discovery_ports
@@ -790,8 +790,7 @@ class CaptureEngine:
         # If the asset has no listening ports, it cannot be classified as OT/IT by itself.
         # It might be a client that only talks to OT devices.
         if not asset.ports_seen:
-            # No listening ports: special role
-            asset.role = "Possible OT Client"
+            # No listening ports; the classifier sets the role.
             # We'll cap confidence_pct later in _recompute_confidence
             # but we also clear the protocol_score because no listening ports
             asset.protocol_score = 0
@@ -803,7 +802,6 @@ class CaptureEngine:
 
         # Normal path for assets with listening ports
         asset.protocols = result["protocols"]
-        asset.role = result["role"]
 
         if result.get("behavioral_constraints"):
             asset.behavioral_constraints = result["behavioral_constraints"]
@@ -1025,7 +1023,10 @@ class CaptureEngine:
                           f"{recent_new} new peers in last hour (limit: {max_peers})")
 
     def _recompute_confidence(self, asset):
-        if not asset.ports_seen and asset.role == "Possible OT Client":
+        # Cap for clients: no listening service, has contacted services, and is not
+        # decided by validated OT requests it sends
+        if (not asset.ports_seen and asset.contacted_ports
+                and asset.classification_rule != RULE_SENDS_VALIDATED_OT_REQUESTS):
             asset.confidence_pct = min(
                 confidence_pct(
                     oui_s=asset.oui_score,

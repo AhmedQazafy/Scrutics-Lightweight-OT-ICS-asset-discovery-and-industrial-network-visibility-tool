@@ -19,7 +19,7 @@ ALLOWED = {
     ("classifier/asset_classifier.py", "classify_asset"),
     ("db/inventory.py", "Asset.__post_init__"),
     ("db/inventory.py", "Asset.is_ot"),
-    ("ui/tui.py", "ScruticsApp._load_last_results"),
+    ("ui/tui.py", "_asset_from_session_row"),
 }
 
 

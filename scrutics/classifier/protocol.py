@@ -29,6 +29,9 @@ CONFIDENCE_HIGH   = "HIGH"
 CONFIDENCE_MEDIUM = "MEDIUM"
 CONFIDENCE_LOW    = "LOW"
 
+# Role label for a device matching two or more OT port rules
+MULTI_PROTOCOL_ROLE = "SCADA Server / HMI (multi-protocol)"
+
 # ── Live rule sets (replaced atomically on reload) ─────────────────────────────
 _RULE_LOCK = threading.RLock()
 _USER_RULES    = load_user_rules()
@@ -131,7 +134,7 @@ def classify_by_ports(ports_seen: set, mac: str = None) -> dict:
                             merged_constraints[k] = r[k]
                 return {
                     "protocols":              [r.get("classify_as", "Unknown") for r in matched],
-                    "role":                   "SCADA Server / HMI (multi-protocol)",
+                    "role":                   MULTI_PROTOCOL_ROLE,
                     "is_ot":                  True,
                     "confidence":             CONFIDENCE_HIGH,
                     "matched_rule":           "builtin",
@@ -143,7 +146,7 @@ def classify_by_ports(ports_seen: set, mac: str = None) -> dict:
     else:
         matched_ics = [{**ICS_PORTS[p], "port": p} for p in ports_seen if p in ICS_PORTS]
         if matched_ics:
-            role = ("SCADA Server / HMI (multi-protocol)"
+            role = (MULTI_PROTOCOL_ROLE
                     if len(matched_ics) > 1 else matched_ics[0]["role"])
             return {
                 "protocols":              [m["protocol"] for m in matched_ics],

@@ -18,14 +18,20 @@ OT or IT, and validated protocol names matched to signature names. Vendor/OUI, D
 hints, hostnames, behavior, discovery, infrastructure-service ports and generic management
 ports never vote; they are listed in the reason.
 
+The classifier also sets the displayed role, so the role never contradicts the class:
+user rule -> the rule's role; OT client -> "OT client"; OT -> the port rule's OT role
+("OT device (multiple OT protocols)" when several OT port rules match, "OT device" when
+none describes the device); IT -> "IT device"; Unknown -> "Possible OT Client" for a
+possible OT client, otherwise "Unclassified".
+
 The result depends only on the asset's current state (listening and contacted ports,
-protocol observation summaries, evidence, MAC) and the loaded user rules. The function
-never reads its own outputs, so repeated calls give the same result.
+protocol observation summaries, evidence, MAC) and the loaded rules. The function never
+reads its own outputs, so repeated calls give the same result.
 """
 
 from dataclasses import dataclass
 
-from scrutics.classifier.protocol import match_user_rule
+from scrutics.classifier.protocol import MULTI_PROTOCOL_ROLE, classify_by_ports, match_user_rule
 from scrutics.classifier.signatures import ALL_SIGNATURES
 
 _VOTING_CATEGORIES = ("OT", "IT")
@@ -48,6 +54,11 @@ REASON_NO_CLASSIFYING_EVIDENCE = "no classifying evidence"
 REASON_POSSIBLE_OT_CLIENT = "possible OT client"
 
 OT_CLIENT_ROLE = "OT client"
+OT_DEVICE_ROLE = "OT device"
+OT_MULTI_PROTOCOL_ROLE = "OT device (multiple OT protocols)"
+IT_DEVICE_ROLE = "IT device"
+POSSIBLE_OT_CLIENT_ROLE = "Possible OT Client"
+UNCLASSIFIED_ROLE = "Unclassified"
 
 
 @dataclass(frozen=True)
@@ -136,12 +147,22 @@ def _non_voting_details(asset) -> dict:
     return details
 
 
+def _ot_role(asset) -> str:
+    """The port rules' role for an OT result, only when those rules describe an OT device."""
+    port_result = classify_by_ports(asset.ports_seen, mac=asset.mac)
+    if port_result.get("is_ot") is not True:
+        return OT_DEVICE_ROLE
+    if port_result.get("role") == MULTI_PROTOCOL_ROLE:
+        return OT_MULTI_PROTOCOL_ROLE
+    return port_result.get("role") or OT_DEVICE_ROLE
+
+
 def _join(base: str, parts: list) -> str:
     return "; ".join([base] + parts)
 
 
 def classify_asset(asset) -> None:
-    """Decide classification_type, decision confidence, rule, reason and conflicts."""
+    """Decide classification_type, decision confidence, role, rule, reason and conflicts."""
     signals = _signals(asset)
     details = _non_voting_details(asset)
     # Non-voting services and vendors explain a decided class but never change it
@@ -159,6 +180,7 @@ def classify_asset(asset) -> None:
             [f"also: {s.reason}" for s in signals if s.cls == cls] + decided_details,
         )
         asset.classification_conflicts = [s.note for s in signals if s.cls != cls]
+        asset.role = rule.get("role", "Custom Device")
         return
 
     if signals:
@@ -174,6 +196,10 @@ def classify_asset(asset) -> None:
         asset.classification_conflicts = [s.note for s in rest if s.cls != winner.cls]
         if winner.rule == RULE_SENDS_VALIDATED_OT_REQUESTS:
             asset.role = OT_CLIENT_ROLE
+        elif winner.cls == "OT":
+            asset.role = _ot_role(asset)
+        else:
+            asset.role = IT_DEVICE_ROLE
         return
 
     if details["contacted"]:
@@ -189,3 +215,4 @@ def classify_asset(asset) -> None:
         base, [d for d in (details["contacted"], details["served"], details["vendor"]) if d]
     )
     asset.classification_conflicts = []
+    asset.role = POSSIBLE_OT_CLIENT_ROLE if details["contacted"] else UNCLASSIFIED_ROLE

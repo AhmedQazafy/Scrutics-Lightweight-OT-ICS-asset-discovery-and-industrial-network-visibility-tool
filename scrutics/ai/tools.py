@@ -10,6 +10,7 @@ import json
 import os
 from typing import Any
 
+from scrutics.db.inventory import split_conflicts
 from scrutics.topology import read_manifest
 
 
@@ -77,6 +78,8 @@ class SessionContext:
                         "type": asset_type,
                         "confidence_pct": conf_pct,
                         "protocols": protocols,
+                        "classification_reason": row.get("classification_reason", "") or "",
+                        "classification_conflicts": split_conflicts(row.get("classification_conflicts", "")),
                         "_raw": row,
                     })
         except Exception:
@@ -217,6 +220,8 @@ def get_asset(ctx: SessionContext, ip: str) -> dict[str, Any]:
     for a in ctx.assets:
         if a.get("ip") == target_ip:
             detail = dict(a.get("_raw", {}))
+            detail["classification_reason"] = a.get("classification_reason", "")
+            detail["classification_conflicts"] = list(a.get("classification_conflicts", []))
             detail["evidence"] = ctx.evidence.get(target_ip, [])
             return detail
 

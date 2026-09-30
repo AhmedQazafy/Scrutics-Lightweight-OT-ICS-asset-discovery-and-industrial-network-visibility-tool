@@ -32,7 +32,9 @@ from textual.strip import Strip
 from rich.text import Text
 from rich.style import Style
 
-from scrutics.db.inventory import AssetInventory, Asset, Evidence
+from rich.markup import escape
+from scrutics.db.inventory import AssetInventory, Asset, Evidence, split_conflicts
+from scrutics.classifier import asset_classifier
 from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 from scrutics.diagnostics import VERSION
@@ -1859,6 +1861,76 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
         except Exception:
             pass
 
+# Deciding classification rule in plain words
+_RULE_DESCRIPTIONS = {
+    asset_classifier.RULE_USER: "user rule",
+    asset_classifier.RULE_SERVES_VALIDATED_OT_PROTOCOL: "serves a validated OT protocol",
+    asset_classifier.RULE_SERVES_OT_PORT: "listens on an OT port",
+    asset_classifier.RULE_SENDS_VALIDATED_OT_REQUESTS: "sends validated OT protocol requests",
+    asset_classifier.RULE_SERVES_IT_PORT: "listens on an IT port",
+    asset_classifier.RULE_NONE: "no classifying evidence",
+}
+NOT_RECORDED = "not recorded"
+
+
+def classification_basis_lines(asset) -> list:
+    """Detail-panel lines explaining the classification: confidence, rule, reason, conflicts."""
+    rule = getattr(asset, "classification_rule", "")
+    lines = [
+        f"Decision confidence: {escape(asset.confidence or NOT_RECORDED)}",
+        f"Decided by: {escape(_RULE_DESCRIPTIONS.get(rule, rule) or NOT_RECORDED)}",
+    ]
+    reason = getattr(asset, "classification_reason", "")
+    if reason:
+        lines.append(f"Reason: {escape(reason)}")
+    for note in getattr(asset, "classification_conflicts", []) or []:
+        lines.append(f"Conflict: {escape(note)}")
+    return lines
+
+
+def _asset_from_session_row(row: dict) -> Asset:
+    """
+    Rebuild an Asset from one row of a saved assets.csv.
+
+    Classification basis columns are optional: sessions written before they existed load
+    with an empty rule, reason and conflicts, and an unrecorded decision confidence.
+    """
+    return Asset(
+        ip=row.get("ip", ""),
+        mac=row.get("mac", ""),
+        vendor=row.get("vendor", "Unknown"),
+        vendor_class=row.get("vendor_class", "UNKNOWN"),
+        is_ot_vendor=row.get("is_ot_vendor", "False").lower() == "true",
+        protocols=row.get("protocol", "").split(", ") if row.get("protocol") else [],
+        ports_seen=set(),
+        contacted_ports=set(),
+        role=row.get("role", "Unclassified"),
+        is_ot="OT" if row.get("type") == "OT" else "IT" if row.get("type") == "IT" else None,
+        confidence=row.get("classification_decision_confidence", ""),
+        oui_score=int(row.get("oui_score", 0)),
+        protocol_score=int(row.get("protocol_score", 0)),
+        behavioral_score=int(row.get("behavioral_score", 0)),
+        directionality_score=int(row.get("directionality_score", 0)),
+        confidence_pct=int(row.get("confidence_pct", 0)),
+        baseline_status=row.get("baseline_status", "no_data"),
+        packet_count=int(row.get("packet_count", 0)),
+        peer_ips=set(),
+        initiates=row.get("initiates", "False").lower() == "true",
+        first_seen=row.get("first_seen", ""),
+        last_seen=row.get("last_seen", ""),
+        classification_type=row.get("classification_type", "Unknown"),
+        classification_confidence_pct=int(row.get("classification_confidence", 0)),
+        domain=row.get("domain", "Unknown"),
+        os_hints=row.get("os_hints", "").split("|") if row.get("os_hints") else [],
+        evidence=[],
+        observed_services=[],
+        dns_names=[],
+        classification_rule=row.get("classification_rule", "") or "",
+        classification_reason=row.get("classification_reason", "") or "",
+        classification_conflicts=split_conflicts(row.get("classification_conflicts", "")),
+    )
+
+
 class DetailScreen(ModalScreen):
     """Full-page asset detail view -- does NOT pause capture."""
     BINDINGS = [
@@ -1904,6 +1976,7 @@ class DetailScreen(ModalScreen):
             lines.append(f"Domain: {asset.domain}")
             lines.append(f"Role: {asset.role}")
             lines.append(f"Confidence: {asset.classification_confidence_pct}%")
+            lines.extend(classification_basis_lines(asset))
             lines.append("")
 
             if asset.os_hints:
@@ -1975,6 +2048,9 @@ class DetailScreen(ModalScreen):
             "protocols": asset.protocols,
             "role": asset.role,
             "classification_type": asset.classification_type,
+            "classification_rule": asset.classification_rule,
+            "classification_reason": asset.classification_reason,
+            "classification_conflicts": list(asset.classification_conflicts),
             "domain": asset.domain,
             "confidence": asset.classification_confidence_pct,
             "os_hints": asset.os_hints,
@@ -2902,37 +2978,7 @@ class ScruticsApp(App):
             with open(assets_csv, newline="") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    asset = Asset(
-                        ip=row.get("ip", ""),
-                        mac=row.get("mac", ""),
-                        vendor=row.get("vendor", "Unknown"),
-                        vendor_class=row.get("vendor_class", "UNKNOWN"),
-                        is_ot_vendor=row.get("is_ot_vendor", "False").lower() == "true",
-                        protocols=row.get("protocol", "").split(", ") if row.get("protocol") else [],
-                        ports_seen=set(),
-                        contacted_ports=set(),
-                        role=row.get("role", "Unclassified"),
-                        is_ot="OT" if row.get("type") == "OT" else "IT" if row.get("type") == "IT" else None,
-                        confidence=row.get("confidence", "LOW"),
-                        oui_score=int(row.get("oui_score", 0)),
-                        protocol_score=int(row.get("protocol_score", 0)),
-                        behavioral_score=int(row.get("behavioral_score", 0)),
-                        directionality_score=int(row.get("directionality_score", 0)),
-                        confidence_pct=int(row.get("confidence_pct", 0)),
-                        baseline_status=row.get("baseline_status", "no_data"),
-                        packet_count=int(row.get("packet_count", 0)),
-                        peer_ips=set(),
-                        initiates=row.get("initiates", "False").lower() == "true",
-                        first_seen=row.get("first_seen", ""),
-                        last_seen=row.get("last_seen", ""),
-                        classification_type=row.get("classification_type", "Unknown"),
-                        classification_confidence_pct=int(row.get("classification_confidence", 0)),
-                        domain=row.get("domain", "Unknown"),
-                        os_hints=row.get("os_hints", "").split("|") if row.get("os_hints") else [],
-                        evidence=[],
-                        observed_services=[],
-                        dns_names=[],
-                    )
+                    asset = _asset_from_session_row(row)
                     self.inventory._assets[asset.ip] = asset
                     norm_mac = self.inventory._normalize_mac(asset.mac)
                     if norm_mac:

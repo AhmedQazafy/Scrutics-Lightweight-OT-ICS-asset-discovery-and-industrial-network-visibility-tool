@@ -17,6 +17,16 @@ EVIDENCE_WEIGHT_OS_HINT = 5
 EVIDENCE_WEIGHT_DISCOVERY = 15
 EVIDENCE_WEIGHT_IT_PORT = 5
 
+# Separator for classification conflict notes in a single CSV cell
+CONFLICT_SEPARATOR = "; "
+
+
+def split_conflicts(text: str | None) -> list:
+    """Parse a CSV conflicts cell back into the list of conflict notes."""
+    if not text:
+        return []
+    return [note for note in text.split(CONFLICT_SEPARATOR) if note]
+
 
 def is_inventory_ip(
     ip: str | None,
@@ -343,6 +353,11 @@ class Asset:
             "is_ot_vendor": self.is_ot_vendor,
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
+            # Classification basis, appended so existing columns keep their order
+            "classification_rule": self.classification_rule,
+            "classification_reason": self.classification_reason,
+            "classification_conflicts": CONFLICT_SEPARATOR.join(self.classification_conflicts),
+            "classification_decision_confidence": self.confidence,
         }
         return {**left, **right}
 
