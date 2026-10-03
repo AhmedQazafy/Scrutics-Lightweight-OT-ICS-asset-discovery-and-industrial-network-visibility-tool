@@ -41,6 +41,9 @@ _SIGNATURE_BY_PORT = {sig.port: sig for sig in ALL_SIGNATURES}
 _PROTOCOL_CLASS = {
     sig.name: sig.category for sig in ALL_SIGNATURES if sig.category in _VOTING_CATEGORIES
 }
+# Ports whose signature is OT, ascending; contacted OT ports are found by membership tests so the
+# cost does not grow with the number of ports an asset has contacted
+_OT_SIGNATURE_PORTS = sorted(port for port, sig in _SIGNATURE_BY_PORT.items() if sig.category == "OT")
 
 RULE_USER = "user_rule"
 RULE_SERVES_VALIDATED_OT_PROTOCOL = "serves_validated_ot_protocol"
@@ -125,11 +128,10 @@ def _non_voting_details(asset) -> dict:
     the asset offers), "vendor" (vendor evidence values); each is a text part or None.
     """
     details = {"contacted": None, "served": None, "vendor": None}
-    contacted_ot = sorted(
-        port for port in asset.contacted_ports
-        if port not in asset.ports_seen
-        and getattr(_SIGNATURE_BY_PORT.get(port), "category", None) == "OT"
-    )
+    contacted_ot = [
+        port for port in _OT_SIGNATURE_PORTS
+        if port in asset.contacted_ports and port not in asset.ports_seen
+    ]
     if contacted_ot:
         details["contacted"] = "contacted OT ports: " + ", ".join(_service_label(p) for p in contacted_ot)
     served = sorted(

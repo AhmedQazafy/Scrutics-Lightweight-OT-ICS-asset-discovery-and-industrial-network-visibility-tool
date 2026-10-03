@@ -1194,8 +1194,12 @@ class CaptureEngine:
 
     def _apply_constraints_from_contacted_ports(self, asset):
         """
-        Apply behavioral constraints from rules that match the asset's contacted ports.
-        Uses merge semantics to preserve constraints from multiple matching rules.
+        Apply behavioral constraints from the rule that matches the asset's MAC or, failing that,
+        from one rule matching a contacted port.
+
+        Each contacted port matches the first rule match_rule returns for it. Of the ports whose
+        rule sets constraints, the highest is used, so the result does not depend on the order
+        ports were contacted. The constraints are merged into those already on the asset.
         """
         from scrutics.classifier.protocol import active_rules, match_rule
         rules = active_rules()
@@ -1220,11 +1224,39 @@ class CaptureEngine:
                     asset.behavioral_constraints.update(constraints)
                     return
     
-        # Then try each contacted port
-        for port in asset.contacted_ports:
-            rule = match_rule(rules, port=port, mac=asset.mac)
-            if rule:
-                constraints = _extract_constraints(rule)
-                if constraints:
-                    asset.behavioral_constraints.update(constraints)
-                    return
+        # Then the contacted ports. Only a port named by a rule can match a rule of its own; any
+        # other port matches the first applicable rule without a port key, which also shadows
+        # every later port rule. Rules after that one can never match, so the scan stops there.
+        first_rule_by_port = {}
+        portless_rule = None
+        for rule in rules:
+            if "port" not in rule:
+                if match_rule([rule], mac=asset.mac):
+                    portless_rule = rule
+                    break
+                continue
+            port = rule["port"]
+            try:
+                hash(port)
+            except TypeError:
+                continue                    # an unhashable port never equals a contacted port
+            if port not in first_rule_by_port and match_rule([rule], port=port, mac=asset.mac):
+                first_rule_by_port[port] = rule
+
+        if portless_rule is not None and _extract_constraints(portless_rule):
+            # Only reachable when the asset has no MAC (with a MAC the step above returns this
+            # rule): any contacted port can resolve to it, so ports are looked up one by one
+            for port in sorted(asset.contacted_ports, reverse=True):
+                rule = match_rule(rules, port=port, mac=asset.mac)
+                if rule:
+                    constraints = _extract_constraints(rule)
+                    if constraints:
+                        asset.behavioral_constraints.update(constraints)
+                        return
+            return
+
+        for port in sorted((p for p in first_rule_by_port if p in asset.contacted_ports), reverse=True):
+            constraints = _extract_constraints(first_rule_by_port[port])
+            if constraints:
+                asset.behavioral_constraints.update(constraints)
+                return
