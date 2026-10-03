@@ -122,10 +122,18 @@ class BaselineEngine:
         self._devices: dict = {}
         self.anomaly_log: deque = deque(maxlen=100)
 
-    def observe(self, ip: str, timestamp: float, initiates: bool, peers: set) -> Optional[dict]:
+    def device(self, ip: str) -> DeviceBaseline:
+        """The baseline of the device at ip, created on first use."""
         if ip not in self._devices:
             self._devices[ip] = DeviceBaseline(ip=ip, observation_window=self.observation_window)
-        anomaly = self._devices[ip].observe(timestamp, initiates, peers)
+        return self._devices[ip]
+
+    def observe(self, ip: str, timestamp: float, initiates: bool, peers: set) -> Optional[dict]:
+        """
+        Record one packet from ip. `peers` must contain every peer not given to this baseline
+        before; peers it already has may be included and change nothing.
+        """
+        anomaly = self.device(ip).observe(timestamp, initiates, peers)
         if anomaly:
             anomaly["ip"] = ip
             anomaly["timestamp"] = timestamp

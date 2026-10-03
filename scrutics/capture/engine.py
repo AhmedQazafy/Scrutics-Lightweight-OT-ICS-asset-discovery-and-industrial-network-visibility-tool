@@ -778,7 +778,7 @@ class CaptureEngine:
                 anomaly = self.baseline.observe(
                     ip=src_ip, timestamp=ts,
                     initiates=asset.initiates,
-                    peers=set(asset.peer_ips),
+                    peers=set(asset.peers_not_given_to(self.baseline.device(src_ip))),
                 )
                 asset.behavioral_score     = self.baseline.get_behavioral_score(src_ip)
                 asset.directionality_score = self.baseline.get_directionality_score(src_ip)

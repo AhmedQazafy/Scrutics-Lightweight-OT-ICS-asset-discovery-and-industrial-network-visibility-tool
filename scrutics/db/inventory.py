@@ -140,6 +140,13 @@ class Asset:
     classification_rule: str = field(default="", repr=False, compare=False)
     classification_reason: str = field(default="", repr=False, compare=False)
     classification_conflicts: list = field(default_factory=list, repr=False, compare=False)
+    # Derived from peer_ips, in-memory only: the peers in order of first addition, rebuilt (with a
+    # new epoch) whenever peer_ips was replaced or changed outside add_peer; and, per baseline IP,
+    # (device baseline, epoch, log position) marking how much of the log that baseline was given
+    _peer_log: list = field(default_factory=list, init=False, repr=False, compare=False)
+    _peer_log_source: Any = field(default=None, init=False, repr=False, compare=False)
+    _peer_log_epoch: int = field(default=0, init=False, repr=False, compare=False)
+    _baseline_peer_cursors: dict = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def __post_init__(self, is_ot: Optional[Union[bool, str]] = None):
         # Sync vendor_class and is_ot_vendor
@@ -212,6 +219,38 @@ class Asset:
         total_weight = sum(e.weight for e in self.evidence)
         max_possible = 100
         self.classification_confidence_pct = min(total_weight, max_possible)
+
+    def _synced_peer_log(self) -> list:
+        """The peer log, rebuilt from peer_ips if that set was replaced or changed directly."""
+        if self._peer_log_source is not self.peer_ips or len(self._peer_log) != len(self.peer_ips):
+            self._peer_log = list(self.peer_ips)
+            self._peer_log_source = self.peer_ips
+            self._peer_log_epoch += 1
+        return self._peer_log
+
+    def add_peer(self, ip: str) -> None:
+        """Record a peer IP this asset communicated with."""
+        log = self._synced_peer_log()
+        if ip not in self.peer_ips:
+            self.peer_ips.add(ip)
+            log.append(ip)
+
+    def peers_not_given_to(self, baseline) -> list:
+        """
+        Peers not yet passed to `baseline` (the device baseline of one IP), now marked as passed.
+
+        A baseline is keyed by IP while the asset is keyed by MAC, so each baseline IP the asset
+        has used keeps its own position: peers learned at another IP still reach this baseline
+        when the asset returns. A baseline object not seen before, or a rebuilt log, gets every
+        peer; passing a peer the baseline already has changes nothing.
+        """
+        log = self._synced_peer_log()
+        start = 0
+        cursor = self._baseline_peer_cursors.get(baseline.ip)
+        if cursor is not None and cursor[0] is baseline and cursor[1] == self._peer_log_epoch:
+            start = cursor[2]
+        self._baseline_peer_cursors[baseline.ip] = (baseline, self._peer_log_epoch, len(log))
+        return log[start:]
 
     def record_protocol_observation(self, protocol: str, *, sends_request: bool,
                                     function_code: int, exception_name: str | None = None):
@@ -411,7 +450,7 @@ class AssetInventory:
 
         # Track peers and initiates
         if self.is_asset_ip(dst_ip):
-            asset.peer_ips.add(dst_ip)
+            asset.add_peer(dst_ip)
             asset.initiates = True
             asset.add_evidence(
                 evidence_type="behavior",
