@@ -3007,7 +3007,7 @@ class ScruticsApp(App):
                                 confidence=ev_dict.get("confidence", "LOW"),
                                 detail=ev_dict.get("detail", ""),
                             )
-                            asset.evidence.append(ev)
+                            asset.load_evidence(ev)
 
             # Populate table -- exactly 9 cells
             for asset in sorted(self.inventory.get_all(), key=lambda x: x.ip):

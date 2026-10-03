@@ -18,6 +18,9 @@ All notable changes to Scrutics are documented here.
 - **A host that announces many names no longer slows processing down**: mDNS names, DHCP host names and DHCP client FQDNs are looked up directly instead of being compared with every record the host already has.
 - **Behavioral constraints from port rules are chosen the same way every time**: when a device without a listening service has contacted several ports whose rules set behavioral constraints, the rule of the highest such port is applied, whatever order the ports were contacted in. Before, the choice depended on internal ordering.
 
+### Fixed — Bounded Memory Per Device
+- **A device that announces many names or identifiers no longer grows without limit**: each kind of evidence keeps the first 64 distinct values seen for a device (for example mDNS names, DHCP host names, DHCP vendor class identifiers), and the DNS name list keeps the first 64 names. Further values are counted instead of stored. A value already kept is still recorded from additional sources. A saved session loads with the same limits.
+
 ### Changed — Log Import Validation
 - A Zeek log whose header cannot be used (an empty `#separator`, or data without a `#fields` header) is reported as a clear file error.
 - Suricata EVE lines are type-checked one by one: a line that is not a JSON object, or has a field of the wrong type (for example a `dest_port` given as a string or a fraction, or a non-integer alert severity), is rejected and the rest of the file is imported.

@@ -102,6 +102,46 @@ def test_evidence_lookups_match_the_list_after_random_mutations(seed):
         _check_evidence_index(asset)
 
 
+def _distinct_values_per_type(evidence):
+    seen, counts = [], {}
+    for e in evidence:
+        try:
+            hash(e.type)
+        except TypeError:
+            continue
+        if not any(t == e.type and v == e.value for t, v in seen):
+            seen.append((e.type, e.value))
+            counts[e.type] = counts.get(e.type, 0) + 1
+    return counts
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_evidence_value_counts_match_the_list_at_the_limit(seed):
+    rng = random.Random(seed)
+    asset = Asset(ip="10.0.0.1", mac="02:00:00:00:00:01")
+    for _ in range(600):
+        op = rng.random()
+        record = Evidence(type=rng.choice(("hostname", "dns")), value=rng.choice((f"v{rng.randint(0, 90)}", ["u"])),
+                          weight=1, source=rng.choice(SOURCES), confidence="LOW")
+        before = _distinct_values_per_type(asset.evidence)
+        if op < 0.6:
+            asset.add_evidence(record.type, record.value, record.weight, record.source)
+        elif op < 0.8:
+            asset.load_evidence(record)
+        elif op < 0.95:
+            asset.evidence.append(record)                   # changed directly
+        else:
+            asset.evidence = asset.evidence[: rng.randint(0, len(asset.evidence))]
+        after = _distinct_values_per_type(asset.evidence)
+        asset._synced_evidence_index()
+        assert asset._ev_type_counts == after
+        if op < 0.8:
+            # Through the Asset's methods a type never gains a value past the limit
+            for t, n in after.items():
+                assert n <= max(64, before.get(t, 0))
+        _check_evidence_index(asset)
+
+
 def test_confidence_after_a_session_load_counts_the_loaded_records():
     asset = Asset(ip="10.0.0.1", mac="02:00:00:00:00:01", classification_confidence_pct=7)
     asset.add_evidence("port", "502", 20, "traffic")

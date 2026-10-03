@@ -21,6 +21,11 @@ EVIDENCE_WEIGHT_IT_PORT = 5
 # Separator for classification conflict notes in a single CSV cell
 CONFLICT_SEPARATOR = "; "
 
+# Retention limits per asset. A value beyond its limit is not kept; the asset counts the refused
+# additions instead, so truncation is visible in exports and summaries.
+MAX_EVIDENCE_VALUES_PER_TYPE = 64     # distinct values per evidence type, the first ones seen
+MAX_DNS_NAMES = 64                    # the first names seen
+
 
 def split_conflicts(text: str | None) -> list:
     """Parse a CSV conflicts cell back into the list of conflict notes."""
@@ -141,6 +146,10 @@ class Asset:
     classification_rule: str = field(default="", repr=False, compare=False)
     classification_reason: str = field(default="", repr=False, compare=False)
     classification_conflicts: list = field(default_factory=list, repr=False, compare=False)
+    # Additions refused because a retention limit was reached, over the asset's recorded lifetime.
+    # Truncation metadata only: never evidence and never classification input.
+    evidence_overflow: dict = field(default_factory=dict, repr=False, compare=False)  # type -> count
+    dns_names_overflow: int = field(default=0, repr=False, compare=False)
     # Derived from peer_ips, in-memory only: the peers in order of first addition, rebuilt (with a
     # new epoch) whenever peer_ips was replaced or changed outside add_peer; and, per baseline IP,
     # (device baseline, epoch, log position) marking how much of the log that baseline was given
@@ -149,14 +158,15 @@ class Asset:
     _peer_log_epoch: int = field(default=0, init=False, repr=False, compare=False)
     _baseline_peer_cursors: dict = field(default_factory=dict, init=False, repr=False, compare=False)
     # Derived from evidence, in-memory only (see _synced_evidence_index): lookup keys, vendor
-    # values and the weight total of the records indexed so far. Records whose key cannot be
-    # hashed are kept in a list that every lookup also scans.
+    # values, the number of distinct values per type and the weight total of the records indexed
+    # so far. Records whose key cannot be hashed are kept in a list that every lookup also scans.
     _ev_source: Any = field(default=None, init=False, repr=False, compare=False)
     _ev_indexed: int = field(default=0, init=False, repr=False, compare=False)
     _ev_keys: set = field(default_factory=set, init=False, repr=False, compare=False)
     _ev_type_values: set = field(default_factory=set, init=False, repr=False, compare=False)
     _ev_unhashable: list = field(default_factory=list, init=False, repr=False, compare=False)
     _ev_vendor_values: set = field(default_factory=set, init=False, repr=False, compare=False)
+    _ev_type_counts: dict = field(default_factory=dict, init=False, repr=False, compare=False)
     _ev_weighted: int = field(default=0, init=False, repr=False, compare=False)
     _ev_weight_total: int = field(default=0, init=False, repr=False, compare=False)
     _ev_weights_exact: bool = field(default=True, init=False, repr=False, compare=False)
@@ -215,13 +225,19 @@ class Asset:
             self.classification_type = str(val)
 
     def add_evidence(self, evidence_type: str, value: str, weight: int,
-                     source: str, confidence: str = "MEDIUM", detail: str = ""):
+                     source: str, confidence: str = "MEDIUM", detail: str = "") -> bool:
         """
-        Add evidence, deduplicating by type+value+source.
-        If identical evidence already exists, skip adding.
+        Add evidence, deduplicating by type+value+source. Returns whether a record was stored.
+
+        Each type keeps at most MAX_EVIDENCE_VALUES_PER_TYPE distinct values, the first ones seen.
+        A record for a value already kept is stored whatever its source; a new value beyond the
+        limit is not stored and is counted in evidence_overflow.
         """
         if self.has_evidence_from(evidence_type, value, source):
-            return
+            return False
+        if self._evidence_type_full(evidence_type) and not self.has_evidence(evidence_type, value):
+            self.evidence_overflow[evidence_type] = self.evidence_overflow.get(evidence_type, 0) + 1
+            return False
 
         # Create new evidence
         ev = Evidence(
@@ -238,12 +254,33 @@ class Asset:
         total_weight = self._evidence_weight_total()
         max_possible = 100
         self.classification_confidence_pct = min(total_weight, max_possible)
+        return True
+
+    def load_evidence(self, ev: Evidence) -> bool:
+        """
+        Append a record read from a saved session as it was saved: duplicates are kept and
+        confidence is not recomputed. A new value beyond its type's limit is not kept and is
+        counted in evidence_overflow. Returns whether the record was kept.
+        """
+        if self._evidence_type_full(ev.type) and not self.has_evidence(ev.type, ev.value):
+            self.evidence_overflow[ev.type] = self.evidence_overflow.get(ev.type, 0) + 1
+            return False
+        self.evidence.append(ev)
+        return True
+
+    def _evidence_type_full(self, evidence_type) -> bool:
+        """Whether the type already has MAX_EVIDENCE_VALUES_PER_TYPE distinct values."""
+        self._synced_evidence_index()
+        try:
+            return self._ev_type_counts.get(evidence_type, 0) >= MAX_EVIDENCE_VALUES_PER_TYPE
+        except TypeError:
+            return False                    # an unhashable type has no count: no code adds one
 
     def _synced_evidence_index(self) -> None:
         """
         Bring the evidence lookups up to date with the evidence list.
 
-        Records are only ever appended, by add_evidence or directly (a session load does), so
+        Records are only ever appended, by add_evidence, load_evidence or directly, so
         only the records added since the last call are indexed. A replaced or shorter list is
         indexed again from the start. A record changed in place is not noticed.
         """
@@ -253,16 +290,35 @@ class Asset:
             self._ev_indexed = self._ev_weighted = self._ev_weight_total = 0
             self._ev_weights_exact = True
             self._ev_keys, self._ev_type_values, self._ev_vendor_values = set(), set(), set()
-            self._ev_unhashable = []
+            self._ev_unhashable, self._ev_type_counts = [], {}
         for ev in evidence[self._ev_indexed:]:
             try:
+                pair = (ev.type, ev.value)
+                if pair not in self._ev_type_values:
+                    self._ev_type_values.add(pair)
+                    self._ev_type_counts[ev.type] = self._ev_type_counts.get(ev.type, 0) + 1
                 self._ev_keys.add((ev.type, ev.value, ev.source))
-                self._ev_type_values.add((ev.type, ev.value))
             except TypeError:
+                self._count_unhashable_value(ev)
                 self._ev_unhashable.append(ev)
             if ev.type == "vendor" and ev.value and ev.value != "Unknown":
                 self._ev_vendor_values.add(str(ev.value))
             self._ev_indexed += 1
+
+    def _count_unhashable_value(self, ev) -> None:
+        """Count the value of a record whose key cannot be hashed, unless it is already counted."""
+        try:
+            hash(ev.type)
+        except TypeError:
+            return
+        try:
+            if (ev.type, ev.value) in self._ev_type_values:
+                return
+        except TypeError:
+            pass
+        if any(e.type == ev.type and e.value == ev.value for e in self._ev_unhashable):
+            return
+        self._ev_type_counts[ev.type] = self._ev_type_counts.get(ev.type, 0) + 1
 
     def _evidence_weight_total(self):
         """
@@ -330,7 +386,10 @@ class Asset:
         return len(times) - bisect.bisect_left(times, cutoff)
 
     def add_dns_name(self, name: str) -> None:
-        """Record a DNS name for this asset once, keeping the order names were first seen."""
+        """
+        Record a DNS name for this asset once, keeping the order names were first seen. Names
+        beyond MAX_DNS_NAMES are not kept and are counted in dns_names_overflow.
+        """
         names = self.dns_names
         if self._dns_source is not names or len(names) < self._dns_indexed:
             self._dns_source, self._dns_indexed = names, 0
@@ -346,7 +405,10 @@ class Asset:
         except TypeError:
             present = name in names
         if not present:
-            names.append(name)
+            if len(names) >= MAX_DNS_NAMES:
+                self.dns_names_overflow += 1
+            else:
+                names.append(name)
 
     def _synced_peer_log(self) -> list:
         """The peer log, rebuilt from peer_ips if that set was replaced or changed directly."""
@@ -404,16 +466,16 @@ class Asset:
         # Check if this exact hint already exists in evidence
         if self.has_evidence("os_hint", hint):
             return
-        # If not, add it
-        self.os_hints.append(hint)
-        self.add_evidence(
+        # If not, add it; the hint is listed only when its evidence record was stored
+        if self.add_evidence(
             evidence_type="os_hint",
             value=hint,
             weight=5 if confidence == "LOW" else 10 if confidence == "MEDIUM" else 15,
             source="traffic",
             confidence=confidence,
             detail="Tentative OS hint from passive observation"
-        )
+        ):
+            self.os_hints.append(hint)
 
     def add_service(self, port: int, protocol: str, last_seen: str):
         """Record an observed service."""
