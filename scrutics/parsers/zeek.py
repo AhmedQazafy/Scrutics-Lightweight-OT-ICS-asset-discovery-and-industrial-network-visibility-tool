@@ -10,6 +10,19 @@ class ZeekFormatError(ValueError):
     """The log header cannot be used, so no line of the file can be read."""
 
 
+class ZeekRecordError(ValueError):
+    """One record cannot be used; its line is rejected with this message as the reason."""
+
+
+def _port(value):
+    """A port field: None when unset ("-"), otherwise a decimal port number in 0..65535."""
+    if value == "-":
+        return None
+    if not (value.isascii() and value.isdigit()) or int(value) > 65535:
+        raise ZeekRecordError("Zeek field id.resp_p is not a port number (0-65535)")
+    return int(value)
+
+
 def _open_zeek(filepath: str):
     if filepath.endswith(".gz"):
         return gzip.open(filepath, "rt", errors="ignore")
@@ -111,8 +124,7 @@ def _flow_from_record(record: dict):
     elif path == "conn":
         dst_port = record.get("id.resp_p", "-")
         proto    = record.get("proto", "tcp").upper()
-        try:    dst_port_int = int(dst_port)
-        except: dst_port_int = None
+        dst_port_int = _port(dst_port)
         return {"src_ip": src_ip, "src_mac": None, "dst_ip": dst_ip,
                 "dst_port": dst_port_int, "proto": proto, "timestamp": ts_float, "source": "zeek_conn"}
     return None
@@ -123,6 +135,10 @@ def iter_zeek_flows(filepath: str, report=None) -> Generator[tuple, None, None]:
     for line_no, record in _iter_zeek_records(filepath, report):
         try:
             flow = _flow_from_record(record)
+        except ZeekRecordError as exc:
+            if report is not None:
+                report.reject(str(exc), PATH, line_no)
+            continue
         except Exception as exc:
             if report is not None:
                 report.contain(exc, PATH, line_no)

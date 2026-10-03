@@ -27,6 +27,7 @@ All notable changes to Scrutics are documented here.
 ### Changed — Log Import Validation
 - A Zeek log whose header cannot be used (an empty `#separator`, or data without a `#fields` header) is reported as a clear file error.
 - Suricata EVE lines are type-checked one by one: a line that is not a JSON object, or has a field of the wrong type (for example a `dest_port` given as a string or a fraction, or a non-integer alert severity), is rejected and the rest of the file is imported.
+- A destination port must be a port number (0 to 65535). A Zeek `conn.log` line whose `id.resp_p` is not a decimal port number from 0 to 65535 (other than `-`, meaning unset) is now rejected as a whole line; before, such a line was kept with no port. A Suricata EVE line whose `dest_port` is outside that range is rejected likewise. Rejected lines are counted in the run summary.
 
 ## [0.6.1] — 2026-09-19
 

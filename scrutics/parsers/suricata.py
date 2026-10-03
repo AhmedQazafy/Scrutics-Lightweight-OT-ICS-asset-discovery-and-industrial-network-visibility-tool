@@ -25,7 +25,8 @@ def _is_int(value) -> bool:
 def _validation_error(event):
     """
     Why an EVE line cannot be used, or None. Types are checked, never coerced: a dest_port of
-    "502" or 502.0 is malformed. Fields that are absent keep today's defaults.
+    "502", 502.0 or true is malformed, and so is one outside 0..65535. Fields that are absent keep
+    today's defaults.
     """
     if not isinstance(event, dict):
         return "EVE line is not a JSON object"
@@ -34,6 +35,8 @@ def _validation_error(event):
             return f"EVE field {field} is not a string"
     if event.get("dest_port") is not None and not _is_int(event["dest_port"]):
         return "EVE field dest_port is not an integer"
+    if event.get("dest_port") is not None and not 0 <= event["dest_port"] <= 65535:
+        return "EVE field dest_port is out of range (0-65535)"
     for field in ("proto", "event_type"):
         if field in event and not isinstance(event[field], str):
             return f"EVE field {field} is not a string"
