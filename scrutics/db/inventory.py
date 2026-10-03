@@ -23,6 +23,7 @@ CONFLICT_SEPARATOR = "; "
 
 # Retention limits per asset. A value beyond its limit is not kept; the asset counts the refused
 # additions instead, so truncation is visible in exports and summaries.
+MAX_IP_HISTORY = 256                  # IP episodes, the most recent ones
 MAX_EVIDENCE_VALUES_PER_TYPE = 64     # distinct values per evidence type, the first ones seen
 MAX_DNS_NAMES = 64                    # the first names seen
 MAX_PEERS = 4096                      # peer IPs and peer first-seen times, the first ones seen
@@ -149,6 +150,7 @@ class Asset:
     classification_conflicts: list = field(default_factory=list, repr=False, compare=False)
     # Additions refused because a retention limit was reached, over the asset's recorded lifetime.
     # Truncation metadata only: never evidence and never classification input.
+    ip_history_dropped: int = field(default=0, repr=False, compare=False)
     evidence_overflow: dict = field(default_factory=dict, repr=False, compare=False)  # type -> count
     dns_names_overflow: int = field(default=0, repr=False, compare=False)
     # Every refused peer addition is counted, repeats included: it is not a count of distinct peers
@@ -537,7 +539,8 @@ class Asset:
         this produces [A, B, A] in order.
         - If ip matches the most recent episode's IP, updates last_seen.
         - If ip differs from the most recent episode, appends a new episode.
-        Never collapses or deduplicates episodes.
+        Never collapses or deduplicates episodes. Only the most recent MAX_IP_HISTORY episodes
+        are kept; older ones are dropped and counted in ip_history_dropped.
         """
         if not ip:
             return
@@ -549,6 +552,8 @@ class Asset:
                 "first_seen": timestamp,
                 "last_seen": timestamp,
             })
+            if len(self.ip_history) > MAX_IP_HISTORY:
+                self._drop_oldest_ip_episodes()
         self.ip = ip
         self.last_seen_epoch = timestamp
         try:
@@ -556,6 +561,21 @@ class Asset:
         except Exception:
             pass
 
+
+    def _drop_oldest_ip_episodes(self) -> None:
+        """
+        Drop the episodes beyond MAX_IP_HISTORY, oldest first. An IP with no episode left also
+        loses its baseline cursor; if the asset returns to it, that baseline is given every peer
+        again, which changes nothing for the peers it already has.
+        """
+        excess = len(self.ip_history) - MAX_IP_HISTORY
+        dropped = self.ip_history[:excess]
+        del self.ip_history[:excess]
+        self.ip_history_dropped += excess
+        remaining = {episode.get("ip") for episode in self.ip_history}
+        for episode in dropped:
+            if episode.get("ip") not in remaining:
+                self._baseline_peer_cursors.pop(episode.get("ip"), None)
 
     def to_dict(self) -> dict:
         proto_str = ", ".join(self.protocols) if self.protocols else "Unknown"

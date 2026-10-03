@@ -6,16 +6,19 @@ collections keep the first entries seen and never evict or replace them; a refus
 counted on the asset, so truncation is never silent. Under the limits nothing changes.
 """
 
+import re
 import struct
 
 import pytest
 from scapy.layers.l2 import Ether
-from scapy.layers.inet import IP, UDP
+from scapy.layers.inet import IP, TCP, UDP
 from scapy.packet import Raw
 
+import scrutics.db.inventory as inventory
+from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.capture.engine import CaptureEngine
 from scrutics.db.inventory import (
-    Asset, AssetInventory, Evidence, MAX_DNS_NAMES, MAX_EVIDENCE_VALUES_PER_TYPE,
+    Asset, AssetInventory, Evidence, MAX_DNS_NAMES, MAX_EVIDENCE_VALUES_PER_TYPE, MAX_IP_HISTORY,
 )
 
 T0 = 1_700_000_000.0
@@ -212,3 +215,100 @@ def test_dhcp_fqdn_flood_is_bounded_in_evidence_and_dns_names():
     assert [e.value for e in asset.evidence if e.type == "dns"] == asset.dns_names
     assert asset.dns_names_overflow == 36
     assert asset.evidence_overflow == {"dns": 36}
+
+
+# ── IP history and baseline cursors ───────────────────────────────────────────
+
+def test_ip_history_limit_is_256_episodes():
+    assert MAX_IP_HISTORY == 256
+
+
+def _hop_ip(i):
+    return f"10.1.{i // 250}.{i % 250 + 1}"
+
+
+@pytest.mark.parametrize("episodes, kept", [(256, 256), (257, 256), (5000, 256)])
+def test_ip_history_keeps_the_most_recent_episodes_and_counts_dropped_ones(episodes, kept):
+    asset = _asset()
+    for i in range(episodes):
+        asset.record_ip(_hop_ip(i), T0 + i)
+        asset.record_ip(_hop_ip(i), T0 + i + 0.5)         # same episode: last_seen moves
+    expected = [{"ip": _hop_ip(i), "first_seen": T0 + i, "last_seen": T0 + i + 0.5}
+                for i in range(episodes - kept, episodes)]
+    assert asset.ip_history == expected
+    assert asset.ip_history_dropped == episodes - kept
+    assert asset.ip == _hop_ip(episodes - 1)
+
+
+def test_ip_history_counts_episodes_not_distinct_ips():
+    asset = _asset()
+    for i in range(300):
+        asset.record_ip(("10.0.0.1", "10.0.0.2")[i % 2], T0 + i)
+    assert len(asset.ip_history) == 256 and asset.ip_history_dropped == 44
+    assert [e["ip"] for e in asset.ip_history[:2]] == ["10.0.0.1", "10.0.0.2"]
+
+
+def test_a_cursor_is_dropped_only_when_its_ip_has_no_episode_left():
+    asset = _asset()
+    baselines = BaselineEngine()
+    asset.record_ip("10.0.0.1", T0)
+    asset.add_peer("10.0.9.1")
+    asset.peers_not_given_to(baselines.device("10.0.0.1"))
+    for i in range(255):                                  # 256 episodes: 10.0.0.1 still kept
+        asset.record_ip(_hop_ip(i), T0 + 1 + i)
+        asset.peers_not_given_to(baselines.device(_hop_ip(i)))
+    assert "10.0.0.1" in asset._baseline_peer_cursors
+    asset.record_ip("10.0.0.2", T0 + 1000)
+    assert "10.0.0.1" not in asset._baseline_peer_cursors
+    assert set(asset._baseline_peer_cursors) <= {e["ip"] for e in asset.ip_history}
+    # Returning to the forgotten IP gives its baseline every peer again
+    asset.record_ip("10.0.0.1", T0 + 2000)
+    assert asset.peers_not_given_to(baselines.device("10.0.0.1")) == ["10.0.9.1"]
+
+
+def test_cursor_map_stays_within_the_ip_history_while_hopping():
+    asset = _asset()
+    baselines = BaselineEngine()
+    for i in range(2000):
+        asset.record_ip(_hop_ip(i % 700), T0 + i)
+        asset.add_peer(f"10.0.9.{i % 200 + 1}")
+        asset.peers_not_given_to(baselines.device(asset.ip))
+        assert len(asset._baseline_peer_cursors) <= MAX_IP_HISTORY
+    assert set(asset._baseline_peer_cursors) <= {e["ip"] for e in asset.ip_history}
+
+
+def _hopping_run():
+    """One MAC learns peers at A, hops through 300 IPs learning more, then returns to A."""
+    engine = CaptureEngine(inventory=AssetInventory(), baseline_window=60)
+    engine.no_baseline = False
+    packets = [("10.0.0.70", f"10.0.9.{i % 5 + 1}", i * 5) for i in range(15)]        # A locks
+    packets += [(_hop_ip(i), f"10.0.8.{i % 40 + 1}", 100 + i) for i in range(300)]
+    packets += [("10.0.0.70", "10.0.9.1", 1000), ("10.0.0.70", "10.0.7.1", 1001)]
+    for src, dst, t in packets:
+        pkt = Ether(src=MAC, dst="02:00:00:00:00:fe") / IP(src=src, dst=dst) / TCP(sport=40000, dport=502, flags="PA")
+        pkt.time = T0 + t
+        engine._process_packet(pkt)
+    return engine
+
+
+def _normalized_anomalies(engine):
+    found = []
+    for a in engine.baseline.anomaly_log:
+        detail = a["detail"]
+        m = re.search(r"New peer\(s\): (.*)$", detail)
+        if m:
+            detail = ", ".join(sorted(m.group(1).split(", ")))
+        found.append((a["type"], a["ip"], detail))
+    return found
+
+
+def test_dropping_cursors_does_not_change_anomalies(monkeypatch):
+    bounded = _hopping_run()
+    asset = bounded.inventory.get_by_mac(MAC)
+    assert asset.ip_history_dropped == 302 - 256
+    assert "10.0.0.70" in asset._baseline_peer_cursors   # recreated on return
+    monkeypatch.setattr(inventory, "MAX_IP_HISTORY", 10**9)
+    unbounded = _hopping_run()
+    assert _normalized_anomalies(bounded) == _normalized_anomalies(unbounded)
+    new_peer = [a for a in _normalized_anomalies(bounded) if a[0] == "NEW_PEER" and a[1] == "10.0.0.70"]
+    assert new_peer and "10.0.8.1" in new_peer[0][2] and "10.0.7.1" in new_peer[-1][2]
