@@ -166,6 +166,23 @@ All output is saved under `output/scrutics_TIMESTAMP/`.
 | `topology.json`   | Every 15s / session end  | Machine-readable graph data                           |
 | `topology.html`   | Every 15s / session end  | Interactive topology map                              |
 
+### Per-device limits
+
+Each device keeps a bounded amount of history, so a flood from one host cannot grow its record
+without limit. What is not kept is counted, and the counts are appended to `assets.csv` (0, or empty
+for the breakdown, when nothing was dropped) and shown in the run summary:
+
+| Kept per device | Limit | Count column in `assets.csv` |
+|---|---|---|
+| IP address history | the most recent 256 changes | `ip_history_dropped` |
+| Evidence values of each kind (for example mDNS names, DHCP host names) | the first 64 distinct values | `evidence_overflow`, per kind in `evidence_overflow_by_type` |
+| DNS names | the first 64 | `dns_names_overflow` |
+| Peer addresses (`peer_count` is the number kept) | the first 4096 | `peer_additions_rejected`, every refused addition including repeats |
+| First-contact times for `max_new_peers_per_hour` | the first 4096 peers | `peer_first_seen_overflow` |
+
+A peer beyond the 4096th is not reported as a new peer by the behavioral baseline and does not count
+toward `max_new_peers_per_hour`; it still appears in the topology.
+
 ---
 
 ## Configuration
@@ -282,6 +299,7 @@ Run `python3 -m scrutics doctor` first : it identifies most issues.
 ## Known limitations
 
 - Large PCAPs may require more processing time and memory. Use `--no-baseline` when behavioral anomaly detection is not required.
+- Memory grows with the number of distinct devices seen; there is no limit on the number of devices. Spoofed traffic that invents many MAC or IP addresses therefore grows memory without bound (about 8.8 KB per device, so about 880 MB per 100,000 invented devices). The history kept per device is bounded (see "Per-device limits"), but the behavioral baseline is kept per IP address, so one device that moves through many addresses still adds one baseline per address.
 - No MAC addresses in Zeek/Suricata logs : OUI vendor matching unavailable; confidence scores are lower
 - No IPv6 support
 - WSL2 file performance : keep Scrutics on the Linux filesystem, not `/mnt/c/...`

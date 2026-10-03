@@ -38,7 +38,7 @@ from scrutics.diagnostics import (
     VERSION, check_dependencies, full_report,
     list_interfaces, suggest_interface, check_output_dir,
 )
-from scrutics.db.inventory import AssetInventory
+from scrutics.db.inventory import AssetInventory, limit_summary_line
 from scrutics.topology import export_topology
 
 SESSION_FLUSH_INTERVAL = 15.0
@@ -832,6 +832,9 @@ def run_headless(args) -> int:
             print(f"[!] {engine.ingest_stats.summary_line()}")
         else:
             print("[+] Input: 0 rejected | 0 contained errors")
+        # Entries a device did not keep because a per-device retention limit was reached
+        limits = inventory.limit_totals()
+        print(f"[{'!' if any(limits.values()) else '+'}] {limit_summary_line(limits)}")
 
         print(f"\n[+] Session saved to: {session_dir}")
         if topology_paths:

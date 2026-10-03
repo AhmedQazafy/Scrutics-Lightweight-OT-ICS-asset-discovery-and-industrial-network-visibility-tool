@@ -33,7 +33,9 @@ from rich.text import Text
 from rich.style import Style
 
 from rich.markup import escape
-from scrutics.db.inventory import AssetInventory, Asset, Evidence, split_conflicts
+from scrutics.db.inventory import (
+    AssetInventory, Asset, Evidence, split_conflicts, limit_summary_line, parse_evidence_overflow,
+)
 from scrutics.classifier import asset_classifier
 from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
@@ -1893,7 +1895,8 @@ def _asset_from_session_row(row: dict) -> Asset:
     Rebuild an Asset from one row of a saved assets.csv.
 
     Classification basis columns are optional: sessions written before they existed load
-    with an empty rule, reason and conflicts, and an unrecorded decision confidence.
+    with an empty rule, reason and conflicts, and an unrecorded decision confidence. Counts of
+    additions refused at the retention limits are read back, and are zero for older sessions.
     """
     return Asset(
         ip=row.get("ip", ""),
@@ -1928,6 +1931,11 @@ def _asset_from_session_row(row: dict) -> Asset:
         classification_rule=row.get("classification_rule", "") or "",
         classification_reason=row.get("classification_reason", "") or "",
         classification_conflicts=split_conflicts(row.get("classification_conflicts", "")),
+        ip_history_dropped=int(row.get("ip_history_dropped") or 0),
+        evidence_overflow=parse_evidence_overflow(row.get("evidence_overflow_by_type")),
+        dns_names_overflow=int(row.get("dns_names_overflow") or 0),
+        peer_additions_rejected=int(row.get("peer_additions_rejected") or 0),
+        peer_first_seen_overflow=int(row.get("peer_first_seen_overflow") or 0),
     )
 
 
@@ -2059,6 +2067,8 @@ class DetailScreen(ModalScreen):
             "packet_count": asset.packet_count,
             "evidence": [ev.to_dict() for ev in asset.evidence],
             "observed_services": asset.observed_services,
+            "evidence_overflow_by_type": dict(asset.evidence_overflow),
+            **asset.limit_counts(),
             "connections": []
         }
         # Add connections if engine available
@@ -2711,11 +2721,17 @@ class ScruticsApp(App):
         stats = self.engine.ingest_stats if self.engine else None
         counts = (f"  |  input: {stats.rejected_total} rejected, {stats.contained_total} contained errors"
                   if stats else "")
+        inventory = getattr(self, "inventory", None)
+        limits = inventory.limit_totals() if inventory else None
+        if limits is not None:
+            counts += f"  |  per-device limits: {sum(limits.values())} not kept"
         self._set_status(f"Session terminated and saved as {self._session_dir}{counts}")
         self.notify(f"Session saved to {self._session_dir}", severity="information")
         if stats and stats.has_issues():
             # The summary can carry input text: show it without markup parsing
             self.notify(stats.summary_line(), severity="warning", markup=False)
+        if limits and any(limits.values()):
+            self.notify(limit_summary_line(limits), severity="warning", markup=False)
         self.query_one("#btn-pause", Button).label = "Pause =P"
         self._paused = False
 

@@ -30,12 +30,42 @@ MAX_EVIDENCE_VALUES_PER_TYPE = 64     # distinct values per evidence type, the f
 MAX_DNS_NAMES = 64                    # the first names seen
 MAX_PEERS = 4096                      # peer IPs and peer first-seen times, the first ones seen
 
+# Labels of the per-asset counts of refused additions, in export column order
+LIMIT_COUNT_LABELS = {
+    "ip_history_dropped": "IP history entries dropped",
+    "evidence_overflow": "evidence values refused",
+    "dns_names_overflow": "DNS names refused",
+    "peer_additions_rejected": "peer additions refused",
+    "peer_first_seen_overflow": "peer first-seen times refused",
+}
+
 
 def split_conflicts(text: str | None) -> list:
     """Parse a CSV conflicts cell back into the list of conflict notes."""
     if not text:
         return []
     return [note for note in text.split(CONFLICT_SEPARATOR) if note]
+
+
+def format_evidence_overflow(counts: dict) -> str:
+    """Refused evidence additions per type as "type:count" cells joined by "|", sorted by type."""
+    return "|".join(f"{t}:{n}" for t, n in sorted(counts.items(), key=lambda item: str(item[0])))
+
+
+def parse_evidence_overflow(text: str | None) -> dict:
+    """Inverse of format_evidence_overflow; empty or missing text gives no counts."""
+    counts = {}
+    for cell in (text or "").split("|"):
+        if cell:
+            evidence_type, _, count = cell.rpartition(":")
+            counts[evidence_type] = int(count)
+    return counts
+
+
+def limit_summary_line(totals: dict) -> str:
+    """One summary line of refused additions at the per-device retention limits."""
+    return "Per-device limits: " + " | ".join(
+        f"{totals.get(key, 0)} {label}" for key, label in LIMIT_COUNT_LABELS.items())
 
 
 def is_inventory_ip(
@@ -592,6 +622,16 @@ class Asset:
             if episode.get("ip") not in remaining:
                 self._baseline_peer_cursors.pop(episode.get("ip"), None)
 
+    def limit_counts(self) -> dict:
+        """Refused additions at each retention limit, keyed as LIMIT_COUNT_LABELS; evidence summed."""
+        return {
+            "ip_history_dropped": self.ip_history_dropped,
+            "evidence_overflow": sum(self.evidence_overflow.values()),
+            "dns_names_overflow": self.dns_names_overflow,
+            "peer_additions_rejected": self.peer_additions_rejected,
+            "peer_first_seen_overflow": self.peer_first_seen_overflow,
+        }
+
     def to_dict(self) -> dict:
         proto_str = ", ".join(self.protocols) if self.protocols else "Unknown"
         type_str = self.classification_type if self.classification_type != "Unknown" else (
@@ -640,6 +680,16 @@ class Asset:
             "classification_conflicts": CONFLICT_SEPARATOR.join(self.classification_conflicts),
             "classification_decision_confidence": self.confidence,
         }
+        # Refused additions at the retention limits, appended after the basis columns
+        limits = self.limit_counts()
+        right.update({
+            "ip_history_dropped": limits["ip_history_dropped"],
+            "evidence_overflow": limits["evidence_overflow"],
+            "evidence_overflow_by_type": format_evidence_overflow(self.evidence_overflow),
+            "dns_names_overflow": limits["dns_names_overflow"],
+            "peer_additions_rejected": limits["peer_additions_rejected"],
+            "peer_first_seen_overflow": limits["peer_first_seen_overflow"],
+        })
         return {**left, **right}
 
 
@@ -889,6 +939,14 @@ class AssetInventory:
         Return count of unique assets in inventory.
         """
         return len(self.get_all())
+
+    def limit_totals(self) -> dict:
+        """Refused additions at the per-device retention limits, summed over all assets."""
+        totals = dict.fromkeys(LIMIT_COUNT_LABELS, 0)
+        for asset in self.get_all():
+            for key, count in asset.limit_counts().items():
+                totals[key] += count
+        return totals
 
     def export_csv(self, path: str):
         assets = self.get_all()
