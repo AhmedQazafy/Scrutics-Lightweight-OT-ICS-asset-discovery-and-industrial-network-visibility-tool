@@ -186,11 +186,7 @@ class CaptureEngine:
             return
 
         # Add as evidence only once
-        existing = any(
-            e.type == "os_hint" and e.value == os_hint
-            for e in asset.evidence
-        )
-        if not existing:
+        if not asset.has_evidence("os_hint", os_hint):
             asset.add_os_hint(
                 f"{os_hint} (observed TTL: {ttl}, inferred initial: {inferred_initial})",
                 confidence=confidence
@@ -250,11 +246,7 @@ class CaptureEngine:
 
         if service_name:
             # Add discovery evidence
-            existing = any(
-                e.type == "discovery" and e.value == service_name
-                for e in asset.evidence
-            )
-            if not existing:
+            if not asset.has_evidence("discovery", service_name):
                 asset.add_evidence(
                     evidence_type="discovery",
                     value=service_name,
@@ -460,8 +452,7 @@ class CaptureEngine:
                 confidence="LOW",
                 detail=f"DHCP Option 81 Client FQDN: {fqdn}"
             )
-            if fqdn not in asset.dns_names:
-                asset.dns_names.append(fqdn)
+            asset.add_dns_name(fqdn)
             self._log(f"{asset.ip} -> DHCP FQDN: {fqdn}", "dim white")
 
         # DHCP evidence never changes the class; refresh the explanation that lists it
@@ -529,12 +520,7 @@ class CaptureEngine:
                     detail += f", StartAddr=0x{obs.starting_address:04X}, Quantity={obs.quantity}"
             
             # Check for existing protocol evidence (avoid duplicates)
-            existing = any(
-                e.type == "protocol" and e.value == "Modbus TCP" and e.source == "modbus_parser"
-                for e in asset.evidence
-            )
-            
-            if not existing:
+            if not asset.has_evidence_from("protocol", "Modbus TCP", "modbus_parser"):
                 # Add validated protocol evidence
                 # Uses same weight as port-based (20) but with HIGH confidence and modbus_parser source
                 asset.add_evidence(
@@ -656,11 +642,7 @@ class CaptureEngine:
                 sig = get_signature(port, proto)
                 if sig and asset:
                     # Add port evidence
-                    existing = any(
-                        e.type == "port" and e.value == str(port)
-                        for e in asset.evidence
-                    )
-                    if not existing:
+                    if not asset.has_evidence("port", str(port)):
                         asset.add_evidence(
                             evidence_type="port",
                             value=str(port),

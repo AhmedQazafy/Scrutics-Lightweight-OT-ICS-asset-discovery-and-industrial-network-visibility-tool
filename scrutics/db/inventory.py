@@ -147,6 +147,23 @@ class Asset:
     _peer_log_source: Any = field(default=None, init=False, repr=False, compare=False)
     _peer_log_epoch: int = field(default=0, init=False, repr=False, compare=False)
     _baseline_peer_cursors: dict = field(default_factory=dict, init=False, repr=False, compare=False)
+    # Derived from evidence, in-memory only (see _synced_evidence_index): lookup keys, vendor
+    # values and the weight total of the records indexed so far. Records whose key cannot be
+    # hashed are kept in a list that every lookup also scans.
+    _ev_source: Any = field(default=None, init=False, repr=False, compare=False)
+    _ev_indexed: int = field(default=0, init=False, repr=False, compare=False)
+    _ev_keys: set = field(default_factory=set, init=False, repr=False, compare=False)
+    _ev_type_values: set = field(default_factory=set, init=False, repr=False, compare=False)
+    _ev_unhashable: list = field(default_factory=list, init=False, repr=False, compare=False)
+    _ev_vendor_values: set = field(default_factory=set, init=False, repr=False, compare=False)
+    _ev_weighted: int = field(default=0, init=False, repr=False, compare=False)
+    _ev_weight_total: int = field(default=0, init=False, repr=False, compare=False)
+    _ev_weights_exact: bool = field(default=True, init=False, repr=False, compare=False)
+    # Derived from dns_names, in-memory only: the names indexed so far
+    _dns_source: Any = field(default=None, init=False, repr=False, compare=False)
+    _dns_indexed: int = field(default=0, init=False, repr=False, compare=False)
+    _dns_set: set = field(default_factory=set, init=False, repr=False, compare=False)
+    _dns_unhashable: list = field(default_factory=list, init=False, repr=False, compare=False)
 
     def __post_init__(self, is_ot: Optional[Union[bool, str]] = None):
         # Sync vendor_class and is_ot_vendor
@@ -198,11 +215,8 @@ class Asset:
         Add evidence, deduplicating by type+value+source.
         If identical evidence already exists, skip adding.
         """
-        # Check if identical evidence exists (same type, value, source)
-        for ev in self.evidence:
-            if ev.type == evidence_type and ev.value == value and ev.source == source:
-                # Optionally update timestamp here if we had one, but we don't.
-                return
+        if self.has_evidence_from(evidence_type, value, source):
+            return
 
         # Create new evidence
         ev = Evidence(
@@ -216,9 +230,98 @@ class Asset:
         self.evidence.append(ev)
 
         # Recalculate classification confidence based on evidence weights
-        total_weight = sum(e.weight for e in self.evidence)
+        total_weight = self._evidence_weight_total()
         max_possible = 100
         self.classification_confidence_pct = min(total_weight, max_possible)
+
+    def _synced_evidence_index(self) -> None:
+        """
+        Bring the evidence lookups up to date with the evidence list.
+
+        Records are only ever appended, by add_evidence or directly (a session load does), so
+        only the records added since the last call are indexed. A replaced or shorter list is
+        indexed again from the start. A record changed in place is not noticed.
+        """
+        evidence = self.evidence
+        if self._ev_source is not evidence or len(evidence) < max(self._ev_indexed, self._ev_weighted):
+            self._ev_source = evidence
+            self._ev_indexed = self._ev_weighted = self._ev_weight_total = 0
+            self._ev_weights_exact = True
+            self._ev_keys, self._ev_type_values, self._ev_vendor_values = set(), set(), set()
+            self._ev_unhashable = []
+        for ev in evidence[self._ev_indexed:]:
+            try:
+                self._ev_keys.add((ev.type, ev.value, ev.source))
+                self._ev_type_values.add((ev.type, ev.value))
+            except TypeError:
+                self._ev_unhashable.append(ev)
+            if ev.type == "vendor" and ev.value and ev.value != "Unknown":
+                self._ev_vendor_values.add(str(ev.value))
+            self._ev_indexed += 1
+
+    def _evidence_weight_total(self):
+        """
+        Sum of all evidence weights. Kept as a running total while every weight is an int;
+        any other weight (as a hand-edited session file may hold) falls back to summing the
+        list, so the result and any error are those of sum().
+        """
+        self._synced_evidence_index()
+        if self._ev_weights_exact:
+            for ev in self.evidence[self._ev_weighted:]:
+                if type(ev.weight) not in (int, bool):
+                    self._ev_weights_exact = False
+                    break
+                self._ev_weight_total += ev.weight
+                self._ev_weighted += 1
+        if not self._ev_weights_exact:
+            return sum(e.weight for e in self.evidence)
+        return self._ev_weight_total
+
+    def has_evidence(self, evidence_type: str, value) -> bool:
+        """Whether any evidence record has this type and value, from any source."""
+        self._synced_evidence_index()
+        try:
+            if (evidence_type, value) in self._ev_type_values:
+                return True
+        except TypeError:
+            return any(e.type == evidence_type and e.value == value for e in self.evidence)
+        return any(e.type == evidence_type and e.value == value for e in self._ev_unhashable)
+
+    def has_evidence_from(self, evidence_type: str, value, source: str) -> bool:
+        """Whether an evidence record has this type, value and source."""
+        self._synced_evidence_index()
+        try:
+            if (evidence_type, value, source) in self._ev_keys:
+                return True
+        except TypeError:
+            return any(e.type == evidence_type and e.value == value and e.source == source
+                       for e in self.evidence)
+        return any(e.type == evidence_type and e.value == value and e.source == source
+                   for e in self._ev_unhashable)
+
+    def vendor_evidence_values(self) -> set:
+        """Text of every vendor evidence value other than empty or "Unknown"."""
+        self._synced_evidence_index()
+        return self._ev_vendor_values
+
+    def add_dns_name(self, name: str) -> None:
+        """Record a DNS name for this asset once, keeping the order names were first seen."""
+        names = self.dns_names
+        if self._dns_source is not names or len(names) < self._dns_indexed:
+            self._dns_source, self._dns_indexed = names, 0
+            self._dns_set, self._dns_unhashable = set(), []
+        for known in names[self._dns_indexed:]:
+            try:
+                self._dns_set.add(known)
+            except TypeError:
+                self._dns_unhashable.append(known)
+            self._dns_indexed += 1
+        try:
+            present = name in self._dns_set or any(known == name for known in self._dns_unhashable)
+        except TypeError:
+            present = name in names
+        if not present:
+            names.append(name)
 
     def _synced_peer_log(self) -> list:
         """The peer log, rebuilt from peer_ips if that set was replaced or changed directly."""
@@ -274,9 +377,8 @@ class Asset:
     def add_os_hint(self, hint: str, confidence: str = "LOW"):
         """Add a tentative OS hint, deduplicated by value."""
         # Check if this exact hint already exists in evidence
-        for ev in self.evidence:
-            if ev.type == "os_hint" and ev.value == hint:
-                return
+        if self.has_evidence("os_hint", hint):
+            return
         # If not, add it
         self.os_hints.append(hint)
         self.add_evidence(

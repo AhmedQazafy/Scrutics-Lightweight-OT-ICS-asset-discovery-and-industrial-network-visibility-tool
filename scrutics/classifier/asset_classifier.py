@@ -140,10 +140,7 @@ def _non_voting_details(asset) -> dict:
     )
     if served:
         details["served"] = "serves: " + ", ".join(_service_label(p) for p in served)
-    vendors = sorted({
-        str(e.value) for e in asset.evidence
-        if e.type == "vendor" and e.value and e.value != "Unknown"
-    })
+    vendors = sorted(asset.vendor_evidence_values())
     if vendors:
         details["vendor"] = "vendor: " + ", ".join(vendors)
     return details
