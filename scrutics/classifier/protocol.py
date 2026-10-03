@@ -54,6 +54,12 @@ def reload_rules():
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def active_rules() -> list:
+    """The loaded user rules followed by the builtin rules, as last set by load or reload."""
+    with _RULE_LOCK:
+        return list(_USER_RULES) + list(_BUILTIN_RULES)
+
+
 def known_service_ports() -> set[int]:
     """Return ports that are meaningful listener/service signals.
 

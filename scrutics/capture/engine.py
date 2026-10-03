@@ -1144,8 +1144,8 @@ class CaptureEngine:
         Apply behavioral constraints from rules that match the asset's contacted ports.
         Uses merge semantics to preserve constraints from multiple matching rules.
         """
-        from scrutics.classifier.protocol import load_user_rules, load_builtin_rules, match_rule
-        rules = load_user_rules() + load_builtin_rules()
+        from scrutics.classifier.protocol import active_rules, match_rule
+        rules = active_rules()
     
         behavioral_fields = {
             "never_initiates",

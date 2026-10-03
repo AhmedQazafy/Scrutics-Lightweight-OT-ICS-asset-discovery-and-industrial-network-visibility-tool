@@ -88,5 +88,6 @@ output:
             assert 'NEVER_INITIATES' in violation_anomalies[0]['detail']
             
         finally:
-            # Restore original config paths
+            # Restore original config paths and the rules loaded from them
             loader._USER_SEARCH_PATHS = original_paths
+            reload_rules()
