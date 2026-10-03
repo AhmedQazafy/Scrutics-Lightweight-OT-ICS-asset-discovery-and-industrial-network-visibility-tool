@@ -162,3 +162,40 @@ def test_evidence_index_does_not_change_equality_or_repr():
     first.vendor_evidence_values()
     assert first == second and repr(first) == repr(second)
     assert "_ev_" not in repr(first) and "_dns_" not in repr(first)
+
+
+# ── Peer first-seen times ─────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", range(20))
+def test_recent_peer_count_matches_first_seen_times_after_random_mutations(seed):
+    rng = random.Random(seed)
+    asset = Asset(ip="10.0.0.1", mac="02:00:00:00:00:01",
+                  peer_first_seen={"10.0.9.1": 5.0} if seed % 2 else {})
+    for _ in range(300):
+        op = rng.random()
+        peer = f"10.0.1.{rng.randint(1, 80)}"
+        ts = rng.choice((0, 1.5, 100, 3600, 3700.25, 7300)) + rng.random() * 50
+        if op < 0.6:
+            first = asset.peer_first_seen.get(peer, ts)
+            asset.record_peer_first_seen(peer, ts)
+            assert asset.peer_first_seen[peer] == first     # a later contact keeps the first time
+        elif op < 0.8:
+            asset.peer_first_seen.setdefault(peer, ts)      # changed directly
+        elif op < 0.9:
+            asset.peer_first_seen = {p: t for p, t in asset.peer_first_seen.items() if rng.random() < 0.5}
+        else:
+            asset.peer_first_seen = {peer: ts}             # replaced
+        times = asset._synced_first_seen_times()
+        assert times == sorted(asset.peer_first_seen.values())
+        for cutoff in (-1, 0, 50, 3600, ts - 3600, ts, 1e9):
+            assert asset.peers_first_seen_since(cutoff) == sum(1 for t in asset.peer_first_seen.values() if t >= cutoff)
+
+
+def test_first_seen_times_do_not_change_equality_or_repr():
+    first = Asset(ip="10.0.0.1", mac="02:00:00:00:00:01")
+    second = Asset(ip="10.0.0.1", mac="02:00:00:00:00:01")
+    first.record_peer_first_seen("10.0.1.1", 10.0)
+    second.peer_first_seen["10.0.1.1"] = 10.0
+    first.peers_first_seen_since(0)
+    assert first == second and repr(first) == repr(second)
+    assert "_first_seen_times" not in repr(first) and "_first_seen_source" not in repr(first)

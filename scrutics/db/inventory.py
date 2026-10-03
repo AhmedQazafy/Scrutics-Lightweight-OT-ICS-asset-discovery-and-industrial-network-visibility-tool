@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field, InitVar
 from typing import Optional, Any, Union
+import bisect
 import csv
 import datetime
 import ipaddress
@@ -164,6 +165,10 @@ class Asset:
     _dns_indexed: int = field(default=0, init=False, repr=False, compare=False)
     _dns_set: set = field(default_factory=set, init=False, repr=False, compare=False)
     _dns_unhashable: list = field(default_factory=list, init=False, repr=False, compare=False)
+    # Derived from peer_first_seen, in-memory only: its first-seen times in ascending order,
+    # rebuilt whenever the dict was replaced or changed outside record_peer_first_seen
+    _first_seen_source: Any = field(default=None, init=False, repr=False, compare=False)
+    _first_seen_times: list = field(default_factory=list, init=False, repr=False, compare=False)
 
     def __post_init__(self, is_ot: Optional[Union[bool, str]] = None):
         # Sync vendor_class and is_ot_vendor
@@ -303,6 +308,26 @@ class Asset:
         """Text of every vendor evidence value other than empty or "Unknown"."""
         self._synced_evidence_index()
         return self._ev_vendor_values
+
+    def _synced_first_seen_times(self) -> list:
+        """First-seen times of all peers, ascending, rebuilt if peer_first_seen changed directly."""
+        if (self._first_seen_source is not self.peer_first_seen
+                or len(self._first_seen_times) != len(self.peer_first_seen)):
+            self._first_seen_times = sorted(self.peer_first_seen.values())
+            self._first_seen_source = self.peer_first_seen
+        return self._first_seen_times
+
+    def record_peer_first_seen(self, ip: str, timestamp: float) -> None:
+        """Record when a peer was first contacted; later contacts keep the first time."""
+        times = self._synced_first_seen_times()
+        if ip not in self.peer_first_seen:
+            self.peer_first_seen[ip] = timestamp
+            bisect.insort(times, timestamp)
+
+    def peers_first_seen_since(self, cutoff: float) -> int:
+        """Number of peers first contacted at or after cutoff."""
+        times = self._synced_first_seen_times()
+        return len(times) - bisect.bisect_left(times, cutoff)
 
     def add_dns_name(self, name: str) -> None:
         """Record a DNS name for this asset once, keeping the order names were first seen."""

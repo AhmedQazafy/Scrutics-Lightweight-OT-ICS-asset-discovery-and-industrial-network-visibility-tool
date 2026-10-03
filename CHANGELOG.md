@@ -13,6 +13,7 @@ All notable changes to Scrutics are documented here.
 
 ### Fixed — Processing Speed Under Scans and Floods
 - **A host that contacts many addresses no longer slows processing down**: the work done for each of its packets no longer grows with the number of addresses it has already contacted.
+- **A device with a new-peer rate limit (`max_new_peers_per_hour`) that contacts many addresses no longer slows processing down**: counting its recent new peers no longer goes through its whole peer history.
 - **A host that contacts many ports no longer slows processing down**: rule and signature lookups for its packets no longer go through every port it has contacted.
 - **A host that announces many names no longer slows processing down**: mDNS names, DHCP host names and DHCP client FQDNs are looked up directly instead of being compared with every record the host already has.
 - **Behavioral constraints from port rules are chosen the same way every time**: when a device without a listening service has contacted several ports whose rules set behavioral constraints, the rule of the highest such port is applied, whatever order the ports were contacted in. Before, the choice depended on internal ordering.

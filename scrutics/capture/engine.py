@@ -1044,10 +1044,8 @@ class CaptureEngine:
         # max_new_peers_per_hour — rate limit new peer discovery
         max_peers = c.get("max_new_peers_per_hour")
         if max_peers and dst_ip:
-            if dst_ip not in asset.peer_first_seen:
-                asset.peer_first_seen[dst_ip] = ts
-            cutoff = ts - 3600
-            recent_new = sum(1 for t in asset.peer_first_seen.values() if t >= cutoff)
+            asset.record_peer_first_seen(dst_ip, ts)
+            recent_new = asset.peers_first_seen_since(ts - 3600)
             if recent_new > max_peers:
                 if _allowed("PEER_RATE", cooldown=300):
                     _emit("PEER_RATE_EXCEEDED",
