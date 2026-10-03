@@ -20,6 +20,7 @@ All notable changes to Scrutics are documented here.
 
 ### Fixed — Bounded Memory Per Device
 - **A device that announces many names or identifiers no longer grows without limit**: each kind of evidence keeps the first 64 distinct values seen for a device (for example mDNS names, DHCP host names, DHCP vendor class identifiers), and the DNS name list keeps the first 64 names. Further values are counted instead of stored. A value already kept is still recorded from additional sources. A saved session loads with the same limits.
+- **A host that contacts very many addresses no longer grows without limit**: a device keeps its first 4096 peer addresses, and the same limit applies to the first-contact times kept for `max_new_peers_per_hour`. `peer_count` is the number of peers kept. Once a device has 4096 peers, a further new peer is not reported as a new peer by the behavioral baseline and is not counted toward its new-peer rate; it still appears in the topology. Every refused addition is counted, repeats included.
 
 ### Changed — Log Import Validation
 - A Zeek log whose header cannot be used (an empty `#separator`, or data without a `#fields` header) is reported as a clear file error.

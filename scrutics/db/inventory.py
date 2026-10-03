@@ -25,6 +25,7 @@ CONFLICT_SEPARATOR = "; "
 # additions instead, so truncation is visible in exports and summaries.
 MAX_EVIDENCE_VALUES_PER_TYPE = 64     # distinct values per evidence type, the first ones seen
 MAX_DNS_NAMES = 64                    # the first names seen
+MAX_PEERS = 4096                      # peer IPs and peer first-seen times, the first ones seen
 
 
 def split_conflicts(text: str | None) -> list:
@@ -150,6 +151,9 @@ class Asset:
     # Truncation metadata only: never evidence and never classification input.
     evidence_overflow: dict = field(default_factory=dict, repr=False, compare=False)  # type -> count
     dns_names_overflow: int = field(default=0, repr=False, compare=False)
+    # Every refused peer addition is counted, repeats included: it is not a count of distinct peers
+    peer_additions_rejected: int = field(default=0, repr=False, compare=False)
+    peer_first_seen_overflow: int = field(default=0, repr=False, compare=False)
     # Derived from peer_ips, in-memory only: the peers in order of first addition, rebuilt (with a
     # new epoch) whenever peer_ips was replaced or changed outside add_peer; and, per baseline IP,
     # (device baseline, epoch, log position) marking how much of the log that baseline was given
@@ -374,9 +378,16 @@ class Asset:
         return self._first_seen_times
 
     def record_peer_first_seen(self, ip: str, timestamp: float) -> None:
-        """Record when a peer was first contacted; later contacts keep the first time."""
+        """
+        Record when a peer was first contacted; later contacts keep the first time. The first
+        MAX_PEERS peers are kept; every later call for a peer not kept is counted in
+        peer_first_seen_overflow, repeats included.
+        """
         times = self._synced_first_seen_times()
         if ip not in self.peer_first_seen:
+            if len(self.peer_first_seen) >= MAX_PEERS:
+                self.peer_first_seen_overflow += 1
+                return
             self.peer_first_seen[ip] = timestamp
             bisect.insort(times, timestamp)
 
@@ -419,9 +430,15 @@ class Asset:
         return self._peer_log
 
     def add_peer(self, ip: str) -> None:
-        """Record a peer IP this asset communicated with."""
+        """
+        Record a peer IP this asset communicated with. The first MAX_PEERS peers are kept; every
+        later call for a peer not kept is counted in peer_additions_rejected, repeats included.
+        """
         log = self._synced_peer_log()
         if ip not in self.peer_ips:
+            if len(self.peer_ips) >= MAX_PEERS:
+                self.peer_additions_rejected += 1
+                return
             self.peer_ips.add(ip)
             log.append(ip)
 

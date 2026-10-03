@@ -239,3 +239,39 @@ def test_first_seen_times_do_not_change_equality_or_repr():
     first.peers_first_seen_since(0)
     assert first == second and repr(first) == repr(second)
     assert "_first_seen_times" not in repr(first) and "_first_seen_source" not in repr(first)
+
+
+# ── At the retention limits ───────────────────────────────────────────────────
+
+import scrutics.db.inventory as inventory
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_peer_log_and_first_seen_times_stay_consistent_at_the_limit(seed, monkeypatch):
+    monkeypatch.setattr(inventory, "MAX_PEERS", 8)
+    rng = random.Random(seed)
+    asset = Asset(ip="10.0.0.1", mac="02:00:00:00:00:01")
+    baselines = BaselineEngine()
+    refused = refused_times = 0
+    for _ in range(300):
+        op = rng.random()
+        peer = f"10.0.1.{rng.randint(1, 20)}"
+        if op < 0.5:
+            full = len(asset.peer_ips) >= 8 and peer not in asset.peer_ips
+            log = list(asset._synced_peer_log())
+            asset.add_peer(peer)
+            refused += full
+            assert asset._synced_peer_log() == (log if full or peer in log else log + [peer])
+        elif op < 0.8:
+            full = len(asset.peer_first_seen) >= 8 and peer not in asset.peer_first_seen
+            asset.record_peer_first_seen(peer, rng.random() * 7200)
+            refused_times += full
+        elif op < 0.9:
+            asset.peers_not_given_to(baselines.device(f"10.0.0.{rng.randint(1, 3)}"))
+        else:
+            asset.peer_first_seen = {p: t for p, t in asset.peer_first_seen.items() if rng.random() < 0.5}
+        assert len(asset.peer_ips) <= 8 and len(asset.peer_first_seen) <= 8
+        assert asset.peer_additions_rejected == refused
+        assert asset.peer_first_seen_overflow == refused_times
+        _check_peer_log(asset)
+        assert asset._synced_first_seen_times() == sorted(asset.peer_first_seen.values())
