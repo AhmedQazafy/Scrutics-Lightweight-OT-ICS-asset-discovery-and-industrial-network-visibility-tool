@@ -9,6 +9,7 @@ import threading
 from collections import deque
 
 from scrutics.db.inventory import AssetInventory
+from scrutics.capture.ingest_stats import IngestStats
 from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
 from scrutics.classifier.protocol import classify_by_ports, classification_evidence_from_ports
@@ -38,6 +39,9 @@ class CaptureEngine:
         self._pending_dhcp: dict[str, dict] = {}
         self._MAX_PENDING_DHCP = 1000
         self._stop_event = threading.Event()
+        # Rejected input and contained per-item errors; one event log entry per new kind
+        self.ingest_stats = IngestStats(log=lambda message: self._log(message, "yellow"))
+        self._ingest_index = 0     # packets handed to _ingest_packet in this engine's lifetime
         self._get_oui_db()         # preload at startup — avoids silent delay on first packet
 
     def _log(self, message: str, style: str = "dim white"):
@@ -52,6 +56,26 @@ class CaptureEngine:
             from scrutics.classifier.oui import load_oui_db
             self._oui_db = load_oui_db()
         return self._oui_db
+
+    def _ingest_packet(self, pkt, path: str = "live"):
+        """
+        Process one captured packet; an unexpected error skips only that packet.
+
+        This is the live capture callback, so Scapy never sees the exception and keeps its
+        socket. KeyboardInterrupt and SystemExit are not caught.
+        """
+        self._ingest_index += 1
+        try:
+            self._process_packet(pkt)
+        except Exception as exc:
+            self.ingest_stats.contain(exc, path, self._ingest_index)
+
+    def _ingest_flow(self, flow: dict, path: str, line_no: int):
+        """Process one log record; an unexpected error skips only that record."""
+        try:
+            self._process_flow(flow)
+        except Exception as exc:
+            self.ingest_stats.contain(exc, path, line_no)
 
     def get_event_buffer(self) -> list:
         """
@@ -1072,7 +1096,7 @@ class CaptureEngine:
                 capture_timeout = 1.0
 
             before = self._packet_count
-            sniff(iface=interface, prn=self._process_packet, store=False,
+            sniff(iface=interface, prn=self._ingest_packet, store=False,
                   count=max(0, packet_count - captured) if packet_count else 0,
                   timeout=capture_timeout, promisc=True)
             captured += self._packet_count - before
@@ -1092,30 +1116,30 @@ class CaptureEngine:
             for pkt in packets:
                 if self._stop_event.is_set():
                     break
-                self._process_packet(pkt)
+                self._ingest_packet(pkt, "pcap")
                 count += 1
         self._log(f"Processed {count} packets", "dim white")
 
     def start_zeek(self, filepath: str):
-        from scrutics.parsers.zeek import extract_flows_from_zeek
+        from scrutics.parsers.zeek import iter_zeek_flows
         self._stop_event.clear()
-        flows = extract_flows_from_zeek(filepath)
+        flows = list(iter_zeek_flows(filepath, self.ingest_stats))
         self._log(f"Loaded {len(flows)} flows from Zeek log", "cyan")
-        for flow in flows:
+        for line_no, flow in flows:
             if self._stop_event.is_set():
                 break
-            self._process_flow(flow)
+            self._ingest_flow(flow, "zeek", line_no)
 
     def start_suricata(self, filepath: str):
-        from scrutics.parsers.suricata import extract_flows_from_eve
+        from scrutics.parsers.suricata import iter_eve_flows
         self._stop_event.clear()
-        flows = extract_flows_from_eve(filepath)
-        alert_count = sum(1 for f in flows if "alert" in f)
+        flows = list(iter_eve_flows(filepath, self.ingest_stats))
+        alert_count = sum(1 for _, f in flows if "alert" in f)
         self._log(f"Loaded {len(flows)} events ({alert_count} alerts) from EVE", "cyan")
-        for flow in flows:
+        for line_no, flow in flows:
             if self._stop_event.is_set():
                 break
-            self._process_flow(flow)
+            self._ingest_flow(flow, "suricata", line_no)
 
     def start_file(self, filepath: str):
         from scrutics.parsers.detector import detect_file_type

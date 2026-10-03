@@ -827,6 +827,12 @@ def run_headless(args) -> int:
             else:
                 print("[+] No anomalies detected.")
 
+        # Rejected input and contained errors, printed as plain text
+        if engine.ingest_stats.has_issues():
+            print(f"[!] {engine.ingest_stats.summary_line()}")
+        else:
+            print("[+] Input: 0 rejected | 0 contained errors")
+
         print(f"\n[+] Session saved to: {session_dir}")
         if topology_paths:
             print(f"[+] Topology map saved to: {topology_paths['html']}")

@@ -2708,8 +2708,14 @@ class ScruticsApp(App):
         btn_start.label = "Start Analysis (1)"
         btn_start.remove_class("running")
         self._export_session()
-        self._set_status(f"Session terminated and saved as {self._session_dir}")
+        stats = self.engine.ingest_stats if self.engine else None
+        counts = (f"  |  input: {stats.rejected_total} rejected, {stats.contained_total} contained errors"
+                  if stats else "")
+        self._set_status(f"Session terminated and saved as {self._session_dir}{counts}")
         self.notify(f"Session saved to {self._session_dir}", severity="information")
+        if stats and stats.has_issues():
+            # The summary can carry input text: show it without markup parsing
+            self.notify(stats.summary_line(), severity="warning", markup=False)
         self.query_one("#btn-pause", Button).label = "Pause =P"
         self._paused = False
 
