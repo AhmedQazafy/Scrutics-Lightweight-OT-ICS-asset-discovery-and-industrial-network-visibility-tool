@@ -3,6 +3,7 @@ Passive capture engine. NEVER transmits packets.
 All Scapy imports are lazy. Passive enforcement applied before capture.
 """
 
+import math
 import time
 import datetime
 import threading
@@ -18,6 +19,17 @@ from scrutics.classifier.signatures import (
     get_signature, get_all_service_ports, get_ot_ports,
     get_it_ports, get_infrastructure_ports, get_discovery_ports
 )
+
+
+def _usable_timestamp(ts) -> bool:
+    """A real, finite timestamp that maps to a calendar date (rejects NaN, inf, out-of-range)."""
+    if isinstance(ts, bool) or not isinstance(ts, (int, float)) or not math.isfinite(ts):
+        return False
+    try:
+        datetime.datetime.fromtimestamp(ts)
+    except (OverflowError, ValueError, OSError):
+        return False
+    return True
 
 
 class CaptureEngine:
@@ -42,6 +54,7 @@ class CaptureEngine:
         # Rejected input and contained per-item errors; one event log entry per new kind
         self.ingest_stats = IngestStats(log=lambda message: self._log(message, "yellow"))
         self._ingest_index = 0     # packets handed to _ingest_packet in this engine's lifetime
+        self._current_item = ("live", 0)   # (path, packet index or line number) being processed
         self._get_oui_db()         # preload at startup — avoids silent delay on first packet
 
     def _log(self, message: str, style: str = "dim white"):
@@ -65,6 +78,7 @@ class CaptureEngine:
         socket. KeyboardInterrupt and SystemExit are not caught.
         """
         self._ingest_index += 1
+        self._current_item = (path, self._ingest_index)
         try:
             self._process_packet(pkt)
         except Exception as exc:
@@ -72,6 +86,7 @@ class CaptureEngine:
 
     def _ingest_flow(self, flow: dict, path: str, line_no: int):
         """Process one log record; an unexpected error skips only that record."""
+        self._current_item = (path, line_no)
         try:
             self._process_flow(flow)
         except Exception as exc:
@@ -95,6 +110,9 @@ class CaptureEngine:
         src_mac = src_ip = dst_ip = src_port = dst_port = proto = None
         now_ts = float(getattr(pkt, "time", time.time()))
         ttl = None
+        if not _usable_timestamp(now_ts):
+            self.ingest_stats.reject("timestamp out of range", *self._current_item)
+            return
 
         if Ether in pkt:
             src_mac = pkt[Ether].src
@@ -199,10 +217,17 @@ class CaptureEngine:
             dns = pkt[DNS]
             if dns.qr == 0:  # Query
                 # We're observing queries — evidence of client activity
-                if dns.qd:
-                    qname = dns.qd.qname.decode() if hasattr(dns.qd.qname, 'decode') else str(dns.qd.qname)
+                # Each question record is guarded like the answers below: a record that is not
+                # a question or whose name is not valid UTF-8 is skipped
+                for question in dns.qd or []:
+                    try:
+                        qname = question.qname
+                        qname = qname.decode() if hasattr(qname, 'decode') else str(qname)
+                    except Exception:
+                        continue
                     service_name = qname
                     service_type = "mDNS query"
+                    break
             elif dns.qr == 1 and dns.ancount > 0:  # Answer
                 for i in range(dns.ancount):
                     try:
@@ -1156,10 +1181,14 @@ class CaptureEngine:
             raise ValueError(f"Cannot parse: {filepath}")
 
     def _process_flow(self, flow: dict):
+        ts = flow.get("timestamp", time.time())
+        if not _usable_timestamp(ts):
+            self.ingest_stats.reject("timestamp out of range", *self._current_item)
+            return
         self._process_flow_data(
             src_ip=flow.get("src_ip"), src_mac=flow.get("src_mac"),
             dst_ip=flow.get("dst_ip"), dst_port=flow.get("dst_port"),
-            proto=flow.get("proto", "TCP"), ts=flow.get("timestamp", time.time()),
+            proto=flow.get("proto", "TCP"), ts=ts,
             alert=flow.get("alert"),
         )
 

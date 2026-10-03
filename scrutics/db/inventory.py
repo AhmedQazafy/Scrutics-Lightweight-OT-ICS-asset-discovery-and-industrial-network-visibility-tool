@@ -40,7 +40,8 @@ def is_inventory_ip(
     Broadcast, multicast, unspecified, and subnet-broadcast-looking .255
     addresses are traffic targets, not assets.
     """
-    if not ip:
+    # Only dotted-quad text is an address here; ipaddress would also accept packed bytes and ints
+    if not ip or not isinstance(ip, str):
         return False
     try:
         addr = ipaddress.ip_address(ip)

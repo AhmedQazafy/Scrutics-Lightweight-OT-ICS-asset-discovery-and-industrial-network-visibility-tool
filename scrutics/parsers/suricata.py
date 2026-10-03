@@ -18,6 +18,38 @@ def parse_eve_file(filepath: str) -> Generator[dict, None, None]:
                 continue
 
 
+def _is_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _validation_error(event):
+    """
+    Why an EVE line cannot be used, or None. Types are checked, never coerced: a dest_port of
+    "502" or 502.0 is malformed. Fields that are absent keep today's defaults.
+    """
+    if not isinstance(event, dict):
+        return "EVE line is not a JSON object"
+    for field in ("src_ip", "dest_ip"):
+        if event.get(field) is not None and not isinstance(event[field], str):
+            return f"EVE field {field} is not a string"
+    if event.get("dest_port") is not None and not _is_int(event["dest_port"]):
+        return "EVE field dest_port is not an integer"
+    for field in ("proto", "event_type"):
+        if field in event and not isinstance(event[field], str):
+            return f"EVE field {field} is not a string"
+    if "timestamp" in event:
+        ts = event["timestamp"]
+        if not (isinstance(ts, str) or (isinstance(ts, (int, float)) and not isinstance(ts, bool))):
+            return "EVE field timestamp is neither a string nor a number"
+    if event.get("event_type") == "alert" and "alert" in event:
+        alert = event["alert"]
+        if not isinstance(alert, dict):
+            return "EVE field alert is not an object"
+        if "severity" in alert and not _is_int(alert["severity"]):
+            return "EVE field alert.severity is not an integer"
+    return None
+
+
 def _flow_from_event(event: dict):
     src_ip   = event.get("src_ip")
     dst_ip   = event.get("dest_ip")
@@ -76,6 +108,11 @@ def iter_eve_flows(filepath: str, report=None) -> Generator[tuple, None, None]:
                 except json.JSONDecodeError:
                     if report is not None:
                         report.reject("EVE line is not valid JSON", PATH, line_no)
+                    continue
+                problem = _validation_error(event)
+                if problem:
+                    if report is not None:
+                        report.reject(problem, PATH, line_no)
                     continue
                 flow = _flow_from_event(event)
             except Exception as exc:

@@ -6,6 +6,10 @@ from typing import Generator
 PATH = "zeek"
 
 
+class ZeekFormatError(ValueError):
+    """The log header cannot be used, so no line of the file can be read."""
+
+
 def _open_zeek(filepath: str):
     if filepath.endswith(".gz"):
         return gzip.open(filepath, "rt", errors="ignore")
@@ -35,6 +39,10 @@ def _iter_zeek_records(filepath: str, report=None) -> Generator[tuple, None, Non
                 parts = line.split(" ", 1)
                 if len(parts) == 2:
                     sep = parts[1].strip()
+                    if not sep:
+                        raise ZeekFormatError(
+                            f"Zeek log header, line {line_no}: #separator is empty, "
+                            "so the fields of the log cannot be split")
                     meta["separator"] = sep.replace("\\t", "\t").replace("\\x09", "\t")
             elif line.startswith("#fields"):
                 meta["fields"] = line.split(meta["separator"])[1:]
@@ -43,6 +51,8 @@ def _iter_zeek_records(filepath: str, report=None) -> Generator[tuple, None, Non
                 meta["path"] = parts[1] if len(parts) > 1 else line.split(" ", 1)[-1].strip()
             elif not line.startswith("#"):
                 data_lines.append((line_no, line))
+        except ZeekFormatError:
+            raise
         except Exception as exc:
             if report is not None:
                 report.contain(exc, PATH, line_no)
@@ -50,6 +60,10 @@ def _iter_zeek_records(filepath: str, report=None) -> Generator[tuple, None, Non
     fields = meta["fields"]
     sep    = meta["separator"]
     if not fields:
+        if data_lines:
+            raise ZeekFormatError(
+                f"Zeek log has data (first at line {data_lines[0][0]}) but no #fields header "
+                "naming its columns")
         return
 
     for line_no, line in data_lines:

@@ -2,6 +2,19 @@
 
 All notable changes to Scrutics are documented here.
 
+## [Unreleased]
+
+### Fixed — Input Robustness
+- **Faster processing of client traffic**: classification rules are loaded once and reused instead of being re-read from disk for every packet from a device without a listening service (about 30 times faster on such traffic). Behavioral constraints now follow a rule reload (`R` key, SIGHUP or the config file watcher) like the rest of classification, and an invalid edit keeps the rules in use.
+- **One bad packet or log line no longer stops an analysis**: live capture, PCAP/PCAP-NG files, Zeek logs and Suricata EVE logs skip an item that cannot be processed and continue. The run summary reports how many items were rejected as malformed and how many unexpected errors were contained.
+- **ARP frames with a non-IPv4 protocol address** are ignored instead of stopping processing.
+- **mDNS queries with a malformed question or a name that is not valid UTF-8**: the name is ignored and the rest of the message is still used.
+- **Timestamps outside the representable date range** (NaN, infinite, beyond year 9999) reject that packet or log record instead of stopping the run.
+
+### Changed — Log Import Validation
+- A Zeek log whose header cannot be used (an empty `#separator`, or data without a `#fields` header) is reported as a clear file error.
+- Suricata EVE lines are type-checked one by one: a line that is not a JSON object, or has a field of the wrong type (for example a `dest_port` given as a string or a fraction, or a non-integer alert severity), is rejected and the rest of the file is imported.
+
 ## [0.6.1] — 2026-09-19
 
 ### Fixed — AI Reliability & Tool-Calling Protocol
