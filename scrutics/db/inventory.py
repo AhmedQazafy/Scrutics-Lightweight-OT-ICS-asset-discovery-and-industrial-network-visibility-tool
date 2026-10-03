@@ -8,6 +8,8 @@ import datetime
 import ipaddress
 import time
 
+from scrutics.capture.cooldown import Cooldowns
+
 # Evidence weights (moved here for central definition)
 EVIDENCE_WEIGHT_OT_VENDOR = 30
 EVIDENCE_WEIGHT_OT_LISTEN_PORT = 10
@@ -185,6 +187,8 @@ class Asset:
     # rebuilt whenever the dict was replaced or changed outside record_peer_first_seen
     _first_seen_source: Any = field(default=None, init=False, repr=False, compare=False)
     _first_seen_times: list = field(default_factory=list, init=False, repr=False, compare=False)
+    # Cooldown decisions over _constraint_anomaly_ts, deleting timestamp keys that have aged out
+    _constraint_cooldowns: Any = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self, is_ot: Optional[Union[bool, str]] = None):
         # Sync vendor_class and is_ot_vendor
@@ -460,6 +464,17 @@ class Asset:
             start = cursor[2]
         self._baseline_peer_cursors[baseline.ip] = (baseline, self._peer_log_epoch, len(log))
         return log[start:]
+
+    def constraint_alert_allowed(self, key: str, timestamp: float, cooldown: float) -> bool:
+        """
+        Whether a behavioral-constraint alert for key may fire at timestamp; if so, it is recorded
+        in _constraint_anomaly_ts. Keys age out as described in scrutics.capture.cooldown; other
+        entries of that dict (the alert_on_new_port port set) are never removed.
+        """
+        cooldowns = self._constraint_cooldowns
+        if cooldowns is None or cooldowns.times is not self._constraint_anomaly_ts:
+            cooldowns = self._constraint_cooldowns = Cooldowns(self._constraint_anomaly_ts)
+        return cooldowns.allow(key, timestamp, cooldown)
 
     def record_protocol_observation(self, protocol: str, *, sends_request: bool,
                                     function_code: int, exception_name: str | None = None):

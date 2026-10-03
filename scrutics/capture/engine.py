@@ -11,6 +11,7 @@ from collections import deque
 
 from scrutics.db.inventory import AssetInventory
 from scrutics.capture.ingest_stats import IngestStats
+from scrutics.capture.cooldown import Cooldowns
 from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
 from scrutics.classifier.protocol import classify_by_ports, classification_evidence_from_ports
@@ -48,6 +49,7 @@ class CaptureEngine:
         self.topology_edges: dict = {}
         self._mac_to_ip: dict[str, str] = {}
         self._mac_anomaly_ts: dict[str, float] = {}
+        self._mac_cooldowns = Cooldowns(self._mac_anomaly_ts)   # keys age out, see Cooldowns
         self._pending_dhcp: dict[str, dict] = {}
         self._MAX_PENDING_DHCP = 1000
         self._stop_event = threading.Event()
@@ -586,9 +588,7 @@ class CaptureEngine:
                 old_mac = existing_asset.mac.strip().lower()
                 if old_mac != norm_mac:
                     key = f"MAC_CHANGED_{src_ip}_{norm_mac}"
-                    last_ts = self._mac_anomaly_ts.get(key)
-                    if last_ts is None or (ts - last_ts) >= 300:
-                        self._mac_anomaly_ts[key] = ts
+                    if self._mac_cooldowns.allow(key, ts, 300):
                         anomaly = {
                             "ip": src_ip,
                             "timestamp": ts,
@@ -608,9 +608,7 @@ class CaptureEngine:
             prior_ip = existing_by_mac.ip if (existing_by_mac and existing_by_mac.ip) else self._mac_to_ip.get(norm_mac)
             if prior_ip and prior_ip != src_ip:
                 key = f"DEVICE_MOVED_{norm_mac}_{src_ip}"
-                last_ts = self._mac_anomaly_ts.get(key)
-                if last_ts is None or (ts - last_ts) >= 300:
-                    self._mac_anomaly_ts[key] = ts
+                if self._mac_cooldowns.allow(key, ts, 300):
                     anomaly = {
                         "ip": src_ip,
                         "timestamp": ts,
@@ -989,11 +987,7 @@ class CaptureEngine:
             return
 
         def _allowed(vtype, cooldown=60):
-            last = asset._constraint_anomaly_ts.get(vtype)
-            if last is not None and (ts - last) < cooldown:
-                return False
-            asset._constraint_anomaly_ts[vtype] = ts
-            return True
+            return asset.constraint_alert_allowed(vtype, ts, cooldown)
 
         def _emit(vtype, detail):
             anomaly = {
