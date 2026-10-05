@@ -27,6 +27,9 @@ All notable changes to Scrutics are documented here.
 ### Added — Per-Device Limit Reporting
 - **Entries not kept because of a per-device limit are reported, never silently dropped**: `assets.csv` gains the columns `ip_history_dropped`, `evidence_overflow` (with a per-type breakdown in `evidence_overflow_by_type`, for example `hostname:6|dns:2`), `dns_names_overflow`, `peer_additions_rejected` and `peer_first_seen_overflow`. They are appended after the existing columns and read 0 (empty for the breakdown) for a device that stayed within every limit. The per-asset JSON export carries the same counts. Loading a saved session reads them back; older sessions load with 0. The CLI run summary prints the totals over all devices, and the TUI shows the total in its status line and a warning when anything was not kept.
 
+### Changed — Port Labels
+- **Port 20547/TCP is labeled ProConOS** (the Phoenix Contact PLC runtime) instead of PCWorx; port 1962/TCP keeps the PCWorx label. The port evidence, event log line and classification reason for 20547 now name ProConOS. A device serving both ports is credited with two OT services instead of one, so its classification reason lists both, and a user rule that classifies it as IT lists both as conflicts. Class, confidence, role and evidence weights are unchanged. A saved session keeps its stored text until the device is seen again.
+
 ### Changed — Log Import Validation
 - A Zeek log whose header cannot be used (an empty `#separator`, or data without a `#fields` header) is reported as a clear file error.
 - Suricata EVE lines are type-checked one by one: a line that is not a JSON object, or has a field of the wrong type (for example a `dest_port` given as a string or a fraction, or a non-integer alert severity), is rejected and the rest of the file is imported.

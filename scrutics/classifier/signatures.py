@@ -118,7 +118,7 @@ OT_PORT_SIGNATURES = [
                   category="OT", detail="Japanese industrial Ethernet"),
     
     # Phoenix Contact
-    PortSignature(20547, "TCP", "PCWorx", "ot_port", 14, "HIGH",
+    PortSignature(20547, "TCP", "ProConOS", "ot_port", 14, "HIGH",
                   category="OT", detail="Phoenix Contact PLC communication"),
     PortSignature(1962, "TCP", "PCWorx", "ot_port", 14, "HIGH",
                   category="OT", detail="Phoenix Contact PLC communication"),

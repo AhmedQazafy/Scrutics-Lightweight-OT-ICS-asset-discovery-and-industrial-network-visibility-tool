@@ -84,3 +84,42 @@ def test_ethernet_ip_over_udp_produces_port_evidence():
     port_records = [e for e in asset.evidence if e.type == "port" and e.value == "44818"]
     assert len(port_records) == 1
     assert port_records[0].weight == 20
+
+
+def test_proconos_and_pcworx_are_separate_ot_signatures():
+    proconos = get_signature(20547, "TCP")
+    pcworx = get_signature(1962, "TCP")
+    assert proconos.name == "ProConOS"
+    assert pcworx.name == "PCWorx"
+    for sig in (proconos, pcworx):
+        assert sig.category == "OT"
+        assert (sig.weight, sig.confidence) == (14, "HIGH")
+
+
+def _serves(mac, ip, sport, dport):
+    return (
+        Ether(src=mac, dst="02:00:00:00:00:05")
+        / IP(src=ip, dst="10.0.0.5")
+        / TCP(sport=sport, dport=dport, flags="SA")
+    )
+
+
+def test_proconos_port_evidence_is_labeled_proconos():
+    inv, engine = _engine()
+    engine._process_packet(_serves("02:00:00:00:00:34", "10.0.0.34", 20547, 50003))
+    asset = inv.get("10.0.0.34")
+    port_records = [e for e in asset.evidence if e.type == "port" and e.value == "20547"]
+    assert [e.detail for e in port_records] == ["Observed ProConOS on port 20547 (OT)"]
+    assert asset.classification_reason == "listens on OT port: ProConOS (20547)"
+
+
+def test_device_serving_pcworx_and_proconos_lists_both_services():
+    inv, engine = _engine()
+    engine._process_packet(_serves("02:00:00:00:00:35", "10.0.0.35", 1962, 50004))
+    engine._process_packet(_serves("02:00:00:00:00:35", "10.0.0.35", 20547, 50005))
+    asset = inv.get("10.0.0.35")
+    assert asset.classification_type == "OT"
+    assert asset.classification_reason == (
+        "listens on OT port: PCWorx (1962); also: listens on OT port: ProConOS (20547)"
+    )
+    assert asset.classification_conflicts == []
