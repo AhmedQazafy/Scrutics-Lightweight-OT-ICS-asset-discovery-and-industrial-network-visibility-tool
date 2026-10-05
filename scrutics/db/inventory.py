@@ -541,19 +541,6 @@ class Asset:
         ):
             self.os_hints.append(hint)
 
-    def add_service(self, port: int, protocol: str, last_seen: str):
-        """Record an observed service."""
-        # Check if service already exists
-        for svc in self.observed_services:
-            if svc.get("port") == port and svc.get("protocol") == protocol:
-                svc["last_seen"] = last_seen
-                return
-        self.observed_services.append({
-            "port": port,
-            "protocol": protocol,
-            "last_seen": last_seen
-        })
-
     def is_stale(self, now_epoch: float | None = None, timeout: float = 30.0) -> bool:
         """Check if asset has not sent traffic in > timeout seconds (online/offline liveness)."""
         if not self.last_seen_epoch:

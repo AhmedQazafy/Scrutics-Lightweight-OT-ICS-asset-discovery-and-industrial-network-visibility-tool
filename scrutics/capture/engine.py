@@ -41,7 +41,6 @@ class CaptureEngine:
         self._oui_db = None
         self.baseline = BaselineEngine(observation_window=baseline_window)
         self.event_log: deque = deque(maxlen=500)
-        self._logged_protocols: dict = {}   # ip -> frozenset of protocols last logged
         self._logged_dst_ports: dict = {}   # ip -> set of dst ports already logged
         self.writer      = None   # RollingWriter, attached by caller before capture
         self.sink_manager = None  # SinkManager, attached by caller before capture
@@ -187,13 +186,11 @@ class CaptureEngine:
         else:
             return
 
-        # Add as evidence only once
-        if not asset.has_evidence("os_hint", os_hint):
-            asset.add_os_hint(
-                f"{os_hint} (observed TTL: {ttl}, inferred initial: {inferred_initial})",
-                confidence=confidence
-            )
-            self._log(f"{ip} -> OS hint: {os_hint} (TTL: {ttl})", "dim white")
+        asset.add_os_hint(
+            f"{os_hint} (observed TTL: {ttl}, inferred initial: {inferred_initial})",
+            confidence=confidence
+        )
+        self._log(f"{ip} -> OS hint: {os_hint} (TTL: {ttl})", "dim white")
 
     def _process_discovery_packet(self, src_ip, dst_ip, dst_port, pkt, ts):
         """
@@ -843,72 +840,6 @@ class CaptureEngine:
         )
         # Confidence will be recomputed in _recompute_confidence
         # No need to call it here; it's called after this method returns.
-
-    def _determine_domain(self, asset) -> str:
-        """Determine domain/industry from evidence."""
-        # Check for utility/SCADA evidence
-        utility_evidence = any(
-            "DNP3" in str(e.detail) or "IEC 60870" in str(e.detail) or "ICCP" in str(e.detail)
-            for e in asset.evidence
-        )
-        if utility_evidence:
-            return "Utility"
-
-        # Check for building automation
-        building_evidence = any(
-            "BACnet" in str(e.detail) or "Niagara" in str(e.detail) or "Metasys" in str(e.detail)
-            for e in asset.evidence
-        )
-        if building_evidence:
-            return "Building_Automation"
-
-        # Check for general OT/industrial
-        if asset.classification_type == "OT":
-            return "Industrial"
-
-        # Check for enterprise IT
-        if asset.classification_type == "IT":
-            return "Enterprise"
-
-        return "Unknown"
-
-    def _determine_role(self, asset) -> str:
-        """Determine asset role from evidence."""
-        # Check evidence for specific roles
-        if any("Modbus" in str(e.detail) or "S7comm" in str(e.detail) or "FINS" in str(e.detail) for e in asset.evidence):
-            return "PLC"
-
-        if any("DNP3" in str(e.detail) or "IEC 60870" in str(e.detail) for e in asset.evidence):
-            return "RTU"
-
-        if any("OPC-UA" in str(e.detail) for e in asset.evidence):
-            return "OPC-UA_Server"
-
-        if any("PROFINET" in str(e.detail) or "EtherCAT" in str(e.detail) for e in asset.evidence):
-            return "Industrial_Ethernet_Device"
-
-        if any("BACnet" in str(e.detail) or "Niagara" in str(e.detail) for e in asset.evidence):
-            return "Building_Controller"
-
-        if any("HTTP" in str(e.detail) or "HTTPS" in str(e.detail) for e in asset.evidence):
-            return "Web_Service"
-
-        if any("SSH" in str(e.detail) or "RDP" in str(e.detail) for e in asset.evidence):
-            return "Remote_Access_Host"
-
-        if any("SNMP" in str(e.detail) for e in asset.evidence):
-            return "Network_Device"
-
-        if any("DNS" in str(e.detail) or "DHCP" in str(e.detail) for e in asset.evidence):
-            return "Infrastructure_Service"
-
-        if asset.classification_type == "OT" and not asset.role:
-            return "OT_Device"
-
-        if asset.classification_type == "IT" and not asset.role:
-            return "IT_Device"
-
-        return "Unknown"
 
     def _record_topology_edge(self, src_asset, dst_asset, src_ip, dst_ip,
                                src_port, dst_port, proto, service_ports, ts):
