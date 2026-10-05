@@ -1,8 +1,8 @@
 """
-Phase B4 + B5: Curated OUI Metadata and OUI Database Lifecycle Tests.
+Curated OUI metadata and OUI database lifecycle tests.
 
 Covers:
-  B4:
+  Curated OUI metadata:
     - Curated OUI metadata loading and parsing
     - Prefix normalization and longest-prefix lookup (MA-S -> MA-M -> MA-L)
     - User-local override (~/.scrutics/curated_oui.yaml overrides bundled per prefix)
@@ -10,7 +10,7 @@ Covers:
     - INVARIANT: device_family_hint never changes classification_type independently
     - Non-matching or malformed MAC handling
 
-  B5:
+  OUI database lifecycle:
     - OUI database resolution precedence (~/.scrutics/oui.txt > local > bundled)
     - validate_oui_file on valid, malformed, empty, and non-existent files
     - Tier counts (MA-L, MA-M, MA-S) calculation
@@ -75,7 +75,7 @@ def _isolate_oui_meta(tmp_path, monkeypatch):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# B4: Curated OUI Metadata Tests
+# Curated OUI Metadata Tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestCuratedOUIMetadata:
@@ -218,7 +218,7 @@ class TestCuratedOUIMetadata:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# B5: OUI Database Validation & Lifecycle Tests
+# OUI Database Validation & Lifecycle Tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestOUIValidationAndLifecycle:
@@ -391,7 +391,7 @@ class TestOUIValidationAndLifecycle:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# B5: CLI Commands & Diagnostics Tests
+# OUI CLI Commands & Diagnostics Tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestOUICLICommands:

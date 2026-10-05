@@ -12,6 +12,5 @@ oui.txt
 .pytest_cache/
 .coverage
 output/
-.kiro/
 *.bak
 *.tmp

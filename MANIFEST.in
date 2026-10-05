@@ -6,8 +6,6 @@
 include pyproject.toml
 include README.md
 include CHANGELOG.md
-
-# LICENSE will be added by the PEP 639 migration commit
 include LICENSE
 
 # ── Documentation ───────────────────────────────────────────────
@@ -24,7 +22,6 @@ include scrutics/web/*.js
 exclude scrutics/classifier/oui.txt
 
 # ── Prune directories that should never ship in an sdist ────────
-prune .kiro
 prune .github
 prune tests
 prune scripts

@@ -1,5 +1,5 @@
 """
-Phase B2 -- OUI Correctness & Multi-Length Prefix Support Tests
+OUI correctness and multi-length prefix support tests.
 
 Tests:
   A. MA-L parsing (6 nibbles)

@@ -1,6 +1,6 @@
 ﻿"""
-Unit tests for Tier 2 MAC-Based Device Identity Model.
-Step 1: Asset ip_history, record_ip, and primary_key property.
+Unit tests for the MAC-based device identity model.
+Asset ip_history, record_ip, and primary_key property.
 """
 
 import pytest
@@ -87,7 +87,7 @@ def test_record_ip_chronological_episodes_no_deduplication():
     assert asset.ip == "10.0.0.1"
     assert asset.last_seen_epoch == 320.0
 
-# ── Step 2 Tests: AssetInventory MAC-based resolution & get_or_create ─────────
+# ── AssetInventory MAC-based resolution & get_or_create ──────────────────────
 
 from scrutics.db.inventory import AssetInventory
 
@@ -266,7 +266,7 @@ def test_scenario_h_learning_mac_for_macless_asset():
     assert asset.mac == "00:11:22:33:44:55"
     assert inv.get_by_mac("00:11:22:33:44:55") is asset
 
-# ── Step 3 Tests: CaptureEngine caller migration & end-to-end integration ───
+# ── CaptureEngine asset resolution & end-to-end integration ─────────────────
 
 from scrutics.capture.engine import CaptureEngine
 

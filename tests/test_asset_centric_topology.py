@@ -1,4 +1,4 @@
-# ── Step 4 Tests: Asset-Centric Topology Migration ────────────────────────────
+# ── Asset-Centric Topology ────────────────────────────────────────────────────
 #
 # These tests verify the core topology invariant:
 # Every topology edge has two resolved Asset identities at capture time.

@@ -219,10 +219,10 @@ def test_build_provider_unrecognized_raises():
     assert "nonexistent_provider_xyz" in str(exc_info.value)
 
 
-# ── Part A: Qwen3.5 reasoning_effort and defensive parsing tests ───────────────
+# ── Qwen3.5 reasoning_effort and defensive parsing tests ───────────────────────
 
 def test_packaged_ai_yaml_includes_reasoning_effort():
-    """Part A.1: Packaged ai.yaml template has correct defaults (enabled: false, reasoning_effort: low)."""
+    """Packaged ai.yaml template has correct defaults (enabled: false, reasoning_effort: low)."""
     import yaml
     from scrutics.ai.config import _DEFAULT_PKG_AI_CONFIG
 
@@ -235,7 +235,7 @@ def test_packaged_ai_yaml_includes_reasoning_effort():
 
 
 def test_build_provider_reasoning_effort_handling():
-    """Part A.2 & A.3: build_provider reads reasoning_effort and defaults to 'low'."""
+    """build_provider reads reasoning_effort and defaults to 'low'."""
     # Defaults to 'low'
     provider_default = build_provider({})
     assert isinstance(provider_default, OllamaProvider)
@@ -250,14 +250,14 @@ def test_build_provider_reasoning_effort_handling():
 
 
 def test_build_provider_invalid_reasoning_effort_raises():
-    """Part A.4: build_provider raises LLMProviderError for invalid reasoning_effort."""
+    """build_provider raises LLMProviderError for invalid reasoning_effort."""
     with pytest.raises(LLMProviderError) as exc_info:
         build_provider({"provider": "ollama", "reasoning_effort": "maximum"})
     assert "Invalid reasoning_effort 'maximum'" in str(exc_info.value)
 
 
 def test_ollama_chat_payload_includes_reasoning_effort():
-    """Part A.5: OllamaProvider.chat() sends reasoning_effort in post payload."""
+    """OllamaProvider.chat() sends reasoning_effort in post payload."""
     provider = OllamaProvider(model="qwen3.5:4b", reasoning_effort="medium")
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -272,7 +272,7 @@ def test_ollama_chat_payload_includes_reasoning_effort():
 
 
 def test_ollama_chat_reasoning_only_raises_informative_error():
-    """Part A.6: Model response with empty content and reasoning raises LLMResponseError."""
+    """Model response with empty content and reasoning raises LLMResponseError."""
     provider = OllamaProvider(model="qwen3.5:4b")
     mock_resp = MagicMock()
     mock_resp.status_code = 200

@@ -1,5 +1,5 @@
 """
-Tests for Scrutics Phase B1: Vendor Classification Foundation.
+Tests for vendor classification.
 
 Verifies:
 1. Vendor classification mapping (OT, IT, NEUTRAL, UNKNOWN).

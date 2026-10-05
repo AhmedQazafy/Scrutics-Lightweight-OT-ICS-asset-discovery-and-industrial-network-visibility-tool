@@ -1,11 +1,11 @@
 """Regression tests for Gemini protocol correctness, thought signatures, and retry behavior.
 
-Covers v0.6.1 contracts:
-  - Part A: Lazy optional dependency boundary (core-only imports without requests)
-  - Part B: Model default consistency
-  - Part C: FunctionCall ID preservation, thought signature on Part (functionCall & text),
-            parallel function calls structure, functionResponse grouping.
-  - Part D: Bounded exponential backoff, RetryInfo parsing, RPC status mapping, sanitized errors.
+Covers:
+  - Lazy optional dependency boundary (core-only imports without requests)
+  - Model default consistency
+  - FunctionCall ID preservation, thought signature on Part (functionCall & text),
+    parallel function calls structure, functionResponse grouping.
+  - Bounded exponential backoff, RetryInfo parsing, RPC status mapping, sanitized errors.
 """
 
 import json
@@ -43,7 +43,7 @@ def _make_response(status_code: int, body: dict, headers: dict | None = None) ->
 
 
 class TestGeminiProtocolCorrectness(unittest.TestCase):
-    """Tests for Part C: FunctionCall IDs, thought signatures, and parallel calls."""
+    """Tests for FunctionCall IDs, thought signatures, and parallel calls."""
 
     def test_function_call_id_preserved_without_fallback_to_name(self):
         """C1: ID is preserved when present, and NOT replaced with function name when absent."""
@@ -317,13 +317,13 @@ class TestGeminiProtocolCorrectness(unittest.TestCase):
 
 
 class TestGeminiRetryAndErrorHandling(unittest.TestCase):
-    """Tests for Part D: Bounded exponential backoff, RetryInfo, and RPC status taxonomy."""
+    """Tests for bounded exponential backoff, RetryInfo, and RPC status taxonomy."""
 
     def setUp(self):
         self.provider = GeminiProvider(model="gemini-3.8-flash", api_key="test-api-key")
 
     def test_extract_retry_delay_formats(self):
-        """D3: Extracts protobuf string ("39s", "1.5s") and struct (seconds/nanos) formats."""
+        """Extracts protobuf string ("39s", "1.5s") and struct (seconds/nanos) formats."""
         # Case A: string duration "39s"
         resp_a = _make_response(429, {
             "error": {
@@ -364,7 +364,7 @@ class TestGeminiRetryAndErrorHandling(unittest.TestCase):
     @patch("time.sleep")
     @patch("requests.post")
     def test_bounded_retry_on_429_with_retry_info(self, mock_post, mock_sleep):
-        """D2 & D3: 429 retries using server retryDelay, succeeds on attempt 2."""
+        """429 retries using server retryDelay, succeeds on attempt 2."""
         err_body = {
             "error": {
                 "status": "RESOURCE_EXHAUSTED",
@@ -389,7 +389,7 @@ class TestGeminiRetryAndErrorHandling(unittest.TestCase):
     @patch("time.sleep")
     @patch("requests.post")
     def test_retryable_status_codes_max_4_attempts(self, mock_post, mock_sleep):
-        """D1 & D2: Status 503 retries up to 4 total attempts before raising."""
+        """Status 503 retries up to 4 total attempts before raising."""
         mock_post.return_value = _make_response(503, {"error": {"status": "UNAVAILABLE"}})
 
         with self.assertRaises(LLMResponseError) as ctx:
@@ -401,7 +401,7 @@ class TestGeminiRetryAndErrorHandling(unittest.TestCase):
 
     @patch("requests.post")
     def test_non_retryable_client_errors_fail_immediately(self, mock_post):
-        """D1: 400, 401, 403, 404 do NOT retry (fail on attempt 1)."""
+        """400, 401, 403, 404 do NOT retry (fail on attempt 1)."""
         for code in (400, 401, 403, 404):
             mock_post.reset_mock()
             mock_post.return_value = _make_response(code, {"error": {"message": "Client Error"}})
@@ -412,7 +412,7 @@ class TestGeminiRetryAndErrorHandling(unittest.TestCase):
             self.assertEqual(mock_post.call_count, 1, f"HTTP {code} should fail immediately on attempt 1")
 
     def test_sanitized_error_does_not_leak_keys_or_prompts(self):
-        """D5: Error messages are sanitized and do not contain secret keys."""
+        """Error messages are sanitized and do not contain secret keys."""
         resp = _make_response(400, {
             "error": {
                 "status": "INVALID_ARGUMENT",
@@ -425,7 +425,7 @@ class TestGeminiRetryAndErrorHandling(unittest.TestCase):
 
 
 class TestLazyDependencyBoundary(unittest.TestCase):
-    """Tests for Part A: Lazy optional dependency boundary."""
+    """Tests for the lazy optional dependency boundary."""
 
     def test_core_provider_importable_without_requests(self):
         """A2: ChatResult and ToolCall can be imported in a core-only environment."""

@@ -64,7 +64,7 @@ All notable changes to Scrutics are documented here.
 - **Text-part signatures are now load-bearing**: With `gemini-3.8-flash` as default (GA Flash model; `gemini-2.0-flash` EOL June 2026), Gemini emits a `thoughtSignature` on the final text part of most responses. The C2 preservation path is exercised on every turn, not only tool-calling turns.
 - **Live rate-limit behavior unverified against real API**: Retry logic was built against documented status codes and documented `RetryInfo` schemas. Confirmation of live 429 `RetryInfo.retryDelay` wire population requires active testing (see post-release verification list: `docs/post-release-verification-v0.6.1.md`).
 - **Multi-turn REPL text-part signature loss**: Multi-turn CLI/TUI REPL sessions concatenate prior turns into a contextual prompt string; signatures attached to text parts in earlier turns are not replayed. This does not affect the agent loop's internal tool-calling rounds, which preserve signatures verbatim.
-- **Default model chosen on EOL/GA status, not full cost comparison**: `gemini-3.8-flash` was selected because `gemini-2.0-flash` reached EOL. A full cost/latency comparison across the GA model tier was not performed in v0.6.1 (see Part 2 of the v0.6.1a micro-contract).
+- **Default model chosen on EOL/GA status, not full cost comparison**: `gemini-3.8-flash` was selected because `gemini-2.0-flash` reached EOL. A full cost/latency comparison across the GA model tier was not performed in v0.6.1.
 
 Post-release verification checklist: see `docs/post-release-verification-v0.6.1.md`.
 
