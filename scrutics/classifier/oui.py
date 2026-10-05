@@ -278,7 +278,7 @@ def is_ot_vendor(vendor: str) -> bool:
     return classify_vendor(vendor) == VENDOR_CLASS_OT
 
 
-# ── Curated OUI Metadata (B4) ──────────────────────────────────────────────────
+# ── Curated OUI Metadata ───────────────────────────────────────────────────────
 
 _CURATED_OUI_CACHE: dict | None = None
 
@@ -384,7 +384,7 @@ def lookup_oui_metadata(prefix_or_mac: str, curated_meta: dict | None = None) ->
     return None
 
 
-# ── OUI Database Lifecycle & Validation (B5) ───────────────────────────────────
+# ── OUI Database Lifecycle & Validation ────────────────────────────────────────
 
 def validate_oui_file(path: str) -> dict:
     """

@@ -580,7 +580,7 @@ class CaptureEngine:
         from scrutics.classifier.protocol import classify_by_ports, known_service_ports
         from scrutics.classifier.signatures import get_signature
 
-        # ── Tier 1: Check for MAC change / Device mobility anomalies ──
+        # ── Check for MAC change / device mobility anomalies ──
         if src_mac and src_mac.strip().lower() != "unknown":
             norm_mac = src_mac.strip().lower()
             existing_asset = self.inventory.get(src_ip)
@@ -731,7 +731,7 @@ class CaptureEngine:
                         detail=f"MAC OUI: {vendor}"
                     )
 
-            # B4: Enrich with curated OUI metadata (device family hint)
+            # Enrich with curated OUI metadata (device family hint)
             if src_mac and src_mac.strip().lower() != "unknown":
                 meta = lookup_oui_metadata(src_mac)
                 if meta and meta.get("device_family_hint"):

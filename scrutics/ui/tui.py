@@ -1973,7 +1973,7 @@ class DetailScreen(ModalScreen):
             lines.append(f"MAC: {asset.mac}    Vendor: {asset.vendor}")
             lines.append("")
 
-            # Liveness status (Tier 1)
+            # Liveness status
             is_offline = asset.is_stale(timeout=30.0)
             status_text = "[bold red]OFFLINE[/bold red] (No traffic seen in >30s)" if is_offline else "[bold green]ONLINE[/bold green] (Active)"
             lines.append(f"Status: {status_text}    Last Seen: {asset.last_seen or 'Never'}")

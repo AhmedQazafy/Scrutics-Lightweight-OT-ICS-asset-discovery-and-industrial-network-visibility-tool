@@ -568,7 +568,7 @@ class Asset:
 
         Invariant note:
         MAC is the best passive signal available, not a guaranteed hardware identity --
-        spoofable, and Tier 2's own MAC_CHANGED detection exists precisely because it can lie.
+        spoofable, and the MAC_CHANGED detection exists precisely because it can lie.
         If MAC is unavailable or Unknown, falls back to IP.
         """
         if self.mac and self.mac.strip() and self.mac.strip().lower() != "unknown":
@@ -788,7 +788,7 @@ class AssetInventory:
         timestamp: float | None = None,
     ) -> Optional[Asset]:
         """
-        Resolve or create an Asset according to Tier 2 MAC-based device identity rules.
+        Resolve or create an Asset according to the MAC-based device identity rules.
 
         Identity invariants:
         1. MAC is the primary physical identity key when known.
