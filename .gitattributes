@@ -1,0 +1,17 @@
+# Text files are stored with LF line endings and checked out with LF on every platform.
+* text=auto eol=lf
+
+# Windows batch files are checked out with CRLF; the repository still stores LF.
+*.bat text eol=crlf
+
+# Binary files are never converted or diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.whl binary
+*.tar.gz binary
+*.gz binary
+*.pcap binary
+*.pcapng binary
