@@ -5,8 +5,8 @@ version: "3.9"
 # Device MAC addresses use real OUI prefixes for known ICS vendors
 # so Scrutics OUI lookup produces realistic results.
 #
-# Phase 1 (current): OUI fingerprinting + port-based classification
-# Phase 2 (future):  Protocol banner fingerprinting, real CIP/BACnet traffic
+# The simulated devices exercise OUI fingerprinting and port-based classification.
+# They send no protocol banners and no real CIP or BACnet traffic.
 #
 # Known limitations flagged inline:
 #   - EtherNet/IP: TCP stub only, no CIP implementation
@@ -40,8 +40,8 @@ services:
     restart: unless-stopped
 
   # EtherNet/IP Device — Rockwell Automation OUI
-  # Phase 1 stub: TCP listener on 44818 only, no CIP
-  # TODO Phase 2: replace with full CIP server (cpppo or similar)
+  # Stub: TCP listener on 44818 only, no CIP
+  # TODO: replace with a full CIP server (cpppo or similar)
   enip-device-1:
     build: ./sim/enip
     mac_address: "00:00:BC:AA:BB:03"
@@ -51,8 +51,8 @@ services:
     restart: unless-stopped
 
   # BACnet Device — Contemporary Controls OUI
-  # Phase 1 stub: UDP listener on 47808 only
-  # TODO Phase 2: replace with bacpypes3 + BBMD for real BACnet/IP broadcast
+  # Stub: UDP listener on 47808 only
+  # TODO: replace with bacpypes3 + BBMD for real BACnet/IP broadcast
   bacnet-device-1:
     build: ./sim/bacnet
     mac_address: "00:60:35:AA:BB:04"
