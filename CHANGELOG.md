@@ -35,6 +35,16 @@ All notable changes to Scrutics are documented here.
 - Suricata EVE lines are type-checked one by one: a line that is not a JSON object, or has a field of the wrong type (for example a `dest_port` given as a string or a fraction, or a non-integer alert severity), is rejected and the rest of the file is imported.
 - A destination port must be a port number (0 to 65535). A Zeek `conn.log` line whose `id.resp_p` is not a decimal port number from 0 to 65535 (other than `-`, meaning unset) is now rejected as a whole line; before, such a line was kept with no port. A Suricata EVE line whose `dest_port` is outside that range is rejected likewise. Rejected lines are counted in the run summary.
 
+### Changed — Protocol Column
+- **The protocol column says how each protocol of a device is known**, so a client such as an HMI polling PLCs no longer shows "Unknown". Entries are listed in this order: protocols the device serves, shown by name when a protocol parser saw the device answer as a server and with ` (port)` when only a listening port shows it; protocols a parser saw the device request as a client, with ` (client)` (for example `Modbus TCP (client)`); and OT services the device only contacted by port, with ` (client, port)` (for example `S7comm / IEC 61850 MMS / ICCP (client, port)`). "Unknown" appears only when none of these is known. This applies to the TUI asset table (live and reloaded sessions), the CLI table, the topology node label and tooltip, the TUI asset export and the AI asset tools. Classification, confidence and evidence are unchanged.
+- The protocol column in the TUI and CLI tables is wider (32 characters). When text still has to be shortened, the protocol name is cut (marked `~`) and the qualifier is kept; entries that still do not fit are counted as `+N`.
+- `assets.csv` gains a last column, `protocol_display`, with the same entries separated by `|`. The `protocol` column still lists only the served protocols, unlabeled. Sessions saved before this column existed show their served protocols as saved.
+- Known limitations: a served protocol named by a user rule that matched the device by MAC alone is still shown with ` (port)`. The destination port of every packet a device sends is recorded as contacted, including replies sent to a client's temporary port, so a server that replies to a client whose temporary port happens to be an OT port (for example 55000 to 55003, 55555 or 45678) can show a false ` (client, port)` entry.
+
+### Fixed — Topology Assistant
+- **The assistant panel in `topology.html` works again**: a page-template escaping error broke its script, so the AI button, the panel and the chat did nothing. The assistant is now also given the devices, protocols and connections of the graph; before, its context described an empty network.
+- The topology chat uses the same default models as the AI configuration for OpenAI, Anthropic and Gemini, instead of its own model names (it named the retired `gemini-2.0-flash`). The API key stays in page memory only and is never stored.
+
 ## [0.6.1] — 2026-09-19
 
 ### Fixed — AI Reliability & Tool-Calling Protocol
