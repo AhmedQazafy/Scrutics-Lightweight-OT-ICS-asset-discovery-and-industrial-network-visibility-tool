@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import json
 import logging
 import os
@@ -148,7 +149,7 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
     }
 
 
-HTML_TEMPLATE = """<!doctype html>
+HTML_TEMPLATE = r"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -1188,9 +1189,9 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
 
     <div class="ai-field-label">Provider</div>
     <select id="ai-provider-select">
-      <option value="gemini">Google Gemini (gemini-2.0-flash) — free tier</option>
-      <option value="openai">OpenAI (gpt-4o-mini)</option>
-      <option value="anthropic">Anthropic (claude-haiku-4-5)</option>
+      <option value="gemini">Google Gemini (__GEMINI_MODEL_HTML__) — free tier</option>
+      <option value="openai">OpenAI (__OPENAI_MODEL_HTML__)</option>
+      <option value="anthropic">Anthropic (__ANTHROPIC_MODEL_HTML__)</option>
     </select>
 
     <div class="ai-field-label">API Key <span style="color:#5a7898;font-size:10px">(memory only, never saved)</span></div>
@@ -1310,7 +1311,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // ── Graph context summary ─────────────────────────────────────────────────
   function buildGraphSummary() {
-    var g = (typeof graph !== "undefined") ? graph : {};
+    var g = {};
+    try { g = JSON.parse(document.getElementById("graph-data").textContent) || {}; } catch (e) { g = {}; }
     var nodes = (g.nodes || []).concat(g.isolated_nodes || []);
     var edges = g.edges || [];
     var ot = nodes.filter(function (n) { return n.type === "OT"; });
@@ -1323,7 +1325,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (ot.length > 0) {
       lines.push("\nOT devices:");
       ot.slice(0, 20).forEach(function (n) {
-        lines.push("  " + (n.label||n.id||"?") + " | " + (n.vendor||"Unknown") + " | " + ((n.protocols||[]).join(", ")||"no protocol") + " | conf: " + (n.confidence||"?") + "%");
+        lines.push("  " + (n.label||n.id||"?") + " | " + (n.vendor||"Unknown") + " | " + (n.protocol||"no protocol") + " | conf: " + (n.confidence||"?") + "%");
       });
       if (ot.length > 20) lines.push("  ...and " + (ot.length - 20) + " more");
     }
@@ -1334,7 +1336,9 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     if (edges.length > 0 && edges.length <= 15) {
       lines.push("\nConnections:");
-      edges.forEach(function (e) { lines.push("  " + e.source + " -> " + e.target + " [" + (e.protocol||"?") + "]"); });
+      var byId = {};
+      nodes.forEach(function (n) { byId[n.id] = n.label || n.id; });
+      edges.forEach(function (e) { lines.push("  " + (byId[e.from]||e.from) + " -> " + (byId[e.to]||e.to) + " [" + (e.label||"?") + "]"); });
     } else if (edges.length > 15) {
       lines.push("\nConnections: " + edges.length + " total");
     }
@@ -1342,6 +1346,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
+  var AI_MODELS = __AI_MODELS_JSON__;
   var aiHistory = [];
   var aiKey = "";
   var aiProvider = "";
@@ -1368,7 +1373,7 @@ document.addEventListener("DOMContentLoaded", function() {
         "Do not invent devices or connections not in the data.\n\n" + summary
     }];
 
-    var labels = { openai: "OpenAI gpt-4o-mini", anthropic: "Anthropic claude-haiku-4-5", gemini: "Gemini gemini-2.0-flash" };
+    var labels = { openai: "OpenAI " + AI_MODELS.openai, anthropic: "Anthropic " + AI_MODELS.anthropic, gemini: "Gemini " + AI_MODELS.gemini };
     document.getElementById("ai-chat-notice").style.display = "none";
     document.getElementById("ai-chat-history").style.display = "flex";
     document.getElementById("ai-chat-input-row").style.display = "flex";
@@ -1449,7 +1454,7 @@ document.addEventListener("DOMContentLoaded", function() {
     return fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-4o-mini", messages: history, temperature: 0.3, max_tokens: 1024 }),
+      body: JSON.stringify({ model: AI_MODELS.openai, messages: history, temperature: 0.3, max_tokens: 1024 }),
     })
     .then(function (r) {
       if (r.status === 401 || r.status === 403) throw new Error("Auth failed — check your OpenAI key.");
@@ -1464,7 +1469,7 @@ document.addEventListener("DOMContentLoaded", function() {
   function callAnthropic(key, history) {
     var sys = history.find(function (m) { return m.role === "system"; });
     var msgs = history.filter(function (m) { return m.role !== "system"; });
-    var payload = { model: "claude-haiku-4-5", max_tokens: 1024, messages: msgs, temperature: 0.3 };
+    var payload = { model: AI_MODELS.anthropic, max_tokens: 1024, messages: msgs, temperature: 0.3 };
     if (sys) payload.system = sys.content;
     return fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -1489,7 +1494,7 @@ document.addEventListener("DOMContentLoaded", function() {
       .map(function (m) { return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }; });
     var payload = { contents: contents, generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } };
     if (sys) payload.systemInstruction = { parts: [{ text: sys.content }] };
-    return fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key), {
+    return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(AI_MODELS.gemini) + ":generateContent?key=" + encodeURIComponent(key), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1512,9 +1517,26 @@ document.addEventListener("DOMContentLoaded", function() {
 """
 
 
+def _browser_chat_models() -> dict:
+    """Models the page's browser chat uses: the configuration defaults for each provider."""
+    from scrutics.ai.config import (
+        DEFAULT_ANTHROPIC_MODEL, DEFAULT_GEMINI_MODEL, DEFAULT_OPENAI_MODEL,
+    )
+    return {
+        "openai": DEFAULT_OPENAI_MODEL,
+        "anthropic": DEFAULT_ANTHROPIC_MODEL,
+        "gemini": DEFAULT_GEMINI_MODEL,
+    }
+
+
 def generate_topology_html(graph: dict) -> str:
     graph_json = json.dumps(graph, separators=(",", ":"), ensure_ascii=False)
-    return HTML_TEMPLATE.replace("__GRAPH_JSON__", graph_json.replace("</", "<\\/"))
+    models = _browser_chat_models()
+    # Graph data is substituted last so text inside it is never taken for a placeholder
+    page = HTML_TEMPLATE.replace("__AI_MODELS_JSON__", json.dumps(models).replace("</", "<\\/"))
+    for provider, model in models.items():
+        page = page.replace(f"__{provider.upper()}_MODEL_HTML__", html.escape(model))
+    return page.replace("__GRAPH_JSON__", graph_json.replace("</", "<\\/"))
 
 
 def export_connections_csv(edges: dict, output_path: str) -> None:

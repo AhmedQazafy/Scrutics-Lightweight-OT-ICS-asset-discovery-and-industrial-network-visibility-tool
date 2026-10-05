@@ -14,6 +14,12 @@ _DEFAULT_PKG_AI_CONFIG = os.path.join(_PKG_DIR, "config", "ai.yaml")
 # Pattern: ${VAR_NAME} resolves to the environment variable VAR_NAME
 _ENV_VAR_PATTERN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
+# Model used for each hosted provider when the configuration names none. The topology page's
+# browser chat uses the same models.
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5"
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+
 
 def _resolve_env_var(value: str) -> str:
     """Resolve an environment-variable reference like ${MY_KEY} to its value.
@@ -120,7 +126,7 @@ def build_provider(config: dict[str, Any] | None = None) -> LLMProvider:
         from scrutics.ai.openai_provider import OpenAIProvider
         api_key = _resolve_env_var(str(cfg.get("api_key", "")))
         return OpenAIProvider(
-            model=str(cfg.get("model", "gpt-4o-mini")),
+            model=str(cfg.get("model", DEFAULT_OPENAI_MODEL)),
             api_key=api_key,
             base_url=str(cfg.get("base_url", OpenAIProvider.DEFAULT_BASE_URL)),
             temperature=float(cfg.get("temperature", 0.3)),
@@ -131,7 +137,7 @@ def build_provider(config: dict[str, Any] | None = None) -> LLMProvider:
         from scrutics.ai.anthropic_provider import AnthropicProvider
         api_key = _resolve_env_var(str(cfg.get("api_key", "")))
         return AnthropicProvider(
-            model=str(cfg.get("model", "claude-haiku-4-5")),
+            model=str(cfg.get("model", DEFAULT_ANTHROPIC_MODEL)),
             api_key=api_key,
             temperature=float(cfg.get("temperature", 0.3)),
             max_tokens=int(cfg.get("max_tokens", 1024)),
@@ -142,7 +148,7 @@ def build_provider(config: dict[str, Any] | None = None) -> LLMProvider:
         from scrutics.ai.gemini_provider import GeminiProvider
         api_key = _resolve_env_var(str(cfg.get("api_key", "")))
         return GeminiProvider(
-            model=str(cfg.get("model", "gemini-3.8-flash")),
+            model=str(cfg.get("model", DEFAULT_GEMINI_MODEL)),
             api_key=api_key,
             temperature=float(cfg.get("temperature", 0.3)),
             max_tokens=int(cfg.get("max_tokens", 1024)),
