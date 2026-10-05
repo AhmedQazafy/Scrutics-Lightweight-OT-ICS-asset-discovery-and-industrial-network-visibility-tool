@@ -1,7 +1,7 @@
 """
 EtherNet/IP stub listener for the OT simulation environment.
 Listens on TCP 44818 (standard EtherNet/IP port) and accepts connections.
-Does NOT implement CIP — flagged for replacement when protocol banner
+Does NOT implement CIP; flagged for replacement when protocol banner
 fingerprinting is added.
 """
 import socket

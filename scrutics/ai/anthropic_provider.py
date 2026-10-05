@@ -130,8 +130,8 @@ def _normalize_anthropic_response(response_body: dict[str, Any]) -> str | dict[s
     """Translate Anthropic's response to the internal OpenAI-compatible contract.
 
     Returns:
-      str  — if the model produced a final text answer
-      dict — with 'role', 'content', 'tool_calls' (OpenAI-style) if the model called tools
+      str:  if the model produced a final text answer
+      dict: with 'role', 'content', 'tool_calls' (OpenAI-style) if the model called tools
     """
     stop_reason = response_body.get("stop_reason", "")
     content_blocks = response_body.get("content", [])
@@ -214,7 +214,7 @@ class AnthropicProvider(LLMProvider):
             payload["tools"] = _openai_tools_to_anthropic(tools)
 
         if stream:
-            # Anthropic streaming uses SSE — out of scope for current usage
+            # Anthropic streaming uses SSE, out of scope for current usage
             # (run_agent_loop always uses stream=False for tool-calling turns)
             raise LLMProviderError(
                 "Streaming is not yet implemented for AnthropicProvider. "
@@ -247,7 +247,7 @@ class AnthropicProvider(LLMProvider):
                 "Check that your API key is valid and correctly set."
             )
         if resp.status_code != 200:
-            # Never echo response body — may contain auth-related detail
+            # Never echo response body; it may contain auth-related detail
             raise LLMResponseError(
                 f"Anthropic returned HTTP {resp.status_code}. "
                 "Check the model name and account limits."

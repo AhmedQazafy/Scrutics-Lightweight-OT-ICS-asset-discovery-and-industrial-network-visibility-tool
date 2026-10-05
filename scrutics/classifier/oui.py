@@ -5,7 +5,7 @@ Maps the first 3 bytes of a MAC address to a vendor name.
 Load priority:
   1. Full IEEE OUI database (oui.txt) if present alongside this file
      → run scripts/download_oui.py to fetch it (requires internet)
-  2. Bundled ICS vendor database (ics_oui.txt) — always present in repo
+  2. Bundled ICS vendor database (ics_oui.txt), always present in repo
      → covers all major OT/ICS vendors for air-gapped deployments
 
 This tool is designed for OT environments that may have no internet access.
@@ -211,7 +211,7 @@ def lookup_vendor(mac: str, oui_db: dict) -> str:
     assignment holder may be a chipset manufacturer, module manufacturer,
     contract manufacturer, or other registered entity and is not necessarily the
     product/vendor brand of the actual OT/ICS device. Therefore, OUI is a
-    supporting, low-confidence identification signal — not definitive product
+    supporting, low-confidence identification signal, not definitive product
     identification.
 
     Accepts common MAC representations:

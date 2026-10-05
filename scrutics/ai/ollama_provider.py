@@ -177,7 +177,7 @@ class OllamaProvider(LLMProvider):
                     if content:
                         yield content
             # NOTE: Only catch requests.exceptions below. LLMResponseError raised inside the loop
-            # must propagate untouched — do NOT add a broad 'except Exception:' here.
+            # must propagate untouched; do NOT add a broad 'except Exception:' here.
             except requests.exceptions.Timeout as e:
                 raise LLMTimeoutError(f"Ollama streaming timed out: {e}") from e
             except requests.exceptions.ConnectionError as e:

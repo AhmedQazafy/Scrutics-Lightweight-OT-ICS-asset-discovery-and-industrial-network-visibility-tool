@@ -1,5 +1,5 @@
 """
-Phase B3 — Passive DHCP Identification Enrichment Tests
+Phase B3: Passive DHCP Identification Enrichment Tests
 
 Verifies:
   - Options 12, 55, 60, 81 parsing and enrichment

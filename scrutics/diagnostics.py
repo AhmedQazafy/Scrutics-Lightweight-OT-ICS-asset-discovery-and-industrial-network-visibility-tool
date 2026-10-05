@@ -1,5 +1,5 @@
 """
-Scrutics diagnostics — shared checks used by startup logging and scrutics doctor.
+Scrutics diagnostics: shared checks used by startup logging and scrutics doctor.
 
 All checks return plain dicts so callers can choose how to format output.
 """
@@ -112,7 +112,7 @@ def check_libpcap() -> dict:
 def _clean_iface_desc(name: str, raw_desc: str) -> str:
     """
     Return a clean description for display.
-    Scapy often returns the interface name as its own description — suppress that.
+    Scapy often returns the interface name as its own description; suppress that.
     Add friendly labels for well-known prefixes.
     """
     if raw_desc and raw_desc != name:

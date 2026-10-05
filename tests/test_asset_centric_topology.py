@@ -26,7 +26,7 @@ def test_topology_edge_keyed_by_primary_key():
     engine._process_flow_data("10.0.0.1", "AA:BB:CC:11:11:11", "10.0.0.2", 502, "TCP", ts=100.0)
     engine._process_flow_data("10.0.0.2", "AA:BB:CC:22:22:22", None, None, None, ts=100.0)
 
-    # Now send traffic from src to dst — both are known Assets
+    # Now send traffic from src to dst; both are known Assets
     engine._process_flow_data("10.0.0.1", "AA:BB:CC:11:11:11", "10.0.0.2", 502, "TCP", ts=200.0)
 
     # Verify edge key is primary_keys (MACs), not IPs
@@ -68,7 +68,7 @@ def test_topology_edge_unresolved_dst_no_retrospective_merge():
     does NOT cause retrospective reconstruction of old observations.
 
     Old observations are not backfilled when the destination later becomes known.
-    This is exactly the behavior we want — otherwise we'd quietly reintroduce
+    This is exactly the behavior we want; otherwise we'd quietly reintroduce
     retrospective identity reconstruction.
     """
     inv = AssetInventory()
@@ -94,7 +94,7 @@ def test_topology_edge_unresolved_dst_no_retrospective_merge():
     # The key point: no edge from the Step 1 observation should exist with the
     # MAC-based dst_pk, because the MAC wasn't known at Step 1 edge time.
 
-    # Step 3: NEW traffic from src to dst — NOW an edge should be created
+    # Step 3: NEW traffic from src to dst; NOW an edge should be created
     engine._process_flow_data("10.0.0.1", "AA:BB:CC:11:11:11", "10.0.0.99", 502, "TCP", ts=300.0)
 
     assert (src_pk, dst_pk) in engine.topology_edges
@@ -130,7 +130,7 @@ def test_topology_edge_device_moves_preserves_identity():
     # Source device moves to 10.0.0.3
     engine._process_flow_data("10.0.0.3", "AA:BB:CC:11:11:11", "10.0.0.2", 502, "TCP", ts=300.0)
 
-    # Same edge key — physical relationship preserved
+    # Same edge key: physical relationship preserved
     assert (src_pk, dst_pk) in engine.topology_edges
     edge = engine.topology_edges[(src_pk, dst_pk)]
     assert edge["count"] > count_before
@@ -142,7 +142,7 @@ def test_topology_edge_device_moves_preserves_identity():
 def test_topology_edge_mac_changed_produces_separate_edges():
     """
     MAC-X then MAC-Y at the same IP produce distinct topology edges.
-    Device replacement creates a new physical identity — the topology
+    Device replacement creates a new physical identity; the topology
     must reflect this as a separate relationship.
     """
     inv = AssetInventory()
@@ -163,7 +163,7 @@ def test_topology_edge_mac_changed_produces_separate_edges():
 
     mac_y_pk = "dd:ee:ff:33:33:33"
 
-    # Two distinct edges exist — one for each physical device
+    # Two distinct edges exist, one for each physical device
     assert (mac_x_pk, dst_pk) in engine.topology_edges
     assert (mac_y_pk, dst_pk) in engine.topology_edges
     assert mac_x_pk != mac_y_pk
@@ -257,7 +257,7 @@ def test_csv_export_writes_ips_not_keys():
 def test_topology_macless_asset_uses_ip_as_node_id():
     """
     When an Asset has no MAC (MAC-less/Unknown), its primary_key falls back
-    to IP. The graph builder must NOT independently implement this fallback —
+    to IP. The graph builder must NOT independently implement this fallback;
     it trusts Asset.primary_key.
     """
     inv = AssetInventory()

@@ -45,7 +45,7 @@ class OpenAICompatMixin:
                     return str(body["error"])
         except Exception:
             pass
-        # Return status only — never echo raw body that might contain auth info
+        # Return status only; never echo raw body that might contain auth info
         return f"HTTP {response.status_code}"
 
     def _check_openai_status(

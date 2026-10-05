@@ -1,5 +1,5 @@
 """
-Phase B4 + B5 — Curated OUI Metadata and OUI Database Lifecycle Tests.
+Phase B4 + B5: Curated OUI Metadata and OUI Database Lifecycle Tests.
 
 Covers:
   B4:

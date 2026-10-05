@@ -11,7 +11,7 @@ from scrutics.ai.provider import LLMProvider, LLMProviderError
 _PKG_DIR = os.path.dirname(os.path.dirname(__file__))
 _DEFAULT_PKG_AI_CONFIG = os.path.join(_PKG_DIR, "config", "ai.yaml")
 
-# Pattern: ${VAR_NAME} — resolves to the environment variable VAR_NAME
+# Pattern: ${VAR_NAME} resolves to the environment variable VAR_NAME
 _ENV_VAR_PATTERN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
 

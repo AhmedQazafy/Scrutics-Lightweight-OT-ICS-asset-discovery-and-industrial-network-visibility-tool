@@ -76,11 +76,11 @@ class TestDependencyChecker:
 
     def test_missing_package_returns_false(self, capsys):
         with patch("builtins.__import__", side_effect=ImportError("no module")):
-            # Can't easily mock selective imports — just verify the function
+            # Can't easily mock selective imports; just verify the function
             # handles ImportError gracefully by checking the logic directly
             pass
 
     def test_headless_skips_textual_check(self):
-        # In headless mode, textual not required — should not raise
+        # In headless mode, textual not required, should not raise
         result = check_dependencies(headless=True)
         assert isinstance(result, bool)

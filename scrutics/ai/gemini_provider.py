@@ -252,8 +252,8 @@ def _normalize_gemini_response(response_body: dict[str, Any]) -> str | dict[str,
     """Translate Gemini's generateContent response to the internal OpenAI-compatible contract.
 
     Returns:
-      ChatResult (str subclass) — if the model produced a final text answer
-      dict — with 'role', 'content', 'tool_calls' (OpenAI-style) if the model called functions
+      ChatResult (str subclass): if the model produced a final text answer
+      dict: with 'role', 'content', 'tool_calls' (OpenAI-style) if the model called functions
              'tool_calls' entries include 'thought_signature' when present per Gemini 3 requirement.
     """
     candidates = response_body.get("candidates", [])
@@ -342,7 +342,7 @@ class GeminiProvider(LLMProvider):
         self.retry_callback = cb
 
     def _endpoint_url(self) -> str:
-        # API key as query param — Gemini generateContent convention
+        # API key as query param (Gemini generateContent convention
         return f"{_GEMINI_BASE_URL}/{self.model}:generateContent?key={self._api_key}"
 
     def chat(

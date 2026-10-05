@@ -1,4 +1,4 @@
-# MANIFEST.in — Scrutics sdist manifest
+# MANIFEST.in: Scrutics sdist manifest
 # Controls what goes into the source distribution (sdist).
 # The wheel already uses [tool.setuptools.package-data] in pyproject.toml.
 
@@ -20,7 +20,7 @@ recursive-include scrutics/config *.yaml *.sh *.bat
 include scrutics/web/*.js
 
 # ── Explicit excludes for runtime-generated files ───────────────
-# oui.txt is written by scripts/download_oui.py — must never ship
+# oui.txt is written by scripts/download_oui.py and must never ship
 exclude scrutics/classifier/oui.txt
 
 # ── Prune directories that should never ship in an sdist ────────

@@ -1,7 +1,7 @@
 """
 Rolling append-mode CSV writer for events and anomalies.
 Replaces the end-of-session _event_buffer flush so data is always
-on disk — crash-safe for infinite / long-running sessions.
+on disk, crash-safe for infinite / long-running sessions.
 """
 
 import csv

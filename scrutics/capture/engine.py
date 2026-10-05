@@ -43,8 +43,8 @@ class CaptureEngine:
         self.event_log: deque = deque(maxlen=500)
         self._logged_protocols: dict = {}   # ip -> frozenset of protocols last logged
         self._logged_dst_ports: dict = {}   # ip -> set of dst ports already logged
-        self.writer      = None   # RollingWriter — attached by caller before capture
-        self.sink_manager = None  # SinkManager   — attached by caller before capture
+        self.writer      = None   # RollingWriter, attached by caller before capture
+        self.sink_manager = None  # SinkManager, attached by caller before capture
         self.no_baseline  = False  # skip anomaly detection (e.g. large PCAP files)
         self.topology_edges: dict = {}
         self._mac_to_ip: dict[str, str] = {}
@@ -57,7 +57,7 @@ class CaptureEngine:
         self.ingest_stats = IngestStats(log=lambda message: self._log(message, "yellow"))
         self._ingest_index = 0     # packets handed to _ingest_packet in this engine's lifetime
         self._current_item = ("live", 0)   # (path, packet index or line number) being processed
-        self._get_oui_db()         # preload at startup — avoids silent delay on first packet
+        self._get_oui_db()         # preload at startup to avoid silent delay on first packet
 
     def _log(self, message: str, style: str = "dim white"):
         ts = datetime.datetime.now().strftime("%H:%M:%S")
@@ -151,7 +151,7 @@ class CaptureEngine:
         if ttl is not None:
             self._process_ttl(src_ip, ttl, now_ts)
 
-        # mDNS (5353) and WS-Discovery (3702) — passive device discovery protocols
+        # mDNS (5353) and WS-Discovery (3702): passive device discovery protocols
         if proto == "UDP" and dst_port in (5353, 3702):
             self._process_discovery_packet(src_ip, dst_ip, dst_port, pkt, now_ts)
 
@@ -198,7 +198,7 @@ class CaptureEngine:
     def _process_discovery_packet(self, src_ip, dst_ip, dst_port, pkt, ts):
         """
         Parse mDNS/WS-Discovery announcements for device identification.
-        Passive only — we never send discovery requests.
+        Passive only: we never send discovery requests.
         """
         from scapy.layers.dns import DNS
         from scapy.packet import Raw
@@ -214,7 +214,7 @@ class CaptureEngine:
         if dst_port == 5353 and DNS in pkt:
             dns = pkt[DNS]
             if dns.qr == 0:  # Query
-                # We're observing queries — evidence of client activity
+                # We're observing queries, evidence of client activity
                 # Each question record is guarded like the answers below: a record that is not
                 # a question or whose name is not valid UTF-8 is skipped
                 for question in dns.qd or []:
@@ -241,7 +241,7 @@ class CaptureEngine:
 
         # WS-Discovery (port 3702)
         elif dst_port == 3702:
-            # WS-Discovery uses SOAP/XML — we can detect it but parsing is complex
+            # WS-Discovery uses SOAP/XML; we can detect it but parsing is complex
             # For now, just note that WS-Discovery was observed
             service_name = "WS-Discovery"
             service_type = "WS-Discovery observed"
@@ -674,7 +674,7 @@ class CaptureEngine:
         # Resolve destination Asset for topology edge creation.
         # An edge is only created when BOTH endpoints are resolved Assets at capture time.
         # If dst_ip was credited as a listener port or already known, it is resolved.
-        # Unresolved destinations produce no topology edge — this is deliberate.
+        # Unresolved destinations produce no topology edge; this is deliberate.
         # topology_edges is an asset relationship aggregate, not a record of
         # every unresolved communication observation.
         dst_asset = self.inventory.get(dst_ip) if dst_ip else None
@@ -825,7 +825,7 @@ class CaptureEngine:
             asset.protocol_score = 0
             # Keep the behavioral/directional scores as-is (they reflect client behavior)
             # Then skip the rest of the normal classification logic.
-            # ── NEW: Apply constraints from contacted ports ─────────────────
+            # ── Apply constraints from contacted ports ──────────────────────
             self._apply_constraints_from_contacted_ports(asset)
             return
 
@@ -919,15 +919,15 @@ class CaptureEngine:
         An edge is only created when BOTH endpoints are resolved Assets at
         capture time. topology_edges is an asset relationship aggregate, not
         a record of every unresolved communication observation. Unresolved
-        destinations produce no topology edge — this is deliberate and must
+        destinations produce no topology edge; this is deliberate and must
         not be "fixed" later by retrospective IP→Asset reconstruction.
 
         Edge key uses Asset.primary_key for persistent identity that survives
         IP changes. source_ip/destination_ip are stored as metadata representing
-        the most-recently-observed IPs for this aggregate edge — NOT identity keys.
+        the most-recently-observed IPs for this aggregate edge, NOT identity keys.
         Asset.ip_history is the authoritative historical IP-assignment timeline.
         """
-        # Both endpoints must be resolved Assets — no exceptions.
+        # Both endpoints must be resolved Assets, no exceptions.
         if not src_asset or not dst_asset:
             return
 
@@ -979,7 +979,7 @@ class CaptureEngine:
     def _check_behavioral_constraints(self, asset, dst_ip, dst_port, ts):
         """
         Check rule-defined behavioral constraints against observed traffic.
-        Fires BEHAVIORAL_VIOLATION anomalies — always HIGH severity.
+        Fires BEHAVIORAL_VIOLATION anomalies, always HIGH severity.
         Independent of baseline window: fires from the first packet.
         """
         c = asset.behavioral_constraints
@@ -1003,13 +1003,13 @@ class CaptureEngine:
             if self.sink_manager:
                 self.sink_manager.emit_anomaly(anomaly)
 
-        # never_initiates — device should only respond, never initiate
+        # never_initiates: device should only respond, never initiate
         if c.get("never_initiates") and asset.initiates:
             if _allowed("NEVER_INITIATES"):
                 _emit("NEVER_INITIATES",
                       f"device initiated connection to {dst_ip}:{dst_port}")
 
-        # allowed_peers — device may only communicate with listed IPs
+        # allowed_peers: device may only communicate with listed IPs
         allowed_peers = c.get("allowed_peers", [])
         if allowed_peers and dst_ip and dst_ip not in allowed_peers:
             key = f"PEER_{dst_ip}"
@@ -1017,7 +1017,7 @@ class CaptureEngine:
                 _emit("DISALLOWED_PEER",
                       f"communicated with {dst_ip} (not in allowed_peers)")
 
-        # allowed_ports — device should only be seen on listed listener ports
+        # allowed_ports: device should only be seen on listed listener ports
         allowed_ports = c.get("allowed_ports", [])
         if allowed_ports and dst_port and dst_port not in allowed_ports:
             key = f"PORT_{dst_port}"
@@ -1025,17 +1025,17 @@ class CaptureEngine:
                 _emit("DISALLOWED_PORT",
                       f"traffic on port {dst_port} (not in allowed_ports)")
 
-        # alert_on_new_port — alert whenever device appears on a port not seen before
+        # alert_on_new_port: alert whenever device appears on a port not seen before
         if c.get("alert_on_new_port") and dst_port:
             known = asset._constraint_anomaly_ts.get("_known_ports", set())
             if dst_port not in known:
                 known.add(dst_port)
                 asset._constraint_anomaly_ts["_known_ports"] = known
-                if len(known) > 1:   # skip the very first port — it's expected
+                if len(known) > 1:   # skip the very first port, it's expected
                     _emit("NEW_PORT",
                           f"device active on new port {dst_port}")
 
-        # max_new_peers_per_hour — rate limit new peer discovery
+        # max_new_peers_per_hour: rate limit new peer discovery
         max_peers = c.get("max_new_peers_per_hour")
         if max_peers and dst_ip:
             asset.record_peer_first_seen(dst_ip, ts)

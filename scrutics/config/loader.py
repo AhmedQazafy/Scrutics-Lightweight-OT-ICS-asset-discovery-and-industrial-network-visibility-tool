@@ -2,8 +2,8 @@
 Configuration loader for Scrutics.
 
 Search order for user config:
-  1. ~/.scrutics/scrutics.yaml    (advanced override — home directory)
-  2. package custom_rules.yaml    (default — always present, users edit this directly)
+  1. ~/.scrutics/scrutics.yaml    (advanced override, home directory)
+  2. package custom_rules.yaml    (default, always present, users edit this directly)
 
   The intended workflow is simple: edit scrutics/config/custom_rules.yaml directly.
   The ~/.scrutics/scrutics.yaml path exists for advanced users who want a

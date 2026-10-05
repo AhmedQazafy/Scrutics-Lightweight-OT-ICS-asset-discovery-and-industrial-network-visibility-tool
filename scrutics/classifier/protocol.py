@@ -1,7 +1,7 @@
 """Protocol-based device classification.
 
 Rule precedence:  user rules → builtin YAML rules → hardcoded ICS_PORTS fallback.
-Hot-reload via reload_rules() — replaces both rule sets in-place, thread-safe via GIL.
+Hot-reload via reload_rules() replaces both rule sets in-place, thread-safe via GIL.
 """
 
 import threading
@@ -121,12 +121,12 @@ def classify_by_ports(ports_seen: set, mac: str = None) -> dict:
     with _RULE_LOCK:
         builtin_rules = list(_BUILTIN_RULES)
 
-    # 1. User rules — single match, early return
+    # 1. User rules: single match, early return
     rule, _, confidence = match_user_rule(ports_seen, mac)
     if rule:
         return _rule_to_result(rule, "user", confidence=confidence)
 
-    # 2. Builtin YAML rules — collect all matches for multi-protocol detection
+    # 2. Builtin YAML rules: collect all matches for multi-protocol detection
     if builtin_rules:
         matched = [match_rule(builtin_rules, port=p) for p in ports_seen]
         matched = [r for r in matched if r]

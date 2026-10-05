@@ -1,5 +1,5 @@
 """
-Tests for scrutics.passive — passive enforcement layer.
+Tests for scrutics.passive: passive enforcement layer.
 
 These tests verify that:
   - enforce_passive() patches all Scapy send functions

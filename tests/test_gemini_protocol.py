@@ -67,7 +67,7 @@ class TestGeminiProtocolCorrectness(unittest.TestCase):
         self.assertEqual(res["tool_calls"][0]["id"], "call_abc_123")
         self.assertEqual(res["tool_calls"][0]["function"]["name"], "get_assets")
 
-        # Case 2: Missing ID — must remain empty string, never become 'get_assets'
+        # Case 2: Missing ID: must remain empty string, never become 'get_assets'
         resp_without_id = {
             "candidates": [{
                 "content": {

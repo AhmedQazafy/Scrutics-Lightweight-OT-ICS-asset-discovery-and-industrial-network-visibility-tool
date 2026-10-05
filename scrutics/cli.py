@@ -1,5 +1,5 @@
 """
-Scrutics CLI — headless and scriptable interface.
+Scrutics CLI: headless and scriptable interface.
 
 Examples:
   scrutics                                         # launch TUI (recommended)
@@ -12,7 +12,7 @@ Examples:
   scrutics doctor                                  # print diagnostic info
 
 Rule reload:
-  Edit scrutics/config/custom_rules.yaml while running — Scrutics detects
+  Edit scrutics/config/custom_rules.yaml while running; Scrutics detects
   the change and reloads automatically within 2-3 seconds.
   Press R in the TUI for an immediate manual reload.
   On Linux, SIGHUP is also available for headless workflows.
@@ -141,7 +141,7 @@ config:
     )
     ask_parser = subparsers.add_parser(
         "ask",
-        help=argparse.SUPPRESS,  # hidden from help — use 'scrutics ai' instead
+        help=argparse.SUPPRESS,  # hidden from help; use 'scrutics ai' instead
     )
     # Both subcommands accept the same arguments
     for sp in (ai_parser, ask_parser):
@@ -1187,7 +1187,7 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
         if not is_tty:
             return 0
 
-    # Interactive loop — only reached when running in a real terminal
+    # Interactive loop, only reached when running in a real terminal
     while True:
         try:
             if is_tty:
@@ -1212,7 +1212,7 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
 
         rc = _do_question(question)
         if rc is not None and rc != 130:
-            # Non-fatal LLM error — print it and let user keep asking
+            # Non-fatal LLM error: print it and let user keep asking
             continue
         if rc == 130:
             return 130
@@ -1321,7 +1321,7 @@ def _run_ai_onboarding_cli() -> dict | None:
     timeout = 180 if provider_id == "ollama" else 60
     try:
         import scrutics as _sc
-        # Write to ~/.scrutics/ai.yaml (user config) — never overwrite the packaged template
+        # Write to ~/.scrutics/ai.yaml (user config); never overwrite the packaged template
         user_scrutics_dir = os.path.join(os.path.expanduser("~"), ".scrutics")
         os.makedirs(user_scrutics_dir, exist_ok=True)
         yaml_path = os.path.join(user_scrutics_dir, "ai.yaml")
@@ -1472,7 +1472,7 @@ def run_ai(args) -> int:
     return _run_ai_repl(provider, ctx, session_dir, initial_question)
 
 
-# Backward-compat alias — old code and old tests that call run_ask() still work
+# Backward-compat alias: old code and old tests that call run_ask() still work
 def run_ask(args) -> int:
     """Backward-compatible alias for run_ai()."""
     return run_ai(args)

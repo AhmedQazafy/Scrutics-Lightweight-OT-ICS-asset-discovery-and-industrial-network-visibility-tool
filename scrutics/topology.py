@@ -1586,7 +1586,7 @@ def write_manifest(session_dir: str, metadata: dict | None = None) -> str:
     """
     Write manifest.json to the session directory.
     Returns the path to the manifest file.
-    Never raises on failure — logs/ignores per existing checkpoint pattern.
+    Never raises on failure; logs/ignores per existing checkpoint pattern.
     """
     manifest_path = os.path.join(session_dir, "manifest.json")
     try:

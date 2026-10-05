@@ -13,7 +13,7 @@ import threading
 import urllib.request
 import urllib.error
 
-# RFC 3164 syslog priorities — facility=1 (user-level messages)
+# RFC 3164 syslog priorities: facility=1 (user-level messages)
 _SEV_PRIORITY = {
     "HIGH":   11,   # facility=1, severity=3 (error)
     "MEDIUM": 12,   # facility=1, severity=4 (warning)

@@ -105,7 +105,7 @@ def _query_models(
 ) -> list[str]:
     """
     Internal: call the provider's model list endpoint and return raw model name strings.
-    Raises on any error — caller handles.
+    Raises on any error; the caller handles it.
     """
     req = requests_module
 
