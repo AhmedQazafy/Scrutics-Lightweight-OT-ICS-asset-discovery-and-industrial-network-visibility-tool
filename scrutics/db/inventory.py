@@ -9,6 +9,7 @@ import ipaddress
 import time
 
 from scrutics.capture.cooldown import Cooldowns
+from scrutics.protocol_display import DISPLAY_SEPARATOR, protocol_display_entries
 
 # Evidence weights (moved here for central definition)
 EVIDENCE_WEIGHT_OT_VENDOR = 30
@@ -176,6 +177,10 @@ class Asset:
     ip_history: list = field(default_factory=list)         # List[dict] - chronological IP episodes: [{"ip": str, "first_seen": float, "last_seen": float}]
     # protocol name -> ProtocolObservationSummary; in-memory only, not part of repr or equality
     protocol_summaries: dict = field(default_factory=dict, repr=False, compare=False)
+    # Protocol display entries read back from a saved session, which has no capture state to
+    # derive them from; None while the asset is live. Display only, in-memory only, not part of
+    # repr or equality
+    restored_protocol_display: Optional[list] = field(default=None, repr=False, compare=False)
     # Explanation of the current classification decision; in-memory only, not part of repr or equality
     classification_rule: str = field(default="", repr=False, compare=False)
     classification_reason: str = field(default="", repr=False, compare=False)
@@ -677,6 +682,8 @@ class Asset:
             "peer_additions_rejected": limits["peer_additions_rejected"],
             "peer_first_seen_overflow": limits["peer_first_seen_overflow"],
         })
+        # Displayed protocol text, last; "protocol" keeps the served protocols only
+        right["protocol_display"] = DISPLAY_SEPARATOR.join(protocol_display_entries(self))
         return {**left, **right}
 
 

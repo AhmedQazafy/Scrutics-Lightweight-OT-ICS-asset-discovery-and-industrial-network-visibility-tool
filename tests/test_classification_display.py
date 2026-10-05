@@ -172,7 +172,7 @@ def test_csv_appends_basis_columns_and_round_trips(tmp_path):
     inv = run(SCENARIOS["5 OT device with SSH admin"][0])
     original = inv.get("10.0.1.6")
     header, rows = _write_session(tmp_path, inv)
-    assert header == OLD_COLUMNS + NEW_COLUMNS + LIMIT_COLUMNS
+    assert header == OLD_COLUMNS + NEW_COLUMNS + LIMIT_COLUMNS + ["protocol_display"]
     row = next(r for r in rows if r["ip"] == "10.0.1.6")
     loaded = _asset_from_session_row(row)
     assert loaded.classification_rule == original.classification_rule

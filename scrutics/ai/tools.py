@@ -11,6 +11,7 @@ import os
 from typing import Any
 
 from scrutics.db.inventory import split_conflicts
+from scrutics.protocol_display import split_display_column
 from scrutics.topology import read_manifest
 
 
@@ -59,6 +60,11 @@ class SessionContext:
                 for row in reader:
                     protocols_raw = row.get("protocol", "")
                     protocols = [p.strip() for p in protocols_raw.split(",") if p.strip()] if protocols_raw else []
+                    # Sessions written before the protocol_display column show served protocols
+                    if "protocol_display" in row:
+                        protocol_display = split_display_column(row.get("protocol_display"))
+                    else:
+                        protocol_display = [p for p in protocols if p != "Unknown"]
 
                     # Parse confidence percentage
                     try:
@@ -78,6 +84,7 @@ class SessionContext:
                         "type": asset_type,
                         "confidence_pct": conf_pct,
                         "protocols": protocols,
+                        "protocol_display": protocol_display,
                         "classification_reason": row.get("classification_reason", "") or "",
                         "classification_conflicts": split_conflicts(row.get("classification_conflicts", "")),
                         "_raw": row,
@@ -200,6 +207,7 @@ def get_assets(
             "type": a["type"],
             "confidence_pct": a["confidence_pct"],
             "protocols": a["protocols"],
+            "protocol_display": a.get("protocol_display", a["protocols"]),
         })
 
     if len(results) > max_results:

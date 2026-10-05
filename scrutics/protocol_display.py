@@ -20,6 +20,9 @@ QUALIFIERS = (CLIENT_PORT_QUALIFIER, CLIENT_QUALIFIER, PORT_QUALIFIER)
 # Characters given to protocol text in the TUI and CLI asset tables
 PROTOCOL_COLUMN_WIDTH = 32
 
+# Separates entries in the protocol_display CSV column; an entry itself can contain ", "
+DISPLAY_SEPARATOR = "|"
+
 # Served value that already states it rests on standard ports only; shown as written
 IT_PORTS_ONLY = "IT (standard ports only)"
 
@@ -28,7 +31,14 @@ def protocol_display_entries(asset) -> list:
     """
     The asset's protocol entries in display order: served, then validated client use, then OT
     services contacted by port only. Empty when none is known.
+
+    An asset loaded from a saved session has no capture state, so the entries read back with it
+    are returned instead.
     """
+    restored = getattr(asset, "restored_protocol_display", None)
+    if restored is not None:
+        return list(restored)
+
     summaries = getattr(asset, "protocol_summaries", None) or {}
     entries = []
 
@@ -58,6 +68,11 @@ def protocol_display_entries(asset) -> list:
     entries.extend(name + CLIENT_PORT_QUALIFIER for name in port_only)
 
     return entries
+
+
+def split_display_column(value) -> list:
+    """Entries from a saved protocol_display column value."""
+    return [entry for entry in (value or "").split(DISPLAY_SEPARATOR) if entry]
 
 
 def protocol_display_text(asset, width: int | None = None) -> str:

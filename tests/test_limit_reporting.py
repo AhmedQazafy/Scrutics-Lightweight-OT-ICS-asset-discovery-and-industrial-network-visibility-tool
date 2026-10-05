@@ -43,7 +43,7 @@ def _overflowing_asset(ip="10.0.0.1", mac="02:00:00:00:00:01"):
 
 def test_export_columns_are_appended_and_zero_under_the_limits():
     row = Asset(ip="10.0.0.1", mac="02:00:00:00:00:01").to_dict()
-    assert list(row)[-len(LIMIT_COLUMNS):] == LIMIT_COLUMNS
+    assert list(row)[-len(LIMIT_COLUMNS) - 1:] == LIMIT_COLUMNS + ["protocol_display"]
     assert [row[c] for c in LIMIT_COLUMNS] == [0, 0, "", 0, 0, 0]
 
 

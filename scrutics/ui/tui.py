@@ -42,7 +42,7 @@ from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 from scrutics.diagnostics import VERSION
 from scrutics.topology import export_topology
 from scrutics.protocol_display import (
-    PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text,
+    PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text, split_display_column,
 )
 
 TAGLINE = "Passive OT/ICS Network Asset Discovery"
@@ -1939,7 +1939,19 @@ def _asset_from_session_row(row: dict) -> Asset:
         dns_names_overflow=int(row.get("dns_names_overflow") or 0),
         peer_additions_rejected=int(row.get("peer_additions_rejected") or 0),
         peer_first_seen_overflow=int(row.get("peer_first_seen_overflow") or 0),
+        restored_protocol_display=_session_protocol_display(row),
     )
+
+
+def _session_protocol_display(row: dict) -> list:
+    """
+    Protocol display entries of a saved asset row. Sessions written before the protocol_display
+    column existed show the served protocols as they were saved.
+    """
+    if "protocol_display" in row:
+        return split_display_column(row.get("protocol_display"))
+    served = row.get("protocol", "").split(", ") if row.get("protocol") else []
+    return [p for p in served if p and p != "Unknown"]
 
 
 class DetailScreen(ModalScreen):
@@ -3035,7 +3047,7 @@ class ScruticsApp(App):
                     asset.ip,
                     asset.mac[:17],
                     asset.vendor[:16],
-                    ", ".join(asset.protocols)[:14] or "?",
+                    protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
                     asset.role[:16],
                     f"{asset.classification_confidence_pct}%",
                     _baseline_display(asset.baseline_status),

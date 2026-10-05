@@ -3,17 +3,20 @@ Displayed protocol text: served, validated client use, and OT services contacted
 labeled with how it is known. Classification never reads it.
 """
 
+import csv
 import struct
 
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, TCP
 from scapy.packet import Raw
 
+from scrutics.ai.tools import SessionContext, get_assets
 from scrutics.capture.engine import CaptureEngine
 from scrutics.db.inventory import Asset, AssetInventory
 from scrutics.protocol_display import (
     format_protocol_entries, protocol_display_entries, protocol_display_text,
 )
+from scrutics.ui.tui import _asset_from_session_row
 
 HMI_IP, PLC_IP = "10.0.0.5", "10.0.0.20"
 HMI_MAC, PLC_MAC = "02:00:00:00:00:05", "02:00:00:00:00:20"
@@ -169,3 +172,80 @@ def test_client_of_unparsed_ot_port_shows_port_only_client_use():
         / TCP(sport=40002, dport=102, flags="S")
     )
     assert protocol_display_text(inv.get(HMI_IP)) == "S7comm / IEC 61850 MMS / ICCP (client, port)"
+
+
+# ── Saved sessions and AI tools ─────────────────────────────────────────────
+
+def _client_hmi_inventory():
+    inv = AssetInventory()
+    hmi = inv.get_or_create(ip=HMI_IP, mac=HMI_MAC, timestamp=1.0)
+    hmi.contacted_ports.update({502, 102})
+    _observe(hmi, "Modbus TCP", sends_request=True)
+    return inv, hmi
+
+
+def _saved_rows(tmp_path, inv):
+    path = tmp_path / "assets.csv"
+    inv.export_csv(str(path))
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def test_csv_keeps_served_protocols_and_saves_display_entries_last(tmp_path):
+    inv, hmi = _client_hmi_inventory()
+    row = _saved_rows(tmp_path, inv)[0]
+    assert list(row)[-1] == "protocol_display"
+    assert row["protocol"] == "Unknown"
+    assert row["protocol_display"] == (
+        "Modbus TCP (client)|S7comm / IEC 61850 MMS / ICCP (client, port)"
+    )
+
+
+def test_reloaded_session_shows_saved_display_entries(tmp_path):
+    inv, hmi = _client_hmi_inventory()
+    loaded = _asset_from_session_row(_saved_rows(tmp_path, inv)[0])
+    assert loaded.protocols == ["Unknown"]
+    assert protocol_display_entries(loaded) == protocol_display_entries(hmi)
+
+
+def test_reloaded_asset_with_nothing_known_stays_unknown(tmp_path):
+    inv = AssetInventory()
+    inv.get_or_create(ip=HMI_IP, mac=HMI_MAC, timestamp=1.0)
+    loaded = _asset_from_session_row(_saved_rows(tmp_path, inv)[0])
+    assert protocol_display_text(loaded) == "Unknown"
+
+
+def test_session_without_display_column_falls_back_to_served_protocols():
+    row = {"ip": PLC_IP, "mac": PLC_MAC, "protocol": "Modbus TCP, S7comm"}
+    assert protocol_display_entries(_asset_from_session_row(row)) == ["Modbus TCP", "S7comm"]
+    row = {"ip": HMI_IP, "mac": HMI_MAC, "protocol": "Unknown"}
+    assert protocol_display_text(_asset_from_session_row(row)) == "Unknown"
+
+
+def _ai_context(tmp_path, rows, fieldnames):
+    path = tmp_path / "assets.csv"
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    ctx = SessionContext.__new__(SessionContext)
+    ctx.assets = ctx._load_assets(str(path))
+    return ctx
+
+
+def test_ai_asset_list_carries_display_entries(tmp_path):
+    inv, hmi = _client_hmi_inventory()
+    rows = _saved_rows(tmp_path, inv)
+    ctx = _ai_context(tmp_path, rows, list(rows[0]))
+    (asset,) = get_assets(ctx)
+    assert asset["protocols"] == ["Unknown"]
+    assert asset["protocol_display"] == [
+        "Modbus TCP (client)", "S7comm / IEC 61850 MMS / ICCP (client, port)",
+    ]
+
+
+def test_ai_asset_list_falls_back_to_served_for_old_sessions(tmp_path):
+    row = {"ip": PLC_IP, "mac": PLC_MAC, "protocol": "Modbus TCP"}
+    ctx = _ai_context(tmp_path, [row], list(row))
+    (asset,) = get_assets(ctx)
+    assert asset["protocol_display"] == ["Modbus TCP"]
