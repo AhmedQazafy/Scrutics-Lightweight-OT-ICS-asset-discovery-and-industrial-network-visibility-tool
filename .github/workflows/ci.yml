@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ main ]
 
 jobs:
   test:
@@ -17,6 +16,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
