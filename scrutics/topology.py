@@ -15,6 +15,7 @@ from ipaddress import ip_address
 from typing import Any, Optional
 
 import scrutics
+from scrutics.protocol_display import protocol_display_text
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,6 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
     for asset in assets:
         pk = asset.primary_key
         ntype = _asset_type(asset)
-        protocols = getattr(asset, "protocols", None) or []
         confidence = int(getattr(asset, "confidence_pct", 0) or 0)
         node_data = {
             "id": pk,                   # Persistent identity (Asset.primary_key)
@@ -98,7 +98,7 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
             "color": NODE_COLORS[ntype],
             "size": max(14, min(36, 14 + confidence // 4)),
             "vendor": _safe_text(getattr(asset, "vendor", None)),
-            "protocol": ", ".join(str(p) for p in protocols if p) or "Unknown",
+            "protocol": protocol_display_text(asset),
             "role": _safe_text(getattr(asset, "role", None), "Unclassified"),
             "confidence": confidence,
             "mac": _safe_text(getattr(asset, "mac", None)),

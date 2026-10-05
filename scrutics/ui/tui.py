@@ -41,6 +41,9 @@ from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 from scrutics.diagnostics import VERSION
 from scrutics.topology import export_topology
+from scrutics.protocol_display import (
+    PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text,
+)
 
 TAGLINE = "Passive OT/ICS Network Asset Discovery"
 SESSION_FLUSH_INTERVAL = 15.0
@@ -2054,6 +2057,7 @@ class DetailScreen(ModalScreen):
             "mac": asset.mac,
             "vendor": asset.vendor,
             "protocols": asset.protocols,
+            "protocol_display": protocol_display_entries(asset),
             "role": asset.role,
             "classification_type": asset.classification_type,
             "classification_rule": asset.classification_rule,
@@ -2920,7 +2924,7 @@ class ScruticsApp(App):
             for i, asset in enumerate(assets):
                 try:
                     table.update_cell_at((i, 2), asset.vendor[:20])
-                    table.update_cell_at((i, 3), ", ".join(asset.protocols)[:18] if asset.protocols else "Unknown")
+                    table.update_cell_at((i, 3), protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH))
                     table.update_cell_at((i, 4), asset.role[:26])
                     table.update_cell_at((i, 5), f"{asset.confidence_pct}%")
                     table.update_cell_at((i, 6), _baseline_display(asset.baseline_status))
@@ -2934,7 +2938,7 @@ class ScruticsApp(App):
                 mac = _sanitize_mac(asset.mac)
                 table.add_row(
                     asset.ip, mac, asset.vendor[:20],
-                    ", ".join(asset.protocols)[:18] if asset.protocols else "Unknown",
+                    protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
                     asset.role[:26], f"{asset.confidence_pct}%",
                     _baseline_display(asset.baseline_status),
                     str(anomaly_counts.get(asset.ip, 0)),

@@ -39,6 +39,7 @@ from scrutics.diagnostics import (
     list_interfaces, suggest_interface, check_output_dir,
 )
 from scrutics.db.inventory import AssetInventory, limit_summary_line
+from scrutics.protocol_display import PROTOCOL_COLUMN_WIDTH, protocol_display_text
 from scrutics.topology import export_topology
 
 SESSION_FLUSH_INTERVAL = 15.0
@@ -526,15 +527,16 @@ def _print_table(inventory: AssetInventory):
     if not assets:
         print("[!] No assets discovered.")
         return
-    print(f"\n{'─'*110}")
-    print(f"{'IP':<18} {'MAC':<20} {'VENDOR':<22} {'PROTOCOL':<18} {'ROLE':<28} {'CONF%':<7} {'TYPE'}")
-    print(f"{'─'*110}")
+    w = PROTOCOL_COLUMN_WIDTH
+    print(f"\n{'─'*(92 + w)}")
+    print(f"{'IP':<18} {'MAC':<20} {'VENDOR':<22} {'PROTOCOL':<{w}} {'ROLE':<28} {'CONF%':<7} {'TYPE'}")
+    print(f"{'─'*(92 + w)}")
     for a in assets:
-        proto  = ", ".join(a.protocols)[:18] if a.protocols else "Unknown"
+        proto  = protocol_display_text(a, w)
         type_s = "OT" if a.is_ot is True else "IT" if a.is_ot is False else "?"
-        print(f"{a.ip:<18} {a.mac:<20} {a.vendor[:22]:<22} {proto:<18} "
+        print(f"{a.ip:<18} {a.mac:<20} {a.vendor[:22]:<22} {proto:<{w}} "
               f"{a.role[:28]:<28} {a.confidence_pct:<7}% {type_s}")
-    print(f"{'─'*110}")
+    print(f"{'─'*(92 + w)}")
     print(f"Total: {inventory.count()} assets\n")
 
 
