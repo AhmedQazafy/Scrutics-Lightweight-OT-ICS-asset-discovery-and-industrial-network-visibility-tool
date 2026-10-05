@@ -68,6 +68,12 @@ from scrutics.cli import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_oui_meta(tmp_path, monkeypatch):
+    """Keep OUI metadata writes out of the real ~/.scrutics; tests may patch the path again."""
+    monkeypatch.setattr("scrutics.classifier.oui.OUI_META_PATH", str(tmp_path / "oui_meta.json"))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # B4: Curated OUI Metadata Tests
 # ═══════════════════════════════════════════════════════════════════════════════
