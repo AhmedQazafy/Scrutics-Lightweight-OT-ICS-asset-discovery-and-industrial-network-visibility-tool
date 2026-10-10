@@ -79,9 +79,11 @@ def known_service_ports() -> set[int]:
 
 
 # (port, transport) pairs that can be a listening service, built from the signature table and
-# the rule lists it was computed for. The rule lists are only ever replaced, never edited in
-# place (reload_rules assigns new lists), so holding them and comparing by identity detects every
-# change; holding them also keeps their ids from being reused by a replacement list.
+# the rule lists it was computed for, and rebuilt under _RULE_LOCK so a reader never sees a
+# partial set.
+# Invariant: _USER_RULES and _BUILTIN_RULES are replaced, never mutated in place. The cache
+# compares the lists with `is`, so an in-place edit (append, item assignment, editing a rule dict)
+# would not be seen. Holding the lists also keeps their ids from being reused by a replacement.
 _CREDITABLE = {"user": None, "builtin": None, "pairs": frozenset()}
 
 
