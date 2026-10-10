@@ -16,12 +16,19 @@ from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
 from scrutics.classifier.protocol import classify_by_ports, classification_evidence_from_ports
 from scrutics.classifier.asset_classifier import classify_asset, RULE_SENDS_VALIDATED_OT_REQUESTS
-from scrutics.capture.direction import decide_flow_record, decide_packet
+from scrutics.capture.direction import (
+    decide_flow_record, decide_packet, decide_suricata_flow, decide_zeek_conn, not_attributed,
+)
 from scrutics.classifier.signatures import (
     get_signature, get_all_service_ports, get_ot_ports,
     get_it_ports, get_infrastructure_ports, get_discovery_ports
 )
 
+
+# Protocol logs whose responder keeps being credited with the protocol's port
+_APP_LOG_SOURCES = frozenset({
+    "zeek_modbus", "zeek_dnp3", "zeek_bacnet", "suricata_modbus", "suricata_dnp3", "suricata_enip",
+})
 
 # Default for _process_modbus_payload: use the direction the parser derived from port 502
 _PARSER_DIRECTION = object()
@@ -577,14 +584,14 @@ class CaptureEngine:
 
     def _process_flow_data(self, src_ip, src_mac, dst_ip, dst_port, proto, ts,
                            src_port=None, alert=None, trust_dst_port=False,
-                           modbus_payload=None, tcp_flags=None):
+                           modbus_payload=None, tcp_flags=None, decision=None):
         """
         Process one packet, or one log record when `trust_dst_port` is set (the record's
         destination is the responder whose service port the originator contacted).
 
         A packet credits at most its sender's port; which side is the service is decided from
         the packet's own evidence (scrutics.capture.direction). `tcp_flags` is the TCP flags
-        byte when known.
+        byte when known. A log record passes its own `decision` (see _process_flow).
         """
         if not self.inventory.is_asset_ip(src_ip):
             return
@@ -648,10 +655,11 @@ class CaptureEngine:
         if modbus_payload is not None:
             from scrutics.parsers.modbus import parse_modbus_payload
             modbus_observations = parse_modbus_payload(modbus_payload, src_port, dst_port)
-        if trust_dst_port:
-            decision = decide_flow_record(proto, dst_port)
-        else:
-            decision = decide_packet(proto, src_port, dst_port, tcp_flags, modbus_observations)
+        if decision is None:
+            if trust_dst_port:
+                decision = decide_flow_record(proto, dst_port)
+            else:
+                decision = decide_packet(proto, src_port, dst_port, tcp_flags, modbus_observations)
         if decision.conflict:
             self.ingest_stats.warn(
                 "direction evidence conflicts (Modbus exception response in a TCP SYN or RST)",
@@ -691,14 +699,21 @@ class CaptureEngine:
         if decision.credit_src:
             self.inventory.credit_listener_port(src_ip, decision.credit_src, timestamp=ts)
 
-        if dst_ip and decision.credit_dst:
-            self.inventory.credit_listener_port(dst_ip, decision.credit_dst, timestamp=ts)
-            dst_asset = self.inventory.get(dst_ip)
-            if dst_asset and dst_asset.ports_seen:
-                self._classify_and_score(dst_asset)
+        # Receiver-side facts come only from log records that show the receiver answered
+        if dst_ip and (decision.credit_dst or decision.create_dst or decision.dst_initiates):
+            dst_asset = self.inventory.get_or_create(ip=dst_ip, mac=None, timestamp=ts)
+            if dst_asset and decision.credit_dst:
+                self.inventory.credit_listener_port(dst_ip, decision.credit_dst, timestamp=ts)
+            if dst_asset and decision.dst_initiates:
+                dst_asset.record_initiation(decision.dst_initiates, src_ip)
+            if dst_asset and decision.dst_contacted:
+                dst_asset.contacted_ports.add(decision.dst_contacted)
+            if dst_asset:
+                if dst_asset.ports_seen or dst_asset.contacted_ports:
+                    self._classify_and_score(dst_asset)
                 classify_asset(dst_asset)
                 from scrutics.classifier.protocol import ICS_PORTS
-                if dst_port in ICS_PORTS:
+                if decision.credit_dst and dst_port in ICS_PORTS:
                     seen = self._logged_dst_ports.setdefault(dst_ip, set())
                     if dst_port not in seen:
                         seen.add(dst_port)
@@ -1115,12 +1130,35 @@ class CaptureEngine:
         if not _usable_timestamp(ts):
             self.ingest_stats.reject("timestamp out of range", *self._current_item)
             return
+        proto = flow.get("proto", "TCP")
         self._process_flow_data(
             src_ip=flow.get("src_ip"), src_mac=flow.get("src_mac"),
             dst_ip=flow.get("dst_ip"), dst_port=flow.get("dst_port"),
-            proto=flow.get("proto", "TCP"), ts=ts,
-            alert=flow.get("alert"), trust_dst_port=True,
+            proto=proto, ts=ts,
+            alert=flow.get("alert"), decision=self._flow_decision(flow, proto),
         )
+
+    @staticmethod
+    def _flow_decision(flow: dict, proto):
+        """
+        Which side of a log record offers the service.
+
+        Zeek conn records use conn_state; Suricata flow events use flow.pkts_toclient and, when
+        present, the server's TCP flags (tcp.tcp_flags_tc). Zeek
+        modbus/dnp3/bacnet logs and Suricata modbus/dnp3/enip events keep crediting the
+        responder's protocol port. Every other record attributes nothing: a Suricata alert's
+        addresses follow the packet that triggered it, not the flow.
+        """
+        source = flow.get("source", "")
+        if source == "zeek_conn":
+            return decide_zeek_conn(proto, flow.get("src_port"), flow.get("dst_port"),
+                                    flow.get("conn_state"))
+        if source == "suricata_flow":
+            return decide_suricata_flow(proto, flow.get("src_port"), flow.get("dst_port"),
+                                        flow.get("pkts_toclient"), flow.get("server_tcp_flags"))
+        if source in _APP_LOG_SOURCES:
+            return decide_flow_record(proto, flow.get("dst_port"))
+        return not_attributed()
 
     def _apply_constraints_from_contacted_ports(self, asset):
         """

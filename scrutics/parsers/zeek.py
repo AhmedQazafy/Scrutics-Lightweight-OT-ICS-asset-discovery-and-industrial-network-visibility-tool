@@ -23,6 +23,14 @@ def _port(value):
     return int(value)
 
 
+def _optional_port(value):
+    """A port field that is only used when valid: None when unset, missing or not a port number."""
+    try:
+        return _port(value) if value is not None else None
+    except ZeekRecordError:
+        return None
+
+
 def _open_zeek(filepath: str):
     if filepath.endswith(".gz"):
         return gzip.open(filepath, "rt", errors="ignore")
@@ -125,8 +133,18 @@ def _flow_from_record(record: dict):
         dst_port = record.get("id.resp_p", "-")
         proto    = record.get("proto", "tcp").upper()
         dst_port_int = _port(dst_port)
-        return {"src_ip": src_ip, "src_mac": None, "dst_ip": dst_ip,
+        flow = {"src_ip": src_ip, "src_mac": None, "dst_ip": dst_ip,
                 "dst_port": dst_port_int, "proto": proto, "timestamp": ts_float, "source": "zeek_conn"}
+        # The originator port is used only by the UDP port heuristic; an unusable value is
+        # ignored and reported, never a reason to drop the record
+        orig_port = record.get("id.orig_p")
+        flow["src_port"] = _optional_port(orig_port)
+        if orig_port not in (None, "-") and flow["src_port"] is None:
+            flow["_warnings"] = ["Zeek field id.orig_p is not a port number (0-65535)"]
+        # conn_state is optional in conn.log; "-" means unset
+        state = record.get("conn_state")
+        flow["conn_state"] = None if state in (None, "-") else state
+        return flow
     return None
 
 
@@ -144,6 +162,9 @@ def iter_zeek_flows(filepath: str, report=None) -> Generator[tuple, None, None]:
                 report.contain(exc, PATH, line_no)
             continue
         if flow is not None:
+            for reason in flow.pop("_warnings", ()):
+                if report is not None:
+                    report.warn(reason, PATH, line_no)
             yield line_no, flow
 
 

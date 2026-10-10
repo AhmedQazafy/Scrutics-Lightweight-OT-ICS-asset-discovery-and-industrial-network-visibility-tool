@@ -14,7 +14,7 @@ from scrutics.capture.engine import CaptureEngine
 from scrutics.db.inventory import AssetInventory
 
 ZEEK_HEADER = ("#separator \\x09\n#path\tconn\n"
-               "#fields\tts\tuid\tid.orig_h\tid.orig_p\tid.resp_h\tid.resp_p\tproto\n")
+               "#fields\tts\tuid\tid.orig_h\tid.orig_p\tid.resp_h\tid.resp_p\tproto\tconn_state\n")
 ZEEK_REASON = "Zeek field id.resp_p is not a port number (0-65535)"
 
 
@@ -28,7 +28,7 @@ def _run(tmp_path, name, text):
 
 
 def _zeek(tmp_path, ports):
-    lines = "".join(f"{1700000000 + i}\tC{i}\t10.0.0.{10 + i}\t40000\t10.0.1.1\t{port}\ttcp\n"
+    lines = "".join(f"{1700000000 + i}\tC{i}\t10.0.0.{10 + i}\t40000\t10.0.1.1\t{port}\ttcp\tSF\n"
                     for i, port in enumerate(ports))
     return _run(tmp_path, "conn.log", ZEEK_HEADER + lines)
 

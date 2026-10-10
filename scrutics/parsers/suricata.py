@@ -1,6 +1,7 @@
 """Suricata EVE JSON parser for Scrutics."""
 
 import json
+import re
 from typing import Generator
 
 PATH = "suricata"
@@ -76,7 +77,43 @@ def _flow_from_event(event: dict):
 
     flow = {"src_ip": src_ip, "src_mac": None, "dst_ip": dst_ip,
             "dst_port": dst_port, "proto": proto,
-            "timestamp": ts_float, "source": f"suricata_{etype}"}
+            "timestamp": ts_float, "source": f"suricata_{etype}", "event_type": etype}
+    warnings = []
+
+    # The source port is used only by the UDP port heuristic; an unusable value is ignored
+    src_port = event.get("src_port")
+    if src_port is not None and not (_is_int(src_port) and 0 <= src_port <= 65535):
+        warnings.append("EVE field src_port is not a port number (0-65535)")
+        src_port = None
+    flow["src_port"] = src_port
+
+    # Packets sent to the flow's client ("pkts_toclient", event type flow, eve-json-format.rst).
+    # Absent means no evidence of a reply; a malformed value is treated as absent and reported.
+    pkts_toclient = None
+    if etype == "flow" and "flow" in event:
+        counts = event["flow"]
+        value = counts.get("pkts_toclient") if isinstance(counts, dict) else None
+        if _is_int(value) and value >= 0:
+            pkts_toclient = value
+        elif not isinstance(counts, dict) or "pkts_toclient" in counts:
+            warnings.append("EVE field flow.pkts_toclient is not a non-negative integer")
+    flow["pkts_toclient"] = pkts_toclient
+
+    # TCP flags the server side sent over the flow: a two-digit hex string of the OR of the
+    # flags, for example "1a" (tcp.tcp_flags_tc in the flow event example of
+    # eve-json-format.rst; written with "%02x" in Suricata's output-json-flow.c). Absent means
+    # unknown; a malformed value is treated as absent and reported.
+    server_flags = None
+    if etype == "flow" and "tcp" in event:
+        tcp = event["tcp"]
+        value = tcp.get("tcp_flags_tc") if isinstance(tcp, dict) else None
+        if isinstance(value, str) and re.fullmatch(r"[0-9A-Fa-f]{1,2}", value):
+            server_flags = int(value, 16)
+        elif not isinstance(tcp, dict) or "tcp_flags_tc" in tcp:
+            warnings.append("EVE field tcp.tcp_flags_tc is not a TCP flags hex string")
+    flow["server_tcp_flags"] = server_flags
+    if warnings:
+        flow["_warnings"] = warnings
 
     if etype == "alert":
         alert_info = event.get("alert", {})
@@ -123,6 +160,9 @@ def iter_eve_flows(filepath: str, report=None) -> Generator[tuple, None, None]:
                     report.contain(exc, PATH, line_no)
                 continue
             if flow is not None:
+                for reason in flow.pop("_warnings", ()):
+                    if report is not None:
+                        report.warn(reason, PATH, line_no)
                 yield line_no, flow
 
 

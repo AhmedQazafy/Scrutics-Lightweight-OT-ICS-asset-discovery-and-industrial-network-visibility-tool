@@ -46,12 +46,26 @@ BASIS_DESTINATION_PORT = "destination port"
 BASIS_TIE_BREAK = "lower port"
 BASIS_NONE = "no evidence"
 BASIS_FLOW = "flow record"
+BASIS_ZEEK_STATE = "zeek conn_state"
+BASIS_SURICATA_FLOW = "suricata flow"
+BASIS_FLOW_PORTS = "flow reply, ports"
+BASIS_NOT_ATTRIBUTED = "record not attributed"
+
+# Zeek conn_state values (base/protocols/conn/main.zeek). The responder answered: the connection
+# was established (S1, SF, S2, S3, RSTO) or the responder reset an established connection (RSTR).
+ZEEK_RESPONDER_ANSWERED = frozenset({"S1", "SF", "S2", "S3", "RSTO", "RSTR"})
+# The originator sent the opening SYN or the connection was established. Not RSTRH, SHR or OTH,
+# where Zeek saw no SYN from the (purported) originator, so its direction may be a guess.
+ZEEK_ORIGINATOR_OPENED = frozenset({"S0", "S1", "SF", "REJ", "S2", "S3", "RSTO", "RSTR", "RSTOS0", "SH"})
 
 
 @dataclass(frozen=True)
 class Decision:
     credit_src: int | None = None      # port credited as a listening service on the sender
     credit_dst: int | None = None      # port credited on the receiver (flow records only)
+    create_dst: bool = False           # the receiver answered, so it is an asset (flow records only)
+    dst_initiates: str | None = None   # the receiver opened the exchange (flow records only)
+    dst_contacted: int | None = None   # service port the receiver contacted (flow records only)
     initiates: str | None = None       # confidence that the sender opened the exchange
     contacted: int | None = None       # service port the sender contacted
     sender: str | None = None          # SENDER_CLIENT, SENDER_SERVER, or None when unresolved
@@ -143,3 +157,71 @@ def decide_flow_record(proto, dst_port) -> Decision:
         sender=SENDER_CLIENT,
         basis=BASIS_FLOW,
     )
+
+
+def _flow_reply_by_ports(proto, orig_port, resp_port, basis) -> Decision:
+    """Both sides of a UDP flow sent: the port heuristic decides which side is the service."""
+    orig_service = creditable(orig_port, proto)
+    resp_service = creditable(resp_port, proto)
+    if orig_service and (not resp_service or orig_port < resp_port):
+        return Decision(credit_src=orig_port, create_dst=True, dst_initiates=INITIATES_LOW,
+                        dst_contacted=orig_port, sender=SENDER_SERVER, basis=basis)
+    if resp_service:
+        return Decision(credit_dst=resp_port, create_dst=True, initiates=INITIATES_LOW,
+                        contacted=resp_port, sender=SENDER_CLIENT, basis=basis)
+    return Decision(create_dst=True, basis=basis)
+
+
+def decide_zeek_conn(proto, orig_port, resp_port, conn_state) -> Decision:
+    """
+    A Zeek conn.log record, from the originator's side. TCP: the responder's port is credited
+    only when the state shows the responder answered, and the originator is an initiator only
+    when the state shows it opened. UDP: a flow whose both sides sent (SF) is decided by the
+    port heuristic; a one-way flow attributes nothing. Missing, "-" or unknown states attribute
+    nothing.
+    """
+    if proto == "TCP":
+        answered = conn_state in ZEEK_RESPONDER_ANSWERED
+        opened = conn_state in ZEEK_ORIGINATOR_OPENED
+        return Decision(
+            credit_dst=resp_port if answered and creditable(resp_port, proto) else None,
+            create_dst=answered,
+            initiates=INITIATES_MEDIUM if opened else None,
+            contacted=(resp_port or None) if opened else None,
+            sender=SENDER_CLIENT if opened else None,
+            basis=BASIS_ZEEK_STATE,
+        )
+    if proto == "UDP" and conn_state == "SF":
+        return _flow_reply_by_ports(proto, orig_port, resp_port, BASIS_FLOW_PORTS)
+    return Decision(create_dst=conn_state == "SF", basis=BASIS_NOT_ATTRIBUTED)
+
+
+def decide_suricata_flow(proto, src_port, dst_port, pkts_toclient, server_tcp_flags=None) -> Decision:
+    """
+    A Suricata `flow` event, oriented from the flow's client. `pkts_toclient` is None when absent
+    or malformed. TCP: the flow source opened; the destination's port is credited only when
+    packets went to the client, unless the server's flags (`server_tcp_flags`, None when
+    unknown) show a RST and no SYN: a rejected attempt, not a service. UDP: only a flow with
+    packets to the client is decided, by the port heuristic.
+    """
+    replied = pkts_toclient is not None and pkts_toclient > 0
+    if proto == "TCP":
+        if (server_tcp_flags is not None and server_tcp_flags & TCP_RST
+                and not server_tcp_flags & TCP_SYN):
+            replied = False
+        return Decision(
+            credit_dst=dst_port if replied and creditable(dst_port, proto) else None,
+            create_dst=replied,
+            initiates=INITIATES_MEDIUM,
+            contacted=dst_port or None,
+            sender=SENDER_CLIENT,
+            basis=BASIS_SURICATA_FLOW,
+        )
+    if proto == "UDP" and replied:
+        return _flow_reply_by_ports(proto, src_port, dst_port, BASIS_FLOW_PORTS)
+    return Decision(create_dst=replied, basis=BASIS_NOT_ATTRIBUTED)
+
+
+def not_attributed() -> Decision:
+    """A record whose addresses show no service or initiation (for example a Suricata alert)."""
+    return Decision(basis=BASIS_NOT_ATTRIBUTED)
