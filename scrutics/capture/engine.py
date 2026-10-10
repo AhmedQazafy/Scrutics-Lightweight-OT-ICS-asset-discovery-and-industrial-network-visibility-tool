@@ -120,7 +120,7 @@ class CaptureEngine:
         from scapy.layers.dns import DNS, DNSQR
         from scapy.packet import Raw
 
-        src_mac = src_ip = dst_ip = src_port = dst_port = proto = None
+        src_mac = src_ip = dst_ip = src_port = dst_port = proto = tcp_flags = None
         now_ts = float(getattr(pkt, "time", time.time()))
         ttl = None
         if not _usable_timestamp(now_ts):
@@ -135,9 +135,11 @@ class CaptureEngine:
             dst_ip = pkt[IP].dst
             ttl = pkt[IP].ttl
 
-        if TCP in pkt:
-            src_port = pkt[TCP].sport
-            dst_port = pkt[TCP].dport
+        tcp = pkt.getlayer(TCP)
+        if tcp is not None:
+            src_port = tcp.sport
+            dst_port = tcp.dport
+            tcp_flags = int(tcp.flags)
             proto = "TCP"
         elif UDP in pkt:
             src_port = pkt[UDP].sport
@@ -170,7 +172,6 @@ class CaptureEngine:
         modbus_payload = None
         if proto == "TCP" and (src_port == 502 or dst_port == 502) and Raw in pkt:
             modbus_payload = pkt[Raw].load
-        tcp_flags = int(pkt[TCP].flags) if proto == "TCP" else None
 
         self._process_flow_data(src_ip=src_ip, src_mac=src_mac,
                                 dst_ip=dst_ip, src_port=src_port,

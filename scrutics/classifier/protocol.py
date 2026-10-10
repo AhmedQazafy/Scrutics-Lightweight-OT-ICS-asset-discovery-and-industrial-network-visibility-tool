@@ -78,35 +78,54 @@ def known_service_ports() -> set[int]:
     return ports
 
 
+# (port, transport) pairs that can be a listening service, built from the signature table and
+# the rule lists it was computed for. The rule lists are only ever replaced, never edited in
+# place (reload_rules assigns new lists), so holding them and comparing by identity detects every
+# change; holding them also keeps their ids from being reused by a replacement list.
+_CREDITABLE = {"user": None, "builtin": None, "pairs": frozenset()}
+
+
+def _creditable_pairs() -> frozenset:
+    from scrutics.classifier.signatures import ALL_SIGNATURES
+
+    with _RULE_LOCK:
+        user, builtin = _USER_RULES, _BUILTIN_RULES
+        if _CREDITABLE["user"] is user and _CREDITABLE["builtin"] is builtin:
+            return _CREDITABLE["pairs"]
+        pairs = set()
+        for sig in ALL_SIGNATURES:
+            if sig.transport in ("Both", "TCP/UDP"):
+                pairs.update({(sig.port, "TCP"), (sig.port, "UDP")})
+            else:
+                pairs.add((sig.port, sig.transport))
+        signature_ports = {sig.port for sig in ALL_SIGNATURES}
+        for rule in list(user) + list(builtin):
+            port = rule.get("port")
+            if not isinstance(port, int):
+                continue
+            if "protocol" in rule:
+                pairs.add((port, str(rule["protocol"]).upper()))
+            elif port not in signature_ports:
+                pairs.update({(port, "TCP"), (port, "UDP")})
+        _CREDITABLE.update(user=user, builtin=builtin, pairs=frozenset(pairs))
+        return _CREDITABLE["pairs"]
+
+
 def port_matches_transport(port, proto) -> bool:
     """Whether `port` can be a listening service on transport `proto` ("TCP" or "UDP").
 
     A port signature matches its own transport only ("TCP/UDP" matches both). A rule port
     matches the rule's protocol when the rule names one; without one it takes the transport
     of the port's signature, and matches both transports only when no signature exists for
-    the port.
+    the port. The answer follows the rule lists as they are now: a reload or a replaced list
+    is seen by the next call.
     """
-    from scrutics.classifier.signatures import get_listener_ports, get_signature
-
     if not port or not proto:
         return False
     proto = str(proto).upper()
     if proto not in ("TCP", "UDP"):
         return False
-    if get_signature(port, proto) is not None:
-        return True
-    with _RULE_LOCK:
-        rules = list(_USER_RULES) + list(_BUILTIN_RULES)
-    has_signature = port in get_listener_ports()
-    for rule in rules:
-        if rule.get("port") != port:
-            continue
-        if "protocol" in rule:
-            if str(rule["protocol"]).upper() == proto:
-                return True
-        elif not has_signature:
-            return True
-    return False
+    return (port, proto) in _creditable_pairs()
 
 
 _BEHAVIORAL_FIELDS = frozenset({

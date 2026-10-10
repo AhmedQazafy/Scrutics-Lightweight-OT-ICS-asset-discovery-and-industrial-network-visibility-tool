@@ -190,3 +190,48 @@ def test_flow_record_credits_only_on_the_signature_transport(tmp_path, rules):
     assert _responder_ports(engine, "10.0.1.1") == set()
     assert _responder_ports(engine, "10.0.1.2") == {502}
     assert _responder_ports(engine, "10.0.1.3") == set()
+
+
+# ── A rule change is seen by the next packet ─────────────────────────────────
+
+def test_swapping_the_user_rules_changes_creditability_immediately(rules):
+    rules([{"name": "Lab", "port": 9999, "protocol": "UDP", "classify_as": "Lab", "is_ot": True}])
+    assert protocol.port_matches_transport(9999, "UDP") and not protocol.port_matches_transport(9999, "TCP")
+    rules([{"name": "Lab", "port": 9999, "protocol": "TCP", "classify_as": "Lab", "is_ot": True}])
+    assert protocol.port_matches_transport(9999, "TCP") and not protocol.port_matches_transport(9999, "UDP")
+    rules([])
+    assert not protocol.port_matches_transport(9999, "TCP")
+
+
+def test_swapping_the_builtin_rules_changes_creditability_immediately(rules):
+    rules([], [{"name": "Lab", "port": 9998, "classify_as": "Lab", "is_ot": True}])
+    assert protocol.port_matches_transport(9998, "UDP")
+    rules([], [])
+    assert not protocol.port_matches_transport(9998, "UDP")
+
+
+def test_a_rule_swap_between_packets_changes_what_the_next_packet_credits(rules):
+    rules([{"name": "Lab", "port": 9999, "classify_as": "Lab", "is_ot": True}])
+    inv, engine = _engine()
+    engine._process_packet(_udp("02:00:00:00:00:6c", "10.0.0.72", "10.0.0.5", 9999, 50000))
+    assert _ports(inv, "10.0.0.72") == {9999}
+    rules([])
+    engine._process_packet(_udp("02:00:00:00:00:6d", "10.0.0.73", "10.0.0.5", 9999, 50000))
+    assert _ports(inv, "10.0.0.73") == set()
+
+
+def test_reloading_rules_from_the_config_file_changes_creditability(tmp_path, monkeypatch):
+    import scrutics.config.loader as loader
+    path = tmp_path / "scrutics.yaml"
+    monkeypatch.setattr(loader, "_USER_SEARCH_PATHS", [str(path)])
+    try:
+        path.write_text('rules:\n  - name: "Lab"\n    port: 9997\n    protocol: udp\n'
+                        '    classify_as: "Lab"\n    role: "Lab device"\n    is_ot: true\n')
+        protocol.reload_rules()
+        assert protocol.port_matches_transport(9997, "UDP")
+        path.write_text("rules: []\n")
+        protocol.reload_rules()
+        assert not protocol.port_matches_transport(9997, "UDP")
+    finally:
+        monkeypatch.undo()
+        protocol.reload_rules()
