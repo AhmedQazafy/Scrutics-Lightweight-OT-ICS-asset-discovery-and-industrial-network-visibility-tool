@@ -78,6 +78,37 @@ def known_service_ports() -> set[int]:
     return ports
 
 
+def port_matches_transport(port, proto) -> bool:
+    """Whether `port` can be a listening service on transport `proto` ("TCP" or "UDP").
+
+    A port signature matches its own transport only ("TCP/UDP" matches both). A rule port
+    matches the rule's protocol when the rule names one; without one it takes the transport
+    of the port's signature, and matches both transports only when no signature exists for
+    the port.
+    """
+    from scrutics.classifier.signatures import get_listener_ports, get_signature
+
+    if not port or not proto:
+        return False
+    proto = str(proto).upper()
+    if proto not in ("TCP", "UDP"):
+        return False
+    if get_signature(port, proto) is not None:
+        return True
+    with _RULE_LOCK:
+        rules = list(_USER_RULES) + list(_BUILTIN_RULES)
+    has_signature = port in get_listener_ports()
+    for rule in rules:
+        if rule.get("port") != port:
+            continue
+        if "protocol" in rule:
+            if str(rule["protocol"]).upper() == proto:
+                return True
+        elif not has_signature:
+            return True
+    return False
+
+
 _BEHAVIORAL_FIELDS = frozenset({
     "never_initiates", "allowed_peers", "allowed_ports",
     "alert_on_new_port", "max_new_peers_per_hour",

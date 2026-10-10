@@ -63,6 +63,9 @@ def test_engine_records_topology_edge_for_source_service_port():
     engine = CaptureEngine(inventory=inventory)
     engine.no_baseline = True
 
+    # The destination is an asset from its own traffic (no MAC, so keyed by IP); port 40000
+    # has no signature and does not make it one
+    engine._process_flow_data("192.168.1.10", None, None, None, None, ts=0.5)
     engine._process_flow_data(
         src_ip="192.168.1.20",
         src_mac="00:11:22:33:44:55",
@@ -74,6 +77,30 @@ def test_engine_records_topology_edge_for_source_service_port():
     )
 
     edge = engine.topology_edges[("00:11:22:33:44:55", "192.168.1.10")]
+    assert edge["count"] == 1
+    assert "Modbus TCP" in edge["protocols"]
+
+
+def test_engine_labels_edge_from_source_service_port_between_known_assets():
+    inventory = AssetInventory()
+    engine = CaptureEngine(inventory=inventory)
+    engine.no_baseline = True
+
+    engine._process_flow_data(
+        src_ip="192.168.1.10", src_mac="00:11:22:33:44:66",
+        dst_ip=None, dst_port=None, proto=None, ts=0.5,
+    )
+    engine._process_flow_data(
+        src_ip="192.168.1.20",
+        src_mac="00:11:22:33:44:55",
+        dst_ip="192.168.1.10",
+        src_port=502,
+        dst_port=40000,
+        proto="TCP",
+        ts=1.0,
+    )
+
+    edge = engine.topology_edges[("00:11:22:33:44:55", "00:11:22:33:44:66")]
     assert edge["count"] == 1
     assert "Modbus TCP" in edge["protocols"]
 

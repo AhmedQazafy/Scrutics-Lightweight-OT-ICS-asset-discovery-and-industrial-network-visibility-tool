@@ -50,7 +50,7 @@ def test_zeek_ports_in_range_and_unset_are_accepted(tmp_path):
     assert engine.inventory.get("10.0.0.11").contacted_ports == {65535}
     assert engine.inventory.get("10.0.0.12").contacted_ports == set()      # unset
     assert engine.inventory.get("10.0.0.13").contacted_ports == {502}
-    assert engine.inventory.get("10.0.1.1").ports_seen == {65535, 502}
+    assert engine.inventory.get("10.0.1.1").ports_seen == {502}            # 65535 has no signature
 
 
 def _eve(tmp_path, ports):

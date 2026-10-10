@@ -1,15 +1,19 @@
 """
 A listening port means the device offers that service.
 
-Packets whose source and destination ports are equal credit no listener unless the
-port's signature votes OT or IT; then both endpoints are credited. The DHCP client
-port 68 is never credited.
+A port is credited only on its signature's transport ("TCP/UDP" signatures on both). A rule
+port takes the rule's protocol, or without one the transport of the port's signature, or both
+transports when the port has no signature. Packets whose source and destination ports are
+equal credit no listener unless the port's signature votes OT or IT; then both endpoints are
+credited. The DHCP client port 68 is never credited.
 """
 
+import pytest
 from scapy.layers.l2 import Ether
-from scapy.layers.inet import IP, UDP
+from scapy.layers.inet import IP, TCP, UDP
 from scapy.packet import Raw
 
+import scrutics.classifier.protocol as protocol
 from scrutics.db.inventory import AssetInventory
 from scrutics.capture.engine import CaptureEngine
 
@@ -71,3 +75,118 @@ def test_mdns_symmetric_announcement_credits_no_listener():
     inv, engine = _engine()
     engine._process_packet(_udp("02:00:00:00:00:54", "10.0.0.54", "224.0.0.251", 5353, 5353, b"\x00" * 12))
     assert _ports(inv, "10.0.0.54") == set()
+
+
+def _tcp(src_mac, src_ip, dst_ip, sport, dport, flags="PA", payload=b"\x00" * 8):
+    return (
+        Ether(src=src_mac, dst="02:00:00:00:00:ff")
+        / IP(src=src_ip, dst=dst_ip)
+        / TCP(sport=sport, dport=dport, flags=flags)
+        / Raw(load=payload)
+    )
+
+
+@pytest.fixture
+def rules(monkeypatch):
+    def use(user_rules, builtin_rules=()):
+        monkeypatch.setattr(protocol, "_USER_RULES", list(user_rules))
+        monkeypatch.setattr(protocol, "_BUILTIN_RULES", list(builtin_rules))
+    return use
+
+
+def test_tcp_only_signature_is_not_credited_from_udp(rules):
+    # IEC 60870-5-104 (2404) is TCP only; a Windows client may use 2404 as a UDP source port
+    rules([], protocol.load_builtin_rules())
+    inv, engine = _engine()
+    engine._process_packet(_udp("02:00:00:00:00:60", "10.0.0.60", "10.0.0.53", 2404, 53))
+    engine._process_packet(_udp("02:00:00:00:00:61", "10.0.0.53", "10.0.0.60", 53, 2404))
+    assert _ports(inv, "10.0.0.60") == set()
+    assert _ports(inv, "10.0.0.53") == {53}
+
+
+def test_udp_only_signature_is_not_credited_from_tcp(rules):
+    # BACnet/IP (47808) is UDP only; 47808 is also a Linux ephemeral TCP port
+    rules([], protocol.load_builtin_rules())
+    inv, engine = _engine()
+    engine._process_packet(_tcp("02:00:00:00:00:62", "10.0.0.62", "10.0.0.63", 47808, 443))
+    engine._process_packet(_tcp("02:00:00:00:00:63", "10.0.0.63", "10.0.0.62", 443, 47808))
+    assert _ports(inv, "10.0.0.62") == set()
+    assert _ports(inv, "10.0.0.63") == {443}
+
+
+def test_dual_transport_signature_is_credited_on_both_transports(rules):
+    rules([])
+    inv, engine = _engine()
+    engine._process_packet(_tcp("02:00:00:00:00:64", "10.0.0.64", "10.0.0.5", 44818, 50000, flags="SA"))
+    engine._process_packet(_udp("02:00:00:00:00:65", "10.0.0.65", "10.0.0.5", 44818, 50001))
+    assert _ports(inv, "10.0.0.64") == {44818}
+    assert _ports(inv, "10.0.0.65") == {44818}
+
+
+def test_rule_port_without_protocol_takes_the_signature_transport(rules):
+    rules([{"name": "IEC 104", "port": 2404, "classify_as": "IEC 104", "is_ot": True}])
+    inv, engine = _engine()
+    engine._process_packet(_udp("02:00:00:00:00:66", "10.0.0.66", "10.0.0.5", 2404, 50000))
+    engine._process_packet(_tcp("02:00:00:00:00:67", "10.0.0.67", "10.0.0.5", 2404, 50000, flags="SA"))
+    assert _ports(inv, "10.0.0.66") == set()
+    assert _ports(inv, "10.0.0.67") == {2404}
+
+
+def test_rule_port_protocol_overrides_the_signature_transport(rules):
+    rules([{"name": "IEC 104 over UDP", "port": 2404, "protocol": "UDP",
+            "classify_as": "IEC 104", "is_ot": True}])
+    inv, engine = _engine()
+    engine._process_packet(_udp("02:00:00:00:00:68", "10.0.0.68", "10.0.0.5", 2404, 50000))
+    assert _ports(inv, "10.0.0.68") == {2404}
+
+
+def test_rule_port_without_signature_or_protocol_is_credited_on_both_transports(rules):
+    rules([{"name": "Lab service", "port": 9999, "classify_as": "Lab", "is_ot": True}])
+    inv, engine = _engine()
+    engine._process_packet(_tcp("02:00:00:00:00:69", "10.0.0.69", "10.0.0.5", 9999, 50000, flags="SA"))
+    engine._process_packet(_udp("02:00:00:00:00:6a", "10.0.0.70", "10.0.0.5", 9999, 50001))
+    assert _ports(inv, "10.0.0.69") == {9999}
+    assert _ports(inv, "10.0.0.70") == {9999}
+
+
+def test_rule_port_with_protocol_is_not_credited_on_the_other_transport(rules):
+    rules([{"name": "Lab service", "port": 9999, "protocol": "TCP", "classify_as": "Lab", "is_ot": True}])
+    inv, engine = _engine()
+    engine._process_packet(_udp("02:00:00:00:00:6b", "10.0.0.71", "10.0.0.5", 9999, 50000))
+    assert _ports(inv, "10.0.0.71") == set()
+
+
+ZEEK_CONN_HEADER = ("#separator \\x09\n#path\tconn\n"
+                    "#fields\tts\tuid\tid.orig_h\tid.orig_p\tid.resp_h\tid.resp_p\tproto\tconn_state\n")
+
+
+def _zeek_conn(tmp_path, lines):
+    path = tmp_path / "conn.log"
+    path.write_text(ZEEK_CONN_HEADER + "".join(lines), encoding="utf-8")
+    engine = CaptureEngine(inventory=AssetInventory())
+    engine.no_baseline = True
+    engine.start_file(str(path))
+    return engine
+
+
+def _responder_ports(engine, ip):
+    asset = engine.inventory.get(ip)
+    return set(asset.ports_seen) if asset else set()
+
+
+def test_flow_record_port_without_signature_is_not_credited(tmp_path, rules):
+    rules([])
+    engine = _zeek_conn(tmp_path, ["1700000000.0\tC1\t10.0.0.10\t40000\t10.0.1.1\t65000\ttcp\tSF\n"])
+    assert _responder_ports(engine, "10.0.1.1") == set()
+
+
+def test_flow_record_credits_only_on_the_signature_transport(tmp_path, rules):
+    rules([])
+    engine = _zeek_conn(tmp_path, [
+        "1700000000.0\tC1\t10.0.0.10\t40000\t10.0.1.1\t502\tudp\tSF\n",
+        "1700000001.0\tC2\t10.0.0.11\t40001\t10.0.1.2\t502\ttcp\tSF\n",
+        "1700000002.0\tC3\t10.0.0.12\t0\t10.0.1.3\t502\ticmp\tOTH\n",
+    ])
+    assert _responder_ports(engine, "10.0.1.1") == set()
+    assert _responder_ports(engine, "10.0.1.2") == {502}
+    assert _responder_ports(engine, "10.0.1.3") == set()

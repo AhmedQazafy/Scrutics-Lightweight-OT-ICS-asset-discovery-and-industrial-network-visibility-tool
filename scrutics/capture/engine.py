@@ -14,7 +14,9 @@ from scrutics.capture.ingest_stats import IngestStats
 from scrutics.capture.cooldown import Cooldowns
 from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
-from scrutics.classifier.protocol import classify_by_ports, classification_evidence_from_ports
+from scrutics.classifier.protocol import (
+    classify_by_ports, classification_evidence_from_ports, port_matches_transport,
+)
 from scrutics.classifier.asset_classifier import classify_asset, RULE_SENDS_VALIDATED_OT_REQUESTS
 from scrutics.classifier.signatures import (
     get_signature, get_all_service_ports, get_ot_ports,
@@ -795,12 +797,13 @@ class CaptureEngine:
         """
         Whether a packet shows that `port` is a service offered by its endpoint.
 
-        The DHCP client port 68 is never a service (RFC 2131 section 4.1). When the
-        source and destination ports are equal, either peer could be the server, so
-        the port is credited only if its signature votes OT or IT; then both
-        endpoints are credited.
+        The port must be a service on the packet's transport: a TCP-only signature is
+        never credited from a UDP packet, nor the reverse. The DHCP client port 68 is
+        never a service (RFC 2131 section 4.1). When the source and destination ports
+        are equal, either peer could be the server, so the port is credited only if its
+        signature votes OT or IT; then both endpoints are credited.
         """
-        if port == 68:
+        if port == 68 or not port_matches_transport(port, proto):
             return False
         if src_port == dst_port:
             sig = get_signature(port, proto)
