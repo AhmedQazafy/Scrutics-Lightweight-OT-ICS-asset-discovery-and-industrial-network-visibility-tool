@@ -511,24 +511,59 @@ class Asset:
             cooldowns = self._constraint_cooldowns = Cooldowns(self._constraint_anomaly_ts)
         return cooldowns.allow(key, timestamp, cooldown)
 
-    def record_protocol_observation(self, protocol: str, *, sends_request: bool,
+    def record_protocol_observation(self, protocol: str, *, sends_request: bool | None,
                                     function_code: int, exception_name: str | None = None):
         """
         Accumulate one validated protocol observation into the per-protocol summary.
+        `sends_request` is None when the packet's direction is unresolved: the observation is
+        counted without marking the asset as a requester or a server.
         Does not add evidence and does not change classification or confidence.
         """
         summary = self.protocol_summaries.get(protocol)
         if summary is None:
             summary = ProtocolObservationSummary()
             self.protocol_summaries[protocol] = summary
-        if sends_request:
+        if sends_request is True:
             summary.sends_requests = True
-        else:
+        elif sends_request is False:
             summary.answers_as_server = True
         summary.function_codes[function_code] = summary.function_codes.get(function_code, 0) + 1
         if exception_name is not None:
             summary.exceptions[exception_name] = summary.exceptions.get(exception_name, 0) + 1
         summary.observation_count += 1
+
+    def record_initiation(self, confidence: str, dst_ip: str):
+        """
+        Record evidence that this asset opens exchanges: one record per asset, raised from
+        LOW (port heuristic) to MEDIUM (TCP SYN or a validated request), never lowered.
+        """
+        self.initiates = True
+        if self.has_evidence_from("behavior", "initiates_connections", "traffic"):
+            if confidence != "MEDIUM":
+                return
+            for ev in self.evidence:
+                if (ev.type, ev.value, ev.source) == ("behavior", "initiates_connections", "traffic"):
+                    if ev.confidence == "LOW":
+                        ev.confidence = "MEDIUM"
+                        ev.detail = f"Initiates connections to {dst_ip}"
+                    return
+            return
+        self.add_evidence(
+            evidence_type="behavior",
+            value="initiates_connections",
+            weight=5,
+            source="traffic",
+            confidence=confidence,
+            detail=(f"Initiates connections to {dst_ip}" if confidence == "MEDIUM"
+                    else f"Initiates connections to {dst_ip} (port heuristic)"),
+        )
+
+    def initiation_confidence(self) -> str | None:
+        """Confidence of this asset's initiation evidence, or None when it has none."""
+        for ev in self.evidence:
+            if (ev.type, ev.value, ev.source) == ("behavior", "initiates_connections", "traffic"):
+                return ev.confidence
+        return None
 
     def add_os_hint(self, hint: str, confidence: str = "LOW"):
         """Add a tentative OS hint, deduplicated by value."""
@@ -718,11 +753,13 @@ class AssetInventory:
         dst_ip: str = None,
         dst_port: int = None,
         timestamp: float | None = None,
+        initiates: str | None = None,
     ) -> Optional[Asset]:
         """
         Update inventory from observed traffic flow.
-        Resolves asset identity via get_or_create(), tracks packet count, peer IPs,
-        and contacted ports.
+        Resolves asset identity via get_or_create(), tracks packet count and peer IPs.
+        `dst_port` is recorded as a contacted port; `initiates` is the confidence ("LOW" or
+        "MEDIUM") of evidence that this asset opened the exchange with `dst_ip`, or None.
         """
         if not self.is_asset_ip(ip):
             return None
@@ -736,15 +773,8 @@ class AssetInventory:
         # Track peers and initiates
         if self.is_asset_ip(dst_ip):
             asset.add_peer(dst_ip)
-            asset.initiates = True
-            asset.add_evidence(
-                evidence_type="behavior",
-                value="initiates_connections",
-                weight=5,
-                source="traffic",
-                confidence="MEDIUM",
-                detail=f"Initiates connections to {dst_ip}"
-            )
+            if initiates:
+                asset.record_initiation(initiates, dst_ip)
 
         # Track contacted ports
         if dst_port:

@@ -14,14 +14,17 @@ from scrutics.capture.ingest_stats import IngestStats
 from scrutics.capture.cooldown import Cooldowns
 from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
-from scrutics.classifier.protocol import (
-    classify_by_ports, classification_evidence_from_ports, port_matches_transport,
-)
+from scrutics.classifier.protocol import classify_by_ports, classification_evidence_from_ports
 from scrutics.classifier.asset_classifier import classify_asset, RULE_SENDS_VALIDATED_OT_REQUESTS
+from scrutics.capture.direction import decide_flow_record, decide_packet
 from scrutics.classifier.signatures import (
     get_signature, get_all_service_ports, get_ot_ports,
     get_it_ports, get_infrastructure_ports, get_discovery_ports
 )
+
+
+# Default for _process_modbus_payload: use the direction the parser derived from port 502
+_PARSER_DIRECTION = object()
 
 
 def _usable_timestamp(ts) -> bool:
@@ -160,11 +163,13 @@ class CaptureEngine:
         modbus_payload = None
         if proto == "TCP" and (src_port == 502 or dst_port == 502) and Raw in pkt:
             modbus_payload = pkt[Raw].load
+        tcp_flags = int(pkt[TCP].flags) if proto == "TCP" else None
 
         self._process_flow_data(src_ip=src_ip, src_mac=src_mac,
                                 dst_ip=dst_ip, src_port=src_port,
                                 dst_port=dst_port, proto=proto, ts=now_ts,
-                                trust_dst_port=False, modbus_payload=modbus_payload)
+                                trust_dst_port=False, modbus_payload=modbus_payload,
+                                tcp_flags=tcp_flags)
 
     def _process_ttl(self, ip: str, ttl: int, ts: float):
         """Extract TTL as OS hint evidence."""
@@ -468,7 +473,8 @@ class CaptureEngine:
             enrichment = self._pending_dhcp.pop(norm)
             self._apply_dhcp_enrichment(asset, enrichment)
 
-    def _process_modbus_payload(self, payload_bytes: bytes, src_ip: str, src_port: int, dst_port: int, ts: float):
+    def _process_modbus_payload(self, payload_bytes: bytes, src_ip: str, src_port: int, dst_port: int, ts: float,
+                                observations=None, direction=_PARSER_DIRECTION):
         """
         Parse Modbus TCP payload and add validated protocol evidence.
         
@@ -482,6 +488,9 @@ class CaptureEngine:
             src_port: TCP source port
             dst_port: TCP destination port
             ts: Packet timestamp
+            observations: the payload already parsed, or None to parse it here
+            direction: the packet's decided direction ("to_server", "from_server", or None when
+                unresolved); by default the parser's own direction, which comes from port 502
         """
         from scrutics.parsers.modbus import parse_modbus_payload, get_exception_name
         
@@ -490,11 +499,13 @@ class CaptureEngine:
         if not asset:
             return
         
-        # Parse the payload
-        observations = parse_modbus_payload(payload_bytes, src_port, dst_port)
+        # Parse the payload, unless the caller already did
+        if observations is None:
+            observations = parse_modbus_payload(payload_bytes, src_port, dst_port)
         
         # Add evidence for each validated observation
         for obs in observations:
+            obs_direction = obs.direction if direction is _PARSER_DIRECTION else direction
             # Build detailed description
             func_name = self._get_modbus_function_name(obs.function_code)
             exception_name = get_exception_name(obs.exception_code) if obs.is_exception else None
@@ -506,15 +517,15 @@ class CaptureEngine:
             # Every valid observation updates the per-protocol summary
             asset.record_protocol_observation(
                 "Modbus TCP",
-                sends_request=(obs.direction == "to_server"),
+                sends_request=None if obs_direction is None else (obs_direction == "to_server"),
                 function_code=obs.function_code,
                 exception_name=summary_exception_name,
             )
             
             if obs.is_exception:
-                detail = f"Modbus TCP Exception: {func_name}, ExceptionCode=0x{obs.exception_code:02X} ({exception_name}), TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs.direction}"
+                detail = f"Modbus TCP Exception: {func_name}, ExceptionCode=0x{obs.exception_code:02X} ({exception_name}), TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs_direction or 'unresolved'}"
             else:
-                detail = f"Modbus TCP: {func_name}, TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs.direction}"
+                detail = f"Modbus TCP: {func_name}, TransID=0x{obs.transaction_id:04X}, UnitID=0x{obs.unit_id:02X}, direction={obs_direction or 'unresolved'}"
                 
                 # Add address/quantity for function codes 03 and 04
                 if obs.starting_address is not None and obs.quantity is not None:
@@ -565,8 +576,16 @@ class CaptureEngine:
         return func_names.get(func_code, f"Function 0x{func_code:02X}")
 
     def _process_flow_data(self, src_ip, src_mac, dst_ip, dst_port, proto, ts,
-                           src_port=None, alert=None, trust_dst_port=True,
-                           modbus_payload=None):
+                           src_port=None, alert=None, trust_dst_port=False,
+                           modbus_payload=None, tcp_flags=None):
+        """
+        Process one packet, or one log record when `trust_dst_port` is set (the record's
+        destination is the responder whose service port the originator contacted).
+
+        A packet credits at most its sender's port; which side is the service is decided from
+        the packet's own evidence (scrutics.capture.direction). `tcp_flags` is the TCP flags
+        byte when known.
+        """
         if not self.inventory.is_asset_ip(src_ip):
             return
         if not self.inventory.is_asset_ip(dst_ip):
@@ -624,13 +643,31 @@ class CaptureEngine:
 
             self._mac_to_ip[norm_mac] = src_ip
 
+        # Which side offers the service, from the packet's own evidence
+        modbus_observations = []
+        if modbus_payload is not None:
+            from scrutics.parsers.modbus import parse_modbus_payload
+            modbus_observations = parse_modbus_payload(modbus_payload, src_port, dst_port)
+        if trust_dst_port:
+            decision = decide_flow_record(proto, dst_port)
+        else:
+            decision = decide_packet(proto, src_port, dst_port, tcp_flags, modbus_observations)
+        if decision.conflict:
+            self.ingest_stats.warn(
+                "direction evidence conflicts (Modbus exception response in a TCP SYN or RST)",
+                *self._current_item)
+
         # Resolve asset identity via AssetInventory.get_or_create (called by inventory.update)
-        asset = self.inventory.update(ip=src_ip, mac=src_mac, dst_ip=dst_ip, dst_port=dst_port, timestamp=ts)
+        asset = self.inventory.update(ip=src_ip, mac=src_mac, dst_ip=dst_ip,
+                                      dst_port=decision.contacted, timestamp=ts,
+                                      initiates=decision.initiates)
         if asset:
             self._check_pending_dhcp(asset)
         # Runs after asset resolution so the first packet from a new device keeps its observation
         if asset and modbus_payload is not None:
-            self._process_modbus_payload(modbus_payload, src_ip, src_port, dst_port, ts)
+            self._process_modbus_payload(modbus_payload, src_ip, src_port, dst_port, ts,
+                                         observations=modbus_observations,
+                                         direction=decision.sender_direction)
         service_ports = known_service_ports()
 
         # Add evidence for each port matched against the signature database
@@ -651,12 +688,11 @@ class CaptureEngine:
                         if sig.category == "OT":
                             self._log(f"{src_ip} -> OT port: {port} ({sig.name})", "cyan")
 
-        if src_port in service_ports and self._credits_listener(src_port, src_port, dst_port, proto):
-            self.inventory.credit_listener_port(src_ip, src_port, timestamp=ts)
+        if decision.credit_src:
+            self.inventory.credit_listener_port(src_ip, decision.credit_src, timestamp=ts)
 
-        if (dst_ip and dst_port and (trust_dst_port or dst_port in service_ports)
-                and self._credits_listener(dst_port, src_port, dst_port, proto)):
-            self.inventory.credit_listener_port(dst_ip, dst_port, timestamp=ts)
+        if dst_ip and decision.credit_dst:
+            self.inventory.credit_listener_port(dst_ip, decision.credit_dst, timestamp=ts)
             dst_asset = self.inventory.get(dst_ip)
             if dst_asset and dst_asset.ports_seen:
                 self._classify_and_score(dst_asset)
@@ -793,23 +829,6 @@ class CaptureEngine:
         if self.progress_callback:
             self.progress_callback(self._packet_count)
 
-    def _credits_listener(self, port, src_port, dst_port, proto):
-        """
-        Whether a packet shows that `port` is a service offered by its endpoint.
-
-        The port must be a service on the packet's transport: a TCP-only signature is
-        never credited from a UDP packet, nor the reverse. The DHCP client port 68 is
-        never a service (RFC 2131 section 4.1). When the source and destination ports
-        are equal, either peer could be the server, so the port is credited only if its
-        signature votes OT or IT; then both endpoints are credited.
-        """
-        if port == 68 or not port_matches_transport(port, proto):
-            return False
-        if src_port == dst_port:
-            sig = get_signature(port, proto)
-            return sig is not None and sig.category in ("OT", "IT")
-        return True
-
     def _classify_and_score(self, asset):
         from scrutics.classifier.protocol import classify_by_ports
 
@@ -940,8 +959,11 @@ class CaptureEngine:
         # never_initiates: device should only respond, never initiate
         if c.get("never_initiates") and asset.initiates:
             if _allowed("NEVER_INITIATES"):
+                basis = ""
+                if asset.initiation_confidence() == "LOW":
+                    basis = " (initiation evidence: LOW confidence, port heuristic)"
                 _emit("NEVER_INITIATES",
-                      f"device initiated connection to {dst_ip}:{dst_port}")
+                      f"device initiated connection to {dst_ip}:{dst_port}{basis}")
 
         # allowed_peers: device may only communicate with listed IPs
         allowed_peers = c.get("allowed_peers", [])
@@ -1097,7 +1119,7 @@ class CaptureEngine:
             src_ip=flow.get("src_ip"), src_mac=flow.get("src_mac"),
             dst_ip=flow.get("dst_ip"), dst_port=flow.get("dst_port"),
             proto=flow.get("proto", "TCP"), ts=ts,
-            alert=flow.get("alert"),
+            alert=flow.get("alert"), trust_dst_port=True,
         )
 
     def _apply_constraints_from_contacted_ports(self, asset):

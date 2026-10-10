@@ -74,6 +74,8 @@ class IngestStats:
         self.rejected_by_reason: dict = {}
         self.contained: dict = {}          # (exception type, site) -> ContainedError
         self.contained_overflow = 0        # occurrences of kinds beyond CONTAINED_KEY_LIMIT
+        self.warned_total = 0
+        self.warned_by_reason: dict = {}   # items processed, with a field that was not used
 
     @property
     def contained_total(self) -> int:
@@ -87,6 +89,16 @@ class IngestStats:
         if first:
             self._emit(f"Rejected input at {_item_label(path, item)}: {reason}; "
                        "further rejections of this kind are counted")
+
+    def warn(self, reason: str, path: str, item: int) -> None:
+        """Record an item that was processed but whose `reason` field or evidence was not used.
+        One event log entry per new reason."""
+        self.warned_total += 1
+        first = reason not in self.warned_by_reason
+        self.warned_by_reason[reason] = self.warned_by_reason.get(reason, 0) + 1
+        if first:
+            self._emit(f"Field warning at {_item_label(path, item)}: {reason}; "
+                       "further warnings of this kind are counted")
 
     def contain(self, exc: Exception, path: str, item: int) -> None:
         """Record a caught unexpected exception. One event log entry per new kind."""
@@ -108,7 +120,7 @@ class IngestStats:
                    "occurrences are counted")
 
     def has_issues(self) -> bool:
-        return bool(self.rejected_total or self.contained_total)
+        return bool(self.rejected_total or self.contained_total or self.warned_total)
 
     def summary_line(self, max_kinds: int = 3) -> str:
         """One plain-text line with both counts, for the CLI and TUI run summaries."""
@@ -124,6 +136,9 @@ class IngestStats:
             more = len(self.contained) - max_kinds
             contained += f" ({shown}{f'; {more} more kinds' if more > 0 else ''})"
         parts.append(contained)
+        if self.warned_by_reason:
+            reasons = ", ".join(f"{r}: {n}" for r, n in sorted(self.warned_by_reason.items()))
+            parts.append(f"{self.warned_total} field warnings ({reasons})")
         return " | ".join(parts)
 
     def _emit(self, message: str) -> None:

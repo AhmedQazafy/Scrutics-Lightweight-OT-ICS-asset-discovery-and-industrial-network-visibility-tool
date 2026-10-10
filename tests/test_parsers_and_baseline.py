@@ -254,7 +254,8 @@ class TestBaselineEngine:
             / TCP(sport=40000, dport=502)
         )
         engine._process_packet(pkt)
-        assert 502 in inventory.get("192.168.1.20").ports_seen
+        # A packet never credits its receiver; 192.168.1.20 sent nothing, so it is not an asset
+        assert inventory.get("192.168.1.20") is None
 
     def test_raw_packet_credits_known_source_port_as_listener(self):
         inventory = AssetInventory()
@@ -262,7 +263,7 @@ class TestBaselineEngine:
         pkt = (
             Ether(src="66:77:88:99:aa:bb", dst="00:11:22:33:44:55")
             / IP(src="192.168.1.20", dst="192.168.1.10")
-            / TCP(sport=502, dport=40000)
+            / TCP(sport=502, dport=40000, flags="SA")
         )
         engine._process_packet(pkt)
         assert 502 in inventory.get("192.168.1.20").ports_seen

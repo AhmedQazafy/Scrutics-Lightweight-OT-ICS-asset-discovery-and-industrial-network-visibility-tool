@@ -101,7 +101,7 @@ def test_arp_with_non_ipv4_address_is_not_an_asset(path, tmp_path, monkeypatch):
     engine = _run_packets(path, [_good(GOOD_A, 1), _frame(ARP_NON_IPV4_FRAME), _good(GOOD_B, 2)],
                           tmp_path, monkeypatch)
     _assert_clean(engine)
-    assert engine.inventory.count() == 3   # the two senders and their common destination
+    assert engine.inventory.count() == 2   # the two senders; their destination sent nothing
 
 
 def test_non_string_addresses_are_not_inventory_ips():

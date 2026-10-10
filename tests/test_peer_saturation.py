@@ -124,6 +124,8 @@ def test_saturated_asset_does_not_report_unretained_peers_but_topology_keeps_the
     _send(engine, _peer(MAX_PEERS - 1), 101)
     assert _new_peer_sets(engine) == []
     late = "10.8.0.1"
+    # The late peer is an asset from its own traffic (no MAC); a packet never creates its receiver
+    engine._process_flow_data(late, None, None, None, None, ts=T0 + 101.5)
     for k in range(3):
         _send(engine, late, 102 + k)
     asset = engine.inventory.get(SRC)

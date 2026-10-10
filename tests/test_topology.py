@@ -10,6 +10,9 @@ def test_engine_records_topology_edge_for_destination_service_port():
     engine = CaptureEngine(inventory=inventory)
     engine.no_baseline = True
 
+    # The destination is an asset from its own traffic (no MAC, so keyed by IP); a packet
+    # never credits or creates its receiver
+    engine._process_flow_data("192.168.1.20", None, None, None, None, ts=0.5)
     engine._process_flow_data(
         src_ip="192.168.1.10",
         src_mac="00:11:22:33:44:55",
