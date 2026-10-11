@@ -78,30 +78,26 @@ def _isolate_oui_meta(tmp_path, monkeypatch):
 # Curated OUI Metadata Tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
+@pytest.fixture
+def user_family_hint(tmp_path, monkeypatch):
+    """A user curated_oui.yaml with family hints for 00:1B:1B and 00:80:F4 (the bundled file has none)."""
+    import scrutics.classifier.oui as oui
+    user_file = tmp_path / "user_curated_oui.yaml"
+    user_file.write_text('"001B1B":\n  device_family_hint: "SIMATIC S7 / SCALANCE"\n'
+                         '"0080F4":\n  device_family_hint: "Modicon / Quantum PLC"\n', encoding="utf-8")
+    monkeypatch.setattr(oui, "CURATED_OUI_USER_PATH", str(user_file))
+    monkeypatch.setattr(oui, "_CURATED_OUI_CACHE", None)
+
+
 class TestCuratedOUIMetadata:
 
-    def test_bundled_curated_metadata_loaded(self):
-        """Bundled curated_oui.yaml is parsed and provides OT device family hints."""
+    def test_bundled_curated_metadata_loaded(self, tmp_path, monkeypatch):
+        """Bundled curated_oui.yaml parses; it lists no hints, since none has a cited source."""
+        monkeypatch.setattr("scrutics.classifier.oui.CURATED_OUI_USER_PATH", str(tmp_path / "absent.yaml"))
         meta = load_curated_oui_metadata(force_reload=True)
-        assert isinstance(meta, dict)
-        assert len(meta) >= 25
+        assert meta == {}
 
-        # Siemens S7 / SCALANCE
-        assert "001B1B" in meta
-        assert "SIMATIC S7" in meta["001B1B"]["device_family_hint"]
-
-        # Schneider Modicon / Quantum
-        assert "0080F4" in meta
-        assert "Modicon" in meta["0080F4"]["device_family_hint"]
-
-        # Rockwell ControlLogix
-        assert "0000BC" in meta
-        assert "ControlLogix" in meta["0000BC"]["device_family_hint"]
-
-        # Moxa NPort / EDS
-        assert "000E8C" in meta
-        assert "Moxa" in meta["000E8C"]["device_family_hint"]
-
+    @pytest.mark.usefixtures("user_family_hint")
     def test_lookup_oui_metadata_mac_formats(self):
         """Lookup accepts colon, hyphen, dotted, unseparated, and lowercase MACs."""
         # 00:1B:1B is Siemens
@@ -142,6 +138,14 @@ class TestCuratedOUIMetadata:
 
     def test_user_local_curated_override(self, tmp_path, monkeypatch):
         """User-local curated_oui.yaml overrides bundled entry for matching prefix."""
+        # A bundled file with two entries, in tmp_path; the real curated_oui.yaml is never written
+        bundled_curated = tmp_path / "bundled_curated_oui.yaml"
+        bundled_curated.write_text(
+            '"001B1B":\n  device_family_hint: "Bundled Siemens hint"\n'
+            '"0080F4":\n  device_family_hint: "Modicon / Quantum PLC"\n',
+            encoding="utf-8"
+        )
+        monkeypatch.setattr("scrutics.classifier.oui.CURATED_OUI_BUNDLED_PATH", str(bundled_curated))
         user_curated = tmp_path / "curated_oui.yaml"
         user_curated.write_text(
             '001B1B:\n  device_family_hint: "Custom User Siemens PLC"\n',
@@ -166,6 +170,7 @@ class TestCuratedOUIMetadata:
         assert lookup_oui_metadata(None) is None
         assert lookup_oui_metadata("not-a-mac") is None
 
+    @pytest.mark.usefixtures("user_family_hint")
     def test_engine_enriches_evidence_with_device_family_hint(self):
         """
         When traffic from a known industrial MAC is observed, engine enriches asset evidence
@@ -194,6 +199,7 @@ class TestCuratedOUIMetadata:
         assert ev.weight == 5
         assert ev.confidence == "LOW"
 
+    @pytest.mark.usefixtures("user_family_hint")
     def test_invariant_device_family_hint_does_not_change_classification_type(self):
         """
         INVARIANT: Device family hint is low-confidence supporting evidence.

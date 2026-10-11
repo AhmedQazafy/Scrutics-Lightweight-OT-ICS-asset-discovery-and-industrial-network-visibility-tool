@@ -219,7 +219,7 @@ def test_ot_vendor_oui_alone_does_not_classify():
     inv, _ = run([tcp(mac, ip, "10.0.0.99", 49152, 49153, flags="S")])
     assert decision(inv.get(ip)) == (
         "Unknown", "LOW", "no_classifying_evidence", [],
-        "no services or protocol observations; vendor: Schneider Electric",
+        "no services or protocol observations; vendor: TELEMECANIQUE ELECTRIQUE",
     )
 
 

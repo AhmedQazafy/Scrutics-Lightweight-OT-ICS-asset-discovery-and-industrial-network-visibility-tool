@@ -110,7 +110,7 @@ class TestClassificationSeparation:
         # (src_port 49152 is client ephemeral, not a service port)
         engine._process_flow_data(
             src_ip="10.0.0.10",
-            src_mac="00:80:F4:11:22:33",  # 00-80-F4 is Schneider Electric in ics_oui.txt
+            src_mac="00:80:F4:11:22:33",  # 00-80-F4 is registered to TELEMECANIQUE ELECTRIQUE, a Schneider brand
             dst_ip="10.0.0.99",
             src_port=49152,
             dst_port=49153,
@@ -121,7 +121,7 @@ class TestClassificationSeparation:
 
         asset = inv.get("10.0.0.10")
         assert asset is not None
-        assert "Schneider" in asset.vendor
+        assert asset.vendor == "TELEMECANIQUE ELECTRIQUE"
         assert asset.vendor_class == VENDOR_CLASS_OT
 
         # The vendor is OT, but the asset itself MUST NOT be classified as OT
