@@ -1,0 +1,2150 @@
+# Vendor assignments from the IEEE Registration Authority registry
+# Organisation names from oui.csv, mam.csv, oui36.csv, iab.csv, retrieved 2026-10-10
+# oui.csv SHA-256 d2e8eb02bc98337a44e246b11e1a63467ac37dd51bd6490bbdde0ad3a8f7b559
+# mam.csv SHA-256 f259ca7090319f23ccef7af1f6698aa983e5924b2e5536b297f99e3725c91a1c
+# oui36.csv SHA-256 db7b936eb75cc6695623956dd9b9baebaf422822aeea3c57c2db05b3ff6d9079
+# iab.csv SHA-256 6e71aa3d47f00f19d09cb3b31ce1038de1834703420f0ce4ce111da586f1a533
+# 1843 names containing a vendor key as a substring (raw or normalised) or used as named probes, plus 300 other names sampled with a fixed seed (kept between regenerations); 2143 names, one per line, sorted
+"Intellect module" LLC
+1Verge Internet Technology (Beijing) Co., Ltd.
+3DGence sp. z o.o.
+3M Germany
+A & R Cambridge
+A&A GENERAL SRL
+A+EC Klein Ingenieurbuero
+A-GEAR COMPANY LIMITED
+AB Regin
+ABB
+ABB AB PGHV
+ABB AB, Cewe-Control
+ABB AG
+ABB AS, Division Automation Products
+ABB Australia
+ABB Automation products GmbH
+ABB Bomem, Inc.
+ABB EVI SPA
+ABB Electrification Smart Power (ELSP)
+ABB Genway Xiamen Electrical Equipment CO., LTD
+ABB Global Industries and Services Private Limited
+ABB INDUSTRIAL SYSTEMS AB
+ABB Inc.
+ABB Inc/Totalflow
+ABB LV Installation Materials Co., Ltd. Beijing
+ABB Ltd
+ABB Oy
+ABB Oy / Medium Voltage Products
+ABB Oy Drives
+ABB POWER T&D COMPANY, INC.
+ABB Power Systems Power Generation
+ABB Power Technologies S.p.A.  Unità  Operativa SACE (PTMV)
+ABB Robotics
+ABB S.p.A.
+ABB SPA - DMPC
+ABB SPA, ABB SACE DIV.
+ABB SpA - DIN Rail
+ABB Switzerland Inc
+ABB Switzerland Ltd
+ABB Switzerland Ltd.
+ABB T&D Spa
+ABB Transmission and Distribution Automation Equipment (Xiamen) Co., Ltd.
+ABB Xiamen Low Voltage Equipment Co.,Ltd.
+ABB Xiamen Switchgear Co. Ltd.
+ABB n.v. Power Quality Products
+ABS Gesellschaft f. Automatisierung, Bildverarbeitung und Software mbH
+ACCESS Systems Americas, Inc.
+ACTECH
+ADVANTECH CO., LTD.
+ADVANTECH TECHNOLOGIES CO.,LTD
+AERONAUTICAL & GENERAL INSTRUMENTS LTD.
+AGE A. Gilg Elektronik
+AGECODAGIS SARL
+AGRANAT SYSTEMS
+AK Automation
+AK-NORD EDV VERTRIEBSGES. mbH
+AKKA Germany GmbH
+ALLIANT COMPUTER SYSTEMS CORP.
+AM General Contractor
+AM General LLC
+ANNAX Anzeigesysteme GmbH
+APASS TECHNOLOGY CO., LTD.
+APC by Schneider Electric
+APPLIED INTELLIGENT SYSTEMS, INC.
+APProSoftware.com
+ARCH METER Corporation
+ART Antriebs- und Regeltechnik GmbH
+ARVIDA Intelligent Electronics Technology  Co.,Ltd.
+ASKI Industrie Elektronik Ges.m.b.H.
+AT & T Laboratories - Cambridge Ltd
+ATG Automatisierungstechnik GERA GmbH
+ATON GREEN STORAGE SPA
+AUMOVIO Autonomous Mobility Germany GmbH
+AUMOVIO Germany GmbH
+AUSOUNDS INTELLIGENCE, LLC
+AUTOMATIZACION Y CONECTIVIDAD SA DE CV
+AVECS Bergen GmbH
+AXIS CORPORATION
+Abbas, a.s.
+Abbey Systems Ltd
+Abbott Diagnostics
+Abbott Diagnostics Technologies AS
+Abbott Medical Optics
+Abbott Medical Optics Inc.
+Abbott Point of Care
+Ability Intelligent Corp.
+Abitsoftware, Ltd.
+AccuSpec Electronics, LLC
+Accusonic
+Action Target, Inc.
+Active Storage Inc.
+Adimec Advanced Image Systems
+Advanced Knowledge Associates
+Advanced Modular Computers Ltd.
+Advanced Rugged System Co., LTD
+Advanced Storage Concepts, Inc.
+Advantage Century Telecommunication Corp.
+Advantage Controls
+Advantage Electronics
+Advantage Pharmacy Services, LLC
+Advantage R&D
+Advantage Six Ltd
+Advantech AMT Inc.
+Advantech Czech
+Advantech Technology (CHINA) Co., Ltd.
+Aegex Technologies LLC Magyarországi Fióktelepe
+Aeon Digital International
+AeroConcierge Inc.
+Aerospace new generation communications Co.,Ltd
+Aesir Copenhagen
+Agere Systems
+Agile Sports Technologies, dba Hudl
+Aginode Germany GmbH
+Aigentec Technology(Zhejiang) Co., Ltd.
+AirVine Scientific, Inc.
+Airtex Manufacturing Partnership
+Aldridge Electrical Industries
+Alfing Montagetechnik GmbH
+Alge-Timing GmbH
+Alifax S.r.l.
+Aligera Equipamentos Digitais Ltda
+All-Win Tech Co., Ltd.
+Alpha Bridge Technologies Private Limited
+Alpiq InTec Management AG
+Altenburger Electronic GmbH
+AltiGen Communications Inc.
+American Edge IP
+American Energy Storage Innovations
+Amethystum Storage Technology Co., Ltd
+Amgen U.S.A. Inc.
+Amobile Intelligent Corp.
+Angee Technologies Ltd.
+Angel Electronics Co., Ltd.
+Angel Iglesias S.A.
+Angel Robotics
+Angelbird Technologies GmbH
+Anhui Shengren Electronic Technology Co., Ltd
+AooGee Controls Co., LTD.
+Apogee Applied Research, Inc.
+Apogee Electronics Corp.
+Apogee Imaging Systems
+Apogee Labs, Inc.
+Apollo Intelligent Connectivity (Beijing) Technology Co., Ltd.
+Apple, Inc.
+Applied Media Technologies Corporation
+Aqua Management
+Arbitron Inc.
+Arounds Intelligent Equipment Co., Ltd.
+Atlinks
+Autel lntelligent Technology Corp.,Ltd
+Automat Engenharia de Automação Ltda.
+Avista Edge
+Axema Passagekontroll AB
+Axiowave Networks, Inc.
+Azalea Networks inc
+B&R Industrial Automation GmbH
+B. R. Electronics
+B. Rexroth the identity company GmbH
+B.Braun Melsungen AG
+BADGER METER INC
+BAE Systems Surface Ships Limited
+BASIC MERTON HANDELSGES.M.B.H.
+BEHRINGER Spezielle Studiotechnik GmbH
+BEIJING GEHUA CATV NETWORK CO.,LTD
+BHP LIMITED
+BHS Corrugated Maschinen- und Anlagenbau GmbH
+BIOTAGE
+BIOTAGE GB LTD
+BKM-Micronic Richtfunkanlagen GmbH
+BR. Voss Ingenjörsfirma AB
+BRIDGE COMMUNICATIONS INC.
+BSH Hausgeräte GmbH
+BZBGEAR
+Babbit and Friends, SIA
+Babcock & Wilcox Power Generation Group, Inc
+Baisstar (Shenzhen) Intelligence Co., Ltd.
+Battery Management Technology Corporation
+Baumuller Aulugen-Systemtechnik GmbH
+Bay Storage Technology
+Beckhoff Automation GmbH
+Beijing BitIntelligence Information Technology Co. Ltd.
+Beijing China Electronics Intelligent Acoustics Technology Co.,Ltd
+Beijing Congyun Technology Co.,Ltd
+Beijing Deephi Intelligent Technology Co., Ltd
+Beijing Geedeen Technology Co., Ltd
+Beijing Geekplus Technology Co.,Ltd.
+Beijing Gefei Tech. Co., Ltd
+Beijing Gemotech Intelligent Technology Co., Ltd.
+Beijing General Research Institute of Mining and Metallurgy
+Beijing ICPC CO.,Ltd.
+Beijing JoinHope Image Technology Ltd.
+Beijing Sifang Automation Co., Ltd.
+Beijing Wanwei Intelligent Technology Co., Ltd.
+Belden
+Belden Deutschland GmbH
+Belden Hirschmann industries (Suzhou) Limited
+Belden India Private Limited
+Belden Mooresville
+Belden Singapore Pte. Ltd.
+Benchmark Storage Innovations
+Bergische Ingenieure GmbH
+Beyond Achieve Enterprises Ltd.
+BiTMICRO Networks, Inc.
+Bidgely
+Bigelow Aerospace
+Bihl + Wiedemann GmbH
+Bintel AB
+Bio-Rad Laboratories, Inc.
+BioIntelliSense, Inc.
+Biotage Sweden AB
+Birger Engineering, Inc.
+Bitrage Inc.
+BitsGen Co., Ltd.
+BizLink Special Cables Germany GmbH
+BlackEdge Capital
+Blair Companies
+Bliq B.V.
+BloomSky,Inc.
+Blue Ridge Networks, Inc.
+BlueSword Intelligent Technology Co., Ltd.
+BobjGear LLC
+Bodensee Gravitymeter Geosystem GmbH
+Boeing India Private Limited
+Boge Kompressoren OTTO Boge GmbH & Co. KG
+Bogen Communications
+Braveridge.co.,ltd.
+Bridge Diagnostics, Inc.
+Bridge Information Co., Ltd.
+Bridge Information Systems
+Bridge Technologies Co AS
+BridgeWave Communications
+Bridgeco Co AG
+Bridgeport Instruments, LLC
+Bridgeworks Ltd.
+Brightlights Intellectual Property Ltd
+Broadcast Wireless Systems Ltd
+Bruckner & Jarosch Ingenieurgesellschaft mbH
+Busch-Jaeger Elektro GmbH
+Business-intelligence of Oriental Nations Corporation Ltd.
+BÄR Bahnsicherung AG
+C.T. ELETTRONICA
+CALL IMAGE SA
+CAMBRIDGE CONSULTANTS LTD
+CAMCO Produktions- und Vertriebs-GmbH für  Beschallungs- und Beleuchtungsanlagen
+CAVALRY STORAGE INC
+CCH Technology & intelligence Co., Ltd.
+CDS Institute of Management Strategy, Inc.
+CHARGELIB
+CHROMATEK INC.
+CI Network Corp.
+CJ intelligent technology LTD.
+CML Emergency Services
+COGENT COMPUTER SYSTEMS, INC.
+COGENT DATA TECHNOLOGIES
+COMPUSERVE, INC.
+COMPUTADORES MODULARES SA
+COMPUTER GENERATION INC.
+COMTTI Intelligent Technology(Shenzhen) Co., Ltd.
+CONTEMPORARY CONTROL
+CONVERGENT NETWORKS, INC.
+COPPER MOUNTAIN COMMUNICATIONS, INC.
+CP GEORGES RENAULT
+CTROGERS LLC
+CWT CO., LTD.
+CYBELEC SA
+CYBERTEL BRIDGE
+Cambridge Broadband Networks Group
+Cambridge Consultants Ltd
+Cambridge Executive Limited
+Cambridge Industries Group (CIG)
+Cambridge Industries(Group) Co.,Ltd.
+Cambridge Medical Robotics Ltd
+Cambridge Mobile Telematics, Inc.
+Cambridge Pixel
+Cambridge Research Systems Ltd
+Cambridge Silicon Radio
+Cambridge Sound Management, LLC
+Cambridge Technology, Inc.
+Cambridge Visual Networks Ltd
+Campus Genevois de Haute Horlogerie
+Canon Imaging Systems Inc.
+Capgemini Netherlands
+CashGuard Sverige AB
+CastGrabber, LLC
+Cavena Image Products AB
+Cellslink Intelligence Technology Co,Ltd
+Centro de Ingenieria y Desarrollo industrial
+Century Geophysical Corp.
+Ceranext Ltd
+Challenger Supply Holdings, LLC
+Changhe Electronics Co., Ltd.
+Changshu Switchgear MFG. Co.,Ltd. (Former Changshu Switchgea
+Changzhou WEBO Weighing Device & System CO.,LTD
+Charge-Amps AB
+ChargeStorm AB
+Charmlink Tech(HK) Co.,Limited
+ChengDU Yi Gong Intelligence Technology Co., Ltd.
+Chengdu Aplux Inteligence Technology Ltd.
+Chengdu ChipIntelli Technology Co., Ltd
+Chengdu GeeYa Technology Co.,LTD
+Chengdu Geeker Technology Co., Ltd.
+Chengdu Quanjing Intelligent Technology Co.,Ltd
+Chi Geng Technology Co., Ltd
+Chitose Co.,Ltd
+Chongqing IQIYI Intelligence Technology Co., Ltd.
+Chongqing Seres Phoenix Intelligent Innovation Technology Co.,Ltd.
+Chongqing Zhouhai  intelligent  technology CO., Ltd
+Chongqing Zhouhai Intelligent Technology Co., Ltd
+Chunghua Intelligent Network Equipment Inc.
+Cisco Meraki
+Cisco SPVTG
+Cisco Systems Inc
+Cisco Systems, Inc
+Cisco-Linksys, LLC
+Clausal Computing Oy
+Clear Edge Networks
+Clever Logger Technologies Pty Ltd
+Cloud Intelligence Pty Ltd
+CloudGenix Inc
+Cloudproject Generation Srl
+Cnergee Technologies Private Limited
+Coagent International Enterprise Limited
+Codepoint Technologies, Inc.
+Cogency Semiconductor, Inc.
+Cogent Defence & Security Networks,
+Cogent Healthcare Systems Ltd
+Cogent Systems, Inc.
+Coloet S.r.l.
+Company NA Stage & Light
+Compumedics Germany GmbH
+Computer Performance, Inc. DBA Digital Loggers, Inc.
+Connected Space Management
+Controlled Electronic Manageme
+Convergence Technologies
+Convergenet Technologies
+Convergens Oy Ltd
+Convergent Bioscience Ltd.
+Convergent Design
+CorEdge Networks, Inc.
+Core Logic Inc.
+CoreEdge Networks Co., Ltd
+Corigine,Inc.
+Corrigent Systems
+Corsa Technology Incorporated
+Cosmo Research Corp.
+Cosonic Intelligent Technologies Co., Ltd.
+Covergence Inc.
+CowManager
+Creatix Polymedia Ges Fur Kommunikaitonssysteme
+Crow Electronic Engeneering
+Cryogenic Control Systems, Inc.
+Cubro Acronet GesmbH
+Current, powered by GE
+Custom Biogenic Systems
+Cyanview
+Cybertelbridge co.,ltd
+Công ty Cổ phần Thiết bị Công nghiệp GEIC
+D-NET International Corporation
+DAKO EDV-Ingenieur- und Systemhaus GmbH
+DARTMOUTH COLLEGE
+DCT-Delta GmbH
+DEHN SE + Co KG
+DELTA
+DELTA COMPUTER SYSTEMS, INC.
+DELTA CONTROLS, INC.
+DELTA DORE
+DELTA NETWORKS (XIAMEN) LIMITED
+DELTA NETWORKS, INC.
+DELTA TAU DATA SYSTEMS, INC.
+DELTACAST.TV
+DELTAKABEL TELECOM CV
+DENTSPLY - Gendex
+DEY Storage Systems, Inc.
+DHK Storage, LLC
+DIGITAL OCEAN
+DIGITRONIC Automationsanlagen GmbH
+DIMASTEC GESTAO DE PONTO E ACESSO EIRELI-ME
+DKS Dienstl.ges. f. Komm.anl. d. Stadt- u. Reg.verk. mbH
+DME Micro
+DOGA
+DR.BRIDGE AQUATECH
+DRDC Valcartier
+DRS Imaging and Targeting Solutions
+DRS Photronics
+DRS Test and Energy Management or DRS-TEM
+DS! Ingenieurbuero
+DUNASYS INGENIERIE
+Dage-MTI of MC, Inc.
+Dallas Delta Corporation
+Danaher Motion - Kollmorgen
+Danbridge
+Dangerous Music Group, LLC
+Data General Communication Ltd.
+Data Management, Inc.
+Databridge Dynamic
+Datrium, Inc.
+Deep BV
+Dell
+Dell EMC
+Dell Inc.
+Dell Technologies
+Dell'Orto S.P.A.
+DellKing Industrial Co., Ltd
+Delta Computers LLC.
+Delta Control GmbH
+Delta Electronics
+Delta Electronics, Inc.
+Delta Elektronika BV
+Delta Elettronica S.p.A.
+Delta Faucet Company
+Delta Information Systems, Inc.
+Delta Mobile Systems, Inc.
+Delta Networks, Inc.
+Delta Solutions LLC
+Delta Surge Inc.
+Delta Tau Data Systems, Inc.
+Deltacom Electronics Ltd
+Deltanet AG
+Deltanode Solutions AB
+Deltapath, Inc.
+Descartes Systems (USA) LLC
+Dhemax Ingenieros Ltda
+Digeo, Inc.
+DigiBoard
+Digiboard Eletronica da Amazonia Ltda
+Digilube Systems Inc
+Digimerge Technology Inc
+Digital Generation Inc.
+Digital Loggers, Inc.
+Digital Media Cartridge Ltd.
+Digital View Limited
+Digitale Analoge COMponenten West Electronic Vertriebs GmbH
+Dilax Intelcom AG
+Dilax Intelcom GmbH
+DinBox Sverige AB
+Discover Video
+DivergeNet, Inc.
+Dixtal Biomedica Ind. Com. Ltda
+Dodge
+Doepke Schaltgeräte GmbH
+Domino UK Ltd
+Dongguan Development Security Intelligent  Tech  Co., Ltd
+Dongguan Gedi Electrons Techeology Co.,LTD
+Douglas Lighting Controls
+Dr. Staiger, Mohilo + Co GmbH
+Draeger Medical
+Draeger Medical Systems, Inc.
+Dreamtek Intelligent Technology Co., Ltd
+Dron Edge India Private Limited
+Drs RADA Technologies
+Drägerwerk AG & Co. KG aA
+Ducommun LaBarge Technologies, Inc
+Dune Networks
+Dynamic Intelligences Co., Ltd.
+Dynamic Ratings P/L
+E Haute Intelligent Technology Co., Ltd
+E-Globaledge Corporation
+E. P. Schlumberger
+E.G.O. Elektro-Ger
+E.ON ES Sverige AB
+EAB/RWI/K
+EAGET Innovation and Technology Co., Ltd.
+EATON FHF Funke + Huster Fernsig GmbH
+EDGE ACCESS INC
+EG&G NUCLEAR INSTRUMENTS
+EGEMEN Bilgisayar Muh San ve Tic LTD STI
+EIFFAGE ENERGIE ELECTRONIQUE
+EIZO RUGGED SOLUTIONS
+ELEKTRO-AUTOMATIK GmbH & Co. KG
+EMPORIA TELECOM Produktions- und VertriebsgesmbH & Co KG
+ENGAGE COMMUNICATION, INC.
+ENGAGE NETWORKS, INC.
+ENGETRON-ENGENHARIA ELETRONICA IND. e COM. LTDA
+ENGenesis
+ENPLUG Co., Ltd.
+EQPlay Intelligent Technology(Kunshan) Co,Ltd.
+ERCO & GENER
+ESA Elektroschaltanlagen Grimma GmbH
+EVLO Stockage Énergie
+Eadingcore  Intelligent Technology Co., Ltd.
+Eagle Research Corporation
+Eaton Automation AG
+Eaton Bussmann
+Eaton Corp. Electrical Group Data Center Solutions - Pulizzi
+Eaton Corporation
+Eaton Industries GmbH
+Echo Ridge, LLC
+EchoStar Mobile
+Echogear
+Edge I&D Co., Ltd.
+Edge Networks Inc
+Edge Networks LLC
+Edge Power Solutions
+Edge Products
+Edge Tech Co., Ltd.
+EdgeCore Networks
+EdgeDX
+EdgePoint Networks, Inc.
+EdgeQ
+EdgeVelocity Corp
+EdgeWave
+Edgecore Americas Networking Corporation
+Edgecore Networks Corporation
+Edgenectar Inc.
+Edgeware AB
+Edgewater Networks Inc
+Edgewater Wireless Systems Inc
+Effigis GeoSolutions
+Egenera, Inc.
+Eidsvoll Electronics AS
+Eigen Development
+Eishin Electronics
+Ekoenergetyka - Polska S.A.
+Ekon GmbH - myGEKKO
+Elap s.r.l.
+Electrical Geodesics Incorporated
+Electro Industries/Gauge Tech
+Electroacustica General Iberica, S.A.
+Elektronik & Modellprodukter Gävle AB
+Elektronikspecialisten i Borlange AB
+Elysia Germany GmbH
+Embedded Intellect Pty Ltd
+Embigence GmbH
+EmergeCore Networks LLC
+Emergency Lighting Products Limited
+Emergency Message Controls LLC
+Emergent Electronics
+Emergent Solutions Inc.
+Emergent Vision Technologies Inc.
+Emerson
+Emerson Appliance Motors and Controls
+Emerson Automation FCP Kft.
+Emerson Climate Technologies GmbH
+Emerson Energy Systems AB
+Emerson Network Power (India) Pvt. Ltd.
+Emerson Network Power Co.,Ltd
+Emerson Network Power, Avocent Division
+Emerson Process Management Power & Water Solutions, Inc.
+Emerson Rosemount Analytical
+EnGenius Technologies, Inc.
+EnOcean Edge Inc.
+Enabling Technology Pty Ltd
+Endress & Hauser GmbH & Co
+EnerAccess inc
+Energet LLC
+Engage Technologies
+Engel Axil S.L.
+Engelmann Sensor GmbH
+Entourage Systems, Inc.
+Eon Instrumentation
+Ericsson, EAB/RWI/K
+Escherlogic Inc.
+Euklis by GSG International
+Evantage Industries Corp
+Eventide
+EverCharge
+Evident Scientific, Inc.
+Evoc Intelligent Technology Co.,Ltd.
+Exalt Communications
+Exigent Sensors
+F1MEDIA
+FA. GEBR. HELLER GMBH
+FAL Corp
+FAXedge Technologies, LLC
+FDSYS
+FILIZOLA S.A. PESAGEM E AUTOMACAO
+FLUECKIGER ELEKTRONIK AG
+FMTec GmbH - Future Management Technologies
+FONsystem co. ltd.
+FORCE INSTITUTE
+FQ Ingenieria Electronica S.A.
+FRAKO Kondensatoren und Anlagenbau GmbH
+FRAKO Kondensatoren- und Anlagenbau GmbH
+FRED KOSCHARA ENTERPRISES
+FSG Fernsteuergeräte Mess- und Regeltechnik GmbH
+FUTURE LIFE TECHNOLOGY
+FaceHeart Inc.
+Falling Edge Technology Ltd
+Farmage Co., Ltd.
+Faurecia Clarion Electronics (Dongguan) Co., Ltd
+Faust ApS
+Federated Wireless, Inc.
+Fela Management AG
+FingerTec Worldwide Sdn Bhd
+Finlux Ltd
+FireAngel Safety Technology Ltd
+FlashForge Corporation
+Flextel S.p.A
+Fluid Management Technology
+Fluke Biomedical, Radiation Management Services
+ForgetBox
+Formula One Management Ltd.
+Fortify Technologies, LLC
+Forward Edge.AI
+Foshan Huadian Intelligent Communications Teachnologies Co.,Ltd
+Foshan YiFeng Electric Industrial Co., ltd
+Foxboro Eckardt Development GmbH
+Foxtel Management Pty Ltd
+Framework Computer Inc.
+FreeBSD Foundation
+Freegene Technology LTD
+Freiburger BlickZentrum
+Freyer & Siegel Elektronik GmbH & Co. KG
+Fritz Pauker Ingenieure GmbH
+Fränkische Rohrwerke Gebr. Kirchner GmbH & Co. KG
+Fujian Newland Auto-ID Tech Co.,Ltd.
+Fujitsu Siemens Computers
+Fuse
+FuyanshengElectronicFujian Co.ltd
+Fuzhou Lesi Intelligent Technology Co., Ltd
+GAGE TALKER CORP.
+GATEWORKS CORP.
+GBS Laboratories LLC
+GE
+GE AVIC Civil Avionics Systems Company Limited
+GE Appliances
+GE Aviation Cheltenham
+GE Aviation System
+GE Energy
+GE Healthcare
+GE Lighting
+GE Medical System China Co. Ltd.
+GE Medical System(China) Co., Ltd.
+GE Power Management
+GE Security
+GE Security Kampro
+GE Security-Kampro
+GE Transportation Systems
+GE Vernova
+GEA Farm Technologies GmbH
+GEARTECH LTD
+GEC AVERY, LTD.
+GECO, Inc.
+GEGA ELECTRONIQUE
+GEM ELETTRONICA Srl
+GEM-MED SL
+GEMAC Chemnitz GmbH
+GEMATICA SRL
+GEMFLEX NETWORKS, LTD.
+GEMINI TRAZE RFID PVT. LTD.
+GEMSOC INNOVISION INC.
+GEMUE Gebr. Mueller Apparatebau
+GENERAL DYNAMICS INFORMATION SYSTEMS
+GENERAL ELECTRIC CORPORATION
+GENERAL Inc.
+GENERAL MAGIC, INC.
+GENERAL MICRO SYSTEMS, INC.
+GENESYS LOGIC, INC.
+GENETEC Corporation
+GENICOM CORPORATION
+GENIS
+GENITECH PTY LTD
+GENIUS NET CO.
+GENIUS SPORTS
+GENIX INFOCOMM CO., LTD.
+GENOA TECHNOLOGY, INC.
+GENRAD INC.
+GENRAD LTD.
+GENROCO INTERNATIONAL, INC.
+GENSTORAIGE TECHNOLOGY CO.LTD.
+GENTEC ELECTRO-OPTICS
+GENUS POWER INFRASTRUCTURES LIMITED
+GEODESIC LTD.
+GEOIDE Crypto&Com
+GEOMC
+GERLOFF GESELLSCHAFT FUR
+GERP Solution
+GERSTEL GmbH & Co. KG
+GERSYS GmbH
+GERTEC BRASIL LTDA
+GES Co, Ltd
+GES SINGAPORE PTE. LTD.
+GESAS GmbH
+GESPAC, S.A.
+GESYTEC MBH
+GET Engineering
+GETCK TECHNOLOGY,  INC
+GETEMED Medizin- und Informationstechnik AG
+GETMOBIT LLC
+GETQCALL
+GETRALINE
+GETT Geraetetechnik GmbH
+GEW (EC) Ltd
+GEW Technologies (PTY)Ltd
+GEWISS S.P.A.
+GITHON TECHNOLOGY CO., LTD.
+GKD Gesellschaft Fur Kommunikation Und Datentechnik
+GL Intelligence
+GLOBAL VILLAGE COMMUNICATION
+GLP German Light Products GmbH
+GS Elektromedizinische Geraete G. Stemple GmbH
+GS Elektromedizinsiche Geräte G. Stemple GmbH
+GSI GeoSolutions International Ltd
+GUANGDONG GENIUS TECHNOLOGY CO., LTD.
+GUANGDONG REAL-DESIGN INTELLIGENT TECHNOLOGY CO.,LTD
+GUANGZHOU AURIC INTELLIGENT TECHNOLOGY CO.,LTD.
+GUANGZHOU OPTICAL BRIDGE COMMUNICATION EQUIPMENT CO.,LTD.
+GYGES LABS PTE.LTD
+Galaxy Next Generation, Inc.
+Garrison Technology
+Gassner Wiege- und Meßtechnik GmbH
+Gastager Systemtechnik GmbH
+Ge Ruili Intelligent Technology ( Beijing ) Co., Ltd.
+GeBE Elektronik und Feinwerktechnik GmbH
+GearUP Portal Pte. Ltd.
+Gearlinx Pty Ltd
+Geberit International AG
+Gebhardt Ventilatoren GmbH
+Gebr. Bode GmbH & Co KG
+Gebr. Kemper GmbH + Co. KG
+Gecko Robotics Inc
+Gedomo GmbH
+Geenovo Technology Ltd.
+Gefen LLC
+Gefran Spa
+Gehirn Inc.
+Gehrke Kommunikationssysteme GmbH
+Geksacon
+GemWon Communications Co., Ltd.
+Gemalto "Document Readers"
+Gemalto M2M GmbH
+Gembird Europe BV
+Gemicom Technology, Inc.
+Gemini Data Loggers (UK) Limited
+Gemini Electronics B.V.
+Geminico co.,Ltd.
+Gemintek Corporation
+Gemmy Electronics (Shenzhen) Co, Ltd
+Gemstar Technology Development Ltd.
+Gemstone Communications, Inc.
+Gemstone Lights
+Gemtek Technology Co., Ltd.
+Gemvax Technology ,. Co.Ltd
+Gen IV Technology LLC
+Gen2wave
+Genadsystem
+Genbyte Technology Inc.
+Gencoa Ltd
+GeneSys Elektronik GmbH
+GeneTouch Corp.
+Genelec
+Gener8, Inc.
+Genera Oy
+General Bandwidth
+General Datacomm LLC
+General Dynamics
+General Dynamics IT
+General Dynamics Land Systems Inc.
+General Dynamics Mission Systems
+General Dynamics United Kingdom Ltd
+General Electric Company
+General Electric Consumer and Industrial
+General Electric Digital Energy
+General Electric Global Research
+General Electric Water & Process Technologies
+General Engine Management Systems Ltd.
+General Hydrogen
+General Industrial Controls Pvt Ltd
+General Industries Argentina
+General Infinity Co.,Ltd.
+General Jack Technology Ltd.
+General Meters Corp.
+General Microsystems Sdn Bhd
+General Motors
+General Research of Electronics, Inc.
+General Resources Co., LTD.
+General Satellite Research & Development Limited
+General Sensing
+General Solutions, LTD.
+General Test Systems
+Generalplus Technology Inc.
+Generiton Co., Ltd.
+Genesis Automation Inc.
+Genesis I&C
+Genesis Technologies AG
+Genesis inc
+Genetec Inc.
+Genetel Systems Inc.
+Genetix Ltd
+Genevisio Ltd.
+Genew Technologies
+Genexis B.V.
+Genexis BV
+Genexis International B.V.
+Genie Industries, Inc.
+Genie Network Resource Management Inc.
+Genie Networks Limited
+Genitek Engineering sprl
+Genius Bytes Software Solutions GmbH
+Genius Pros
+Genius Sports SS LLC
+Genius Vision Digital Private Limited
+Genmark Automation
+Gennet s.a.
+Gennum Corporation
+Genoray
+Genotech Co., Ltd.
+Gentec
+Gentec Systems  Co.
+GentechMedia.co.,ltd.
+Gentex Corporation/Electro-Acoustic Products
+Gentner Communications Corp.
+Gentrice tech
+Genuine Optics
+Genuine Technologies Co., Ltd.
+GeoFocus, LLC
+GeoSIG Ltd.
+GeoSpectrum Technologies Inc
+GeoVision Inc.
+GeoWAN Pty Ltd
+Geocast Network Systems, Inc.
+Geolux
+Geomation, Inc.
+Geometrics, Inc.
+Geomodeling Wuxi Technology Co. Ltd.
+Geonautics Australia Pty Ltd
+Geophysical Survey Systems, Inc.
+Geoplan Korea
+Geoquip Ltd
+Georg Fischer Piping Systems Ltd.
+Georg Neumann GmbH
+George Robotics Limited
+George Wilson Industries Ltd
+Georgia Tech Research Institute
+Geospace Technologies
+Geotab Inc.
+Geotech Instruments, LLC
+Geppetto Electronics
+Gerber Scientific Products, Inc.
+Gerdes Aktiengesellschaft
+Gerhard D. Wempe KG
+German Autolabs
+German Pipe GmbH
+German Power GmbH
+German Technologies
+Germaneers GmbH
+Gesellschaft für  Rationalisierung und Rechentechnik mbH
+Gesellschaft für Sonder-EDV-Anlagen mbH
+Gesellschaft industrieller Technologien
+Gespant
+Gessler GmbH
+Get SAT
+Getein Biotechnology Co.,ltd
+Getinge IT Solutions ApS
+Getinge Sterilization AB
+Getriebebau NORD GmbH and Co. KG
+Gets MSS
+Gets MSS S.A.
+Geutebrück GmbH
+Geyser Networks, Inc.
+Ginzinger electronic systems
+Global Regency Ltd
+Global Target Enterprise Inc
+Globalstar Inc.
+Glowforge Inc
+Golden Highway Industry Development Co., Ltd.
+Grass Valley, A Belden Brand
+GreenPeak Technologies
+GridBridge Inc
+GridManager A/S
+Groupe Citypassenger Inc
+Grup Arge Enerji ve Kontrol Sistemleri
+Guan Show Technologe Co., Ltd.
+GuangZhou Dazzleview Intelligent Technology Co., Ltd
+Guangdong Coagent Electronics S&amp;T Co.,Ltd.
+Guangdong Juan Intelligent Technology Joint Stock Co., Ltd.
+Guangdong Leawin Group Co., Ltd
+Guangdong NanGuang Photo & Video Systems Co., Ltd
+Guangdong Seneasy Intelligent Technology Co., Ltd.
+Guangdong Sygole Intelligent Technology Co.,Ltd
+Guangzhou Blue Cheetah Intelligent Technology Co., Ltd.
+Guangzhou Duge Technology Co.,LTD
+Guangzhou Heygears Technology Ltd
+Guangzhou Hongcai Stage Equipment co.,ltd
+Guangzhou Juan Intelligent Tech Joint Stock Co.,Ltd
+Guangzhou Juan Optical and Electronical Tech Joint Stock Co., Ltd
+Guangzhou Legendview Electronic Technology Co.,Ltd
+Guangzhou Sageran Technology Co., Ltd.
+Guangzhou Skytone Transmission Technology Com. Ltd.
+Guangzhou TR Intelligent Manufacturing Technology Co., Ltd
+Guangzhou Xianyou Intelligent Technogoly CO., LTD
+Guangzhou Yuhong Technology Co.,Ltd.
+Gygax Embedded Engineering GEE.ch
+GÉANT
+H&abyz
+HAMMER STORAGE SOLUTIONS
+HANGZHOU ZENOINTEL TECHNOLOGY CO., LTD
+HEFEI DATANG STORAGE TECHNOLOGY CO.,LTD
+HG Genuine Intelligent Terminal (Xiaogan) Co.,Ltd.
+HGH SYSTEMES INFRAROUGES
+HI-P Tech Corporation
+HI-TARGET SURVEYING INSTRUMENT CO.,LTD
+HIGHPRO INTERNATIONAL R&D CO,.LTD.
+HIRSCHMANN AUSTRIA GMBH
+HITACHI-LG DATA STORAGE INC
+HMS Industrial Networks
+HMS Industrial Networks SLU
+HOERBIGER Elektronik GmbH
+HONEYWELL-DATING
+HONGKONG RAGENTEK COMMUNICATION TECHNOLOGY CO.,LIMITED
+HOSCH Gebäude Automation Neue Produkte GmbH
+HP GLOBALES MEXICO
+HP Inc.
+HP Tuners LLC
+HPC Platform
+HPI High Pressure Instrumentation GmbH
+HPL Electric & Power Private Limited
+HPN Supply Chain
+HPRO
+HPRO-Video
+HSC-Regelungstechnik GmbH
+HUGEL GmbH
+HUIZHOU MAORONG INTELLIGENT TECHNOLOGY CO.,LTD
+HUNAN AIMAG INTELLIGENT TECHNOLOGY CO.,LTD
+HYFIX Spatial Intelligence
+HYUNDAE YONG-O-SA CO.,LTD
+HYUNSUNG CONVERGENCE
+Hach Lange Sarl
+Hagenuk KMT GmbH
+Hagenuk KMT Kabelmesstechnik GmbH
+Hagenuk Marinekommunikation GmbH
+Hager Electro SAS
+HagerEnergy GmbH
+HangZhou QiYang Technology Co.,Ltd.
+Hangzhou Advanced Intelligent Manufacturing Systems Co.,Ltd.
+Hangzhou ChengFengErLai Digial Technology Co.,Ltd.
+Hangzhou Hikstorage Technology Co.,Ltd.
+Hangzhou I'converge Technology Co.,Ltd
+Hangzhou Microimage Software Co., Ltd
+Hangzhou SDIC Microelectronics Inc.
+Hangzhou SunTown Intelligent Science & Technology Co.,Ltd.
+Hangzhou Xiaowen Intelligent Technology Co., Ltd.
+Hangzhou Zhongxinghui Intelligent Technology Co., Ltd.
+Harmony Fire Ltd
+Hauppauge Computer Works, Inc.
+Hear Gear, Inc.
+Hefei Panyuan Intelligent Technology Co., Ltd
+Heidelberger Druckmaschinen AG
+Heinzinger electronic GmbH
+Heizomat Gerätebau GmbH
+Heliogen
+Hellberg Safety AB
+Hellige GMBH
+Henge Docks LLC
+Hengen Technologies GmbH
+Hengtai Intelligent Technology (Zhongshan) Co., LTD
+Hewlett Packard
+Hewlett Packard Enterprise
+Heyuan intelligence technology CO.,Ltd
+Hi-Target Surveying Instrument Co., Ltd.
+Higeco S.r.l.
+High Infinity Germany
+HighPoint Technologies Incorporated
+Hilger u. Kern GMBH
+Hilscher GmbH
+Hipad Intelligent Technology Co., Ltd.
+Hiquel Elektronik- und Anlagenbau GmbH
+Hirschmann Automation
+Hirschmann Automation and Control GmbH
+Hirschmann Multimedia B.V.
+Hitachi Energy Germany AG
+Hitachi-LG Data Storage Korea, Inc
+Homegear GmbH
+Hon Hai Precision Ind. Co.,Ltd.
+Honeywell
+Honeywell (China) Co., LTD
+Honeywell Analytics
+Honeywell Analytics Ltd
+Honeywell CMSS
+Honeywell Co., Ltd. (KOREA)
+Honeywell Connected Building
+Honeywell Environmental & Combustion Controls
+Honeywell Environmental & Combustion Controls (Tianjin) Co., Ltd.
+Honeywell Fire System (Shanghai) Co,. Ltd.
+Honeywell GNO
+Honeywell GmbH
+Honeywell International
+Honeywell International Inc
+Honeywell Life Safety
+Honeywell SPS
+Honeywell Safety Products (Shanghai) Co.,Ltd
+Honeywell Safety Products USA, Inc
+Honeywell Security (China) Co., Ltd.
+Honeywell Sensotec
+Honeywell Video Systems
+Honeywell spol. s.r.o. HTS CZ o.z.
+Hong Kong AMobile Intelligent Corp. Limited Taiwan Branch
+Hongtai Intelligent Technology
+Hotel Technology Next Generation
+Hottinger Brüel & Kjaer GmbH
+Hottinger Brüel & Kjær A/S
+Hoval Aktiengesellschaft
+Huanshun Network Science and Technology Co., Ltd.
+Hubei Baobao Intelligent Technology Co.,LTD
+Hubei HanRui Jing Automotive Intelligent System Co.,Ltd
+Huges Hi-Tech Inc.,
+HuiTong intelligence Company
+Huizhou City Sunsin lntelligent Technology Co.,Ltd
+Huizhou Foryou General Electronics Co., Ltd.
+Huizhou KDT Intelligent Display Technology Co. Ltd
+HumanEyes Technologies Ltd.
+Humanplus Intelligent Robotics Technology Co.,Ltd.
+Hunan Honestone lntelligence Technology Co.,Ltd
+Hunan ciwei intelligent Technology Co., LTD
+HyperEdge
+Hyperloop Technologies, Inc dba Virgin Hyperloop
+Hyundai ImageQuest Co.,Ltd.
+I-Convergence.com
+IBERNEX INGENIERIA, S.L.
+IBG Industriebeteiligungsgesellschaft mbH &b Co. KG
+IBT Ingenieurbureau Broennimann Thun
+ICC Intelligent Platforms GmbH
+IDS GeoRadar s.r.l.
+IFM Electronic gmbh
+IGEMA GmbH
+IGEN Tech Co., Ltd.
+IHP-GmbH
+IMAGE DATA PROCESSING SYSTEM GROUP
+IMAGE SCIENCES, INC.
+IMAGE TECH CO.,LTD
+IMLOGIX, DIVISION OF GENESYS
+IMS Röntgensysteme GmbH
+IMT - Information Management T
+INCREDIBLE TECHNOLOGIES, INC.
+INGELABS S.L.
+INGENICO
+INGENICO TERMINALS SAS
+INGENIERIA ELECTRONICA COMERCIAL INELCOM S.A.
+INGETEAM
+INRange Systems, Inc
+INSTITUTO DE GESTÃO, REDES TECNOLÓGICAS E NERGIAS
+INTELLICOM, INC.
+INTELLIGENCE TECHNOLOGY OF CEC CO., LTD
+INTELLIGENT DEVICES INC. (IDI)
+INTELLIWORXX, INC.
+INTELNET S.A.
+INTERPHASE CORPORATION
+IOGEAR, Inc.
+ION Geophysical Corporation Inc.
+IQ Automation GmbH
+ISA - Intelligent Sensing Anywhere, S.A.
+IST ElektronikgesmbH
+ISis ImageStream Internet Solutions, Inc
+ITO ELECTRIC INDUSTRY CO, LTD.
+IVOR Intelligent Electrical Appliance Co., Ltd
+Ibridge Networks & Communications Ltd.
+Image Control Design Limited
+Image Display Systems, Inc.
+Image Engineering
+Image Sensing Systems, Inc.
+Image Soft Oy
+Image Video
+ImageCom Limited
+Imagenet Co.,Ltd
+Imagenics, Co., Ltd.
+Imageo s.r.o.
+Imerge Ltd
+InMage Systems Inc
+Independent Storage Corporation
+Industrial Cyber Sensing Inc.
+InfoGear Technology Corp.
+Ingenic Semiconductor Co.,Ltd
+Ingenico International
+Ingeniería AlmudÃ­ S.L.
+Ingenieurbuero Bickele und Buehler GmbH
+Ingenieurbuero SOMTRONIK
+Ingenieurbuero Stahlkopf
+Ingenieurbuero Stark GmbH und Ko. KG
+Ingenieurbüro Schober
+Ingenious Technology LLC
+Ingersoll Rand
+Ingersoll-Rand
+Ingespace
+Ingeteam Paneles S.A.U.
+Inner Range Pty. Ltd.
+Innovative Advantage
+Innovative Converged Devices Inc
+Inogeni
+Inspero Inc
+Inspired Flight
+Institute of geophysics, China earthquake administration
+Integer.pl S.A.
+Intel Corporate
+Intel Corporation
+Intel Wireless Network Group
+Intel – GE Care Innovations LLC
+IntelPro Inc.
+Intelbras
+Intelcan Technosystems Inc.
+InteliCloud Technology Inc.
+Intelicis Corporation
+Intelitech SIA
+Intellambda Systems, Inc.
+Intellect International NV
+Intellectronika
+Intelleflex Corporation
+IntelliDesign Pty Ltd
+IntelliLUM
+IntelliPlanner Software System India Pvt Ltd
+IntelliVIX Co. Ltd.
+IntelliVision Technologies, Corp
+IntelliVoice Co.,Ltd.
+Intellian Technologies, Inc.
+Intellibyte Inc.
+Intellicon Private Limited
+Intellics
+Intelligent Computer Solutions Inc.
+Intelligent Control Systems (Asia) Pte Ltd
+Intelligent Data
+Intelligent Devices
+Intelligent Digital Services GmbH
+Intelligent Distributed Controls Ltd
+Intelligent Energy Ltd
+Intelligent Mechatronic Systems Inc
+Intelligent Media Technologies, Inc.
+Intelligent Optical Network High Tech CO.,LTD.
+Intelligent Photonics Control
+Intelligent Platforms, LLC.
+Intelligent Security Systems
+Intelligent Security Systems (ISS)
+Intelligent Steward Co.,Ltd
+Intelligent Surveillance Corp
+Intelligent Systems
+Intelligent Technology Inc.
+Intelligent Telecommunications, Inc.
+Intelligraphics
+Intelligrated System LLC
+Intellimedia Systems Ltd
+Intellio Ltd
+Intellion AG
+Intellisense Systems Inc.
+Intellisis
+Intellitect Water Ltd
+Intellithings Ltd.
+Intelliverese - DBA Voicecom
+Intellivision Holdings, LLC
+Intellvisions Software Ltd
+InterBridge,Inc.
+Interactive Intelligence
+Interactive Multimedia eXchange Inc.
+Interactive Technologies, Inc.
+Internet Information Image Inc.
+Invensys
+Invensys Controls Network Systems
+Invensys Controls UK Limited
+Invensys Energy Systens (NZ) Limited
+Invent Vision - iVision Sistemas de Imagem e Visão S.A.
+Italdata Ingegneria dell'Idea S.p.A.
+J1-LED Intelligent Transport Systems Pty Ltd
+J125, NATIONAL SECURITY AGENCY
+JB-Lighting Lichtanlagen GmbH
+JIANGSU HORAINTEL CO.,LTD
+JISEONGENG Co,.LTD
+JM Zengge Co., Ltd
+JSC "IB Reform"
+James G. Biddle dba Megger
+Janz - Contagem e Gestão de Fluídos S.A.
+Japan Image & Network Inc.
+JiangSu ZhongXie Intelligent Technology co., LTD
+Jiangsu Delianda Intelligent Technology Co., Ltd.
+Jiangsu Hetai Intelligent Control Technology Co., Ltd
+Jiangsu Houge Technology Corp.
+Jiangsu Jinshi Legend Technology Co.,Ltd
+Jiangsu Xinsheng Intelligent Technology Co., Ltd.
+Jiangsu byzoro intelligent technology Co.,Ltd
+Jiangxi Remote lntelligence Technology Co.,Ltd
+Jiangxi Winsky Intelligence Technology Co., Ltd
+Jiangxi Xunte Intelligent Terminal Co., Ltd
+Jiaxing Cyber Sensor Intelligent Technology Co., Ltd.
+Jinwoo Industrial system
+JumpGen Systems, LLC
+Junger Audio-Studiotechnik GmbH
+Jäger Computergesteuerte Meßtechnik GmbH.
+K&J Schmittschneider AG
+KEBA Industrial Automation Germany GmbH
+KEBODA Intelligent TECHNOLOGY CO., LTD.
+KEITHLEY INSTRUMENTS
+KENTKART EGE ELEKTRONIK SAN. VE TIC. LTD. STI.
+KINGENE Technology Corporation
+KINKI ROENTGEN INDUSTRIAL CO.,LTD
+KISS Teknical Solutions, Inc.
+KOFAX IMAGE PRODUCTS
+KOSTAL (Shanghai) Management Co., Ltd.
+KWONG MING ELECTRICAL MANUFACTORY LIMITED
+Kahf Software Limited
+Kandao lightforge Co., Ltd.
+Kaztek Systems
+Kegao Intelligent Garden Technology(Guangdong) Co.,Ltd.
+Kilchherr Elektronik AG
+Kingnuo Intelligent Technology (Jiaxing) Co., Ltd.
+Klingenthaler Musikelektronik GmbH
+Knapp Logistik Automation GmbH
+Knick Elektronische Messgeraete GmbH & Co. KG
+Kniggendorf + Kögler Security GmbH
+Knowledge Development for POF S.L.
+Knowledge Resources GmbH
+Kollmorgen Corp
+Kollmorgen-Servotronix
+Kommunikations- & Sicherheitssysteme Gesellschaft m.b.H
+Konze System Technology Co.,Ltd.
+Korea Image Technology Co., Ltd
+Krabbenhøft og Ingolfsson
+Kraftway Corporation PLC
+Kruger DB Series Indústria Eletrônica ltda
+Krüger &Gothe GmbH
+Kuebrich Ingeniergesellschaft mbh & Co. KG
+Kunshan Baifeng Intelligent Technology Co.,Ltd
+Kunshan excellent Intelligent Technology Co., Ltd.
+Kygo Life A
+Kyoto Electronics Manufacturing Co., Ltd.
+L-3 Communications Geneva Aerospace
+LAMTEC Mess- und Regeltechnik für Feuerungen GmbH & Co. KG
+LASERANIMATION SOLLINGER GMBH
+LEGEND WINNER LIMITED
+LEGENDAIRE TECHNOLOGY CO., LTD.
+LENOVO(BEIJING)CO., LTD.
+LGE
+LGM Ingénierie
+LHP Telematics LLC
+LIFI LABS MANAGEMENT PTY LTD
+LINEAGE POWER PVT LTD.,
+LLC Open Converged Networks
+LOGEL S.R.L.
+LORD INGENIERIE
+Labforge Inc.
+Labor Strauss Sicherungsanlagenbau GmbH
+Labotect Labor-Technik-Göttingen GmbH
+Landinger
+Langfang ENN lntelligent Technology Co.,Ltd.
+Lantronix
+Last Mile Gear
+Lechpol Electronics Leszek Sp.k.
+Lechpol Electronics Spółka z o.o. Sp.k.
+Ledger
+Leegiot Intelligent Technology Co., Ltd.
+Legerity
+Legrand INTELLIGENT ELECTRICAL(HUIZHOU)CO.,LTD.
+LeiShen Intelligent  System Co.Ltd
+Leica Geosystems AG
+Lemei Intelligent IOT (Shenzhen) Co., Ltd
+Lenovo
+Lenovo (Beijing) Co., Ltd.
+Lenovo (Beijing) Limited.
+Lenovo Data Center Group
+Lenovo Future Communication Technology (Chongqing) Company Limited
+Lenovo Image(Tianjin) Technology Ltd.
+Lenovo India Private Limited
+Lenovo Information Products (Shenzhen)Co.,Ltd
+Lenovo Mobile Communication (Wuhan) Company Limited
+Lenovo Mobile Communication Technology Ltd.
+LenovoEMC Products USA, LLC
+Leonardo Germany GmbH
+Letv Mobile and Intelligent Information Technology (Beijing) Corporation Ltd.
+Ligent Tech,Inc
+Lineage Power
+Linkage System Integration Co.Ltd.
+LinkedHope Intelligent Technologies Co., Ltd
+Linseis Messgeraete GmbH
+Liuhe Intelligence Technology Ltd.
+LodgeNet Entertainment Corp.
+Logotherm Regelsysteme GmbH
+Long Range Systems, Inc.
+Longhorn lntelligent Tech Co.,Ltd.
+Loupedeck Oy
+Lufft Mess- und Regeltechnik GmbH
+Luke Granger-Brown
+Lundinova AB
+MAGO di Della Mora Walter
+MANUSA-GEST, S.L.
+MCS Engenharia ltda
+MEDIAEDGE Corporation
+MEPS Realtime
+MER TELEMANAGEMENT SOLUTIONS, LTD.
+MERKLE Schweissanlagen-Technik GmbH
+MESA RIDGE TECHNOLOGIES, INC.
+METIER MANAGEMENT SYSTEMS LTD.
+MGE UPS Systems France
+MICROHARD S.R.L.
+MICROSAGE COMPUTER SYSTEMS INC
+MICROSOFT CORP.
+MII
+MITSUBISHI CHEMICAL AMERICA, INC.
+MITSUBISHI ELECTRIC AUTOMATION (CHINA) LTD.
+MITSUBISHI ELECTRIC INDIA PVT. LTD.
+MITSUBISHI ELECTRIC SYSTEM & SERVICE CO.,LTD.
+MITSUBISHI ELECTRONICS LOGISTIC SUPPORT CO.
+MITSUBISHI HEAVY INDUSTRIES MECHATRONICS SYSTEMS,LTD.
+MITSUBISHI HEAVY INDUSTRIES THERMAL SYSTEMS, LTD.
+MITSUBISHI WIRELESS COMMUNICATIONS. INC.
+MMB Research Inc.
+MOBIWIRE MOBILES (NINGBO) CO.,LTD
+MOXA TECHNOLOGIES CORP., LTD.
+MOZI (Shenzhen) Artificial Intelligence Technology Co., Ltd.
+MSB Elektronik und Geraetebau GmbH
+MSB Elektronik und Gerätebau GmbH
+MULTI-FIELD LOW TEMPERATURE TECHNOLOGY(BEIJING) CO., LTD.
+Macherey-Nagel GmbH & Co. KG
+Macro Image Technology, Inc.
+Madge Ltd.
+MadgeTech, Inc
+MagTarget LLC
+Magellan Technology Pty Limited
+Magenta Labs, Inc.
+Magenta Research Ltd.
+Magic Control Technology Corporation
+Magic Intelligence Technology Limited
+MaiaEdge, Inc.
+Maiyue Future Intelligent Technology (Suzhou) Co.,Ltd.
+Management Service Corporation
+Manz
+Margento R&D
+MasterImage 3D
+Matribox Intelligent Technology co.Ltd.
+Maxvision Technology Corp.
+Mcharge
+Mediabridge Products, LLC.
+Megawin Switchgear Pvt. Ltd.
+Megger
+Megger Germany GmbH
+Melange Systems Pvt. Ltd.
+MeshPlusPlus, Inc.
+Metalligence Technology Corp.
+Micro Systems Co.,Ltd.
+Micro-Biz intelligence solutions Co.,Ltd
+Microchip Technology Germany II GmbH&Co.KG
+Microsoft
+Microsoft Corp.
+Microsoft Corporation
+Microsoft Mobile Oy
+Microsoft Research
+Microsoft XCG
+Microtarget Tecnologia Digital Ltda.
+Minicom Digital Signage
+Minimax GmbH & Co KG
+Mitsubishi Electric Corporation
+Mitsubishi Electric Europe B.V UK Branch
+Mitsubishi Electric India PVT. LTD
+Mitsubishi Electric India Pvt. Ltd.
+Mitsubishi Electric Klimat Transportation Systems S.p.A.
+Mitsubishi Electric Micro-Computer Application Software Co.,Ltd.
+Mitsubishi Electric System & Service Co., Ltd.
+Mitsubishi Electric US, Inc.
+Mitsubishi Heavy Industries, Ltd.
+Mitsubishi Precision Co.,LTd.
+Mobileye Vision Technologies LTD
+Modelleisenbahn GmbH
+Monico Monitoring, Inc.
+Montage Technology Group Limited
+Morgen Technology
+Mosberger Consulting LLC
+Motorola Mobility LLC, a Lenovo Company
+Move Innovation
+Moving iMage Technologies LLC
+Moxa.Inc
+Multimessage Systems Ltd.
+Multivision Intelligent Surveillance (Hong Kong) Ltd
+Multiware & Image Co., Ltd.
+Murrelektronik GmbH
+Myers Emergency Power Systems
+NEOLAB Convergence
+NETCORE SYSTEMS, INC.
+NETGEAR
+NETGEN HITECH SOLUTIONS LLP
+NETVANTAGE
+NETWORK GENERAL CORPORATION
+NEW Lift Neue Elektronische Wege Steuerungsbau GmbH
+NEWGEN SYSTEMS CORP.
+NEWONE CO.,LTD.
+NEXGEN Mediatech Inc.
+NEXT GENERATION INTEGRATION LIMITED (NGI)
+NEXTEYE Co., Ltd.
+NGES Denro Systems
+NICE Total Cash Management Co., Ltd.
+NMS Communications
+NOJA Power Switchgear Pty Ltd
+NT-ware Systemprg GmbH
+NXP (China) Management Ltd.
+NXP Semiconductors Germany GmbH
+NanShanBridge Co.Ltd
+Nanjing Aotong Intelligent Technology Co.,Ltd
+Nanjing Bilin Intelligent Identification Technology Co.,Ltd
+Nanjing Juplink Intelligent Technologies Co., Ltd.
+Nanjing Magewell Electronics Co., Ltd.
+Nanjing Magewell Electronics Co.,Ltd
+Nanjing Yining Intelligent Technology Co., Ltd.
+Nanjing Yufei Intelligent Control Technology Co.,LTD
+Nanjing yuekong Intelligent Technology
+Narnix Edge Pvt. Ltd.
+National Resource Management, Inc.
+NeGeN Access, Inc.
+Netgem
+Netgenetech.co.,ltd.
+Network General Corporation
+Neuberger Gebaeudeautomation GmbH & Co.
+Neuberger Gebäudeautomation GmbH
+Neural Image. Co. Ltd.
+Neutronics
+New H3C Intelligence Terminal Co., Ltd.
+NewAgeMicro
+NewEdge Signal Solutions LLC
+Newbridge Technologies Int. Ltd.
+Newtek Electronics co., Ltd.
+NexGen City, LP
+NexGen Storage
+Nexlawn Intelligent Technology (Suzhou) Co., Ltd.
+Nexoforge Inc.
+Next Generation Systems, Inc.
+NextGen Business Solutions, Inc
+NextGen RF Design, Inc.
+NextGen Venturi LTD
+NextGenTel Holding ASA
+Nextcomm, Inc.
+Nextorage Corporation
+Ngen d.o.o.
+Nimble Storage
+Nippon Manufacturing Service Corporation (abbreviated as 'nms')
+Nitgen Co., Ltd
+Nokia Siemens Networks GmbH & Co. KG.
+Nolangroup S.P.A con Socio Unico
+North American Blue Tiger Company, LLC
+North Bridge Technologies
+Northwest Towers
+Notebook Development Lab.  Lenovo Japan Ltd.
+Novatium Solutions (P) Ltd
+Novell, Inc.
+Nuvera Fuel Cells
+Nvergence, Inc.
+NxGen Comm LLC
+OB Telecom Electronic Technology Co., Ltd
+OLYMPUS IMAGE SYSTEMS, INC.
+OMESH CITY GROUP
+OMRON Corporation
+OMRON HEALTHCARE Co., Ltd.
+OMRON SENTECH CO., LTD.
+OMRON TATEISI ELECTRONICS CO.
+OOO NPP EKRA
+OOO Samlight
+OPTO-22
+OPW Fuel Management Systems
+ORANGE MICRO, INC.
+ORANGE POLSKA
+ORIENT TELECOM CO., LTD.
+Omnima Limited
+Omron Healthcare Co., Ltd
+OnAsset Intelligence
+OnTarget Technologies, Inc
+Ontrol A.S.
+OpenGear, Inc
+Oppermann Regelgeräte GmbH
+Orange Logic
+Orange Precision Measurement LLC
+Orange Tree Technologies
+Orange Tree Technologies Ltd
+Orbotix, Inc.
+Osborne Coinage Co
+Overland Storage Inc.
+Oxygen Broadband s.a.
+OÜ ELIKO Tehnoloogia Arenduskeskus
+PA CONSULTING SERVICES
+PACIFIC RESEARCH & ENGINEERING CORPORATION
+PAGE IBERICA, S.A.
+PENTA Gesellschaft für elektronische Industriedatenverarbeitung mbH
+PHPower Srl
+PIN GENIE, INC.DBA LOCKLY
+POLVISION
+PRESSOL Schmiergeraete GmbH
+PROSOFT-SYSTEMS LTD
+PSG Germany GmbH
+Package Guard, Inc
+Pakedge Device and Software Inc
+Pakedge Device and Software Inc.
+Paragea Communications
+Parker Hannifin Manufacturing Germany GmbH & Co. KG
+Pauly Steuer- und Regelanlagen GmbH & Co. KG
+PayRange Inc.
+Peerbridge Health Inc
+Pen Generations, Inc.
+Pepperl+Fuchs GmbH
+Perspicace Intellegince Technology
+Petroleum Geo-Services
+Phantom Intelligence
+Phidgets Inc.
+Phoenix Contact GmbH & Co. KG
+Phoenix Geophysics Ltd.
+Photonic Bridges  Inc.
+Photonic Bridges, Inc.
+Photonicbridges (China) Co., Ltd.
+Phybridge Inc
+Pilz GmbH & Co.
+Planmeca Oy
+Platypus Technology
+Pleiger Elektronik GmbH  and Co. KG
+Pliem (Shanghai) Intelligent Technology Co., Ltd
+Polewall Norge AS
+Polska Fabryka Wodomierzy i Ciep?omierzy FILA
+Pongee Industries Co., Ltd.
+Prisma Engineering srl
+ProCurve Networking by HP
+Progentech Limited
+Progeny Systems
+Project Management Enterprises, Inc.
+Projects Unlimited Inc.
+Prompttec Product Management GmbH
+Prosoft Systems LTD
+Prosoft Technology, Inc
+Psigenics Corporation
+Pulsotronic Anlagentechnik GmbH
+Pulsotronic-Anlagentechnik GmbH
+QIAGEN Instruments AG
+QLove Mobile Intelligence Information Technology (W.H.) Co. Ltd.
+QPS, Inc.
+QUANTUM BRIDGE COMMUNICATIONS
+Qingdao Geesatcom Technology Co., Ltd
+Qingdao Goertek Intelligent Sensor Co.,Ltd
+Qingdao Haier Intelligent Home Appliance Technology Co.,Ltd
+Qingdao Hi-image Technologies Co., Ltd
+Qingdao Intelligent&Precise Electronics Co.,Ltd.
+Qingdao Yuze lntelligent Technology Co.,Ltd
+Qingting Intelligent Technology（Suzhou）Co.,Ltd.
+Quanta Storage Inc.
+QuantumVision Corporation
+Quester Tangent Corporation
+R. STAHL Schaltgeräte GmbH
+R.P.T. INTERGROUPS INT'L LTD.
+RAB Microfluidics R&D Company Ltd
+RASTER IMAGE PROCESSING SYSTEM
+RATIO Entwicklungen GmbH
+RB GeneralEkonomik
+RCS Energy Management Limited
+RCS Energy Management Ltd
+RED Hydrogen LLC
+REFU Storage System GmbH
+REGENT ELECTRONICS CORP.
+RELISTE Ges.m.b.H.
+RESOL Elektronische Regelungen GmbH
+RHEWA-WAAGENFABRIK August Freudewald GmbH &amp;Co. KG
+RIDGE COMPUTERS
+RIEXINGER Elektronik
+RITEC
+RMA Mess- und Regeltechnik GmbH & Co.KG
+ROGER D.Wensker, G.Wensker sp.j.
+RS Gesellschaft fur Informationstechnik mbH & Co KG
+RZB Rudolf Zimmermann, Bamberg GmbH
+Rademacher Geraete-Elektronik GmbH
+Radio Bridge
+Ragentek Technology Group
+Rangestar Wireless
+Raster Images Pvt. Ltd
+Rawasi Co
+Raysgem Electronics and Technology Co.Ltd
+RealWear (Shanghai) Intelligent Technology Co. Ltd
+Realfit(Shenzhen) Intelligent Technology Co., Ltd
+Red Lion Controls Inc.
+Red Lion Controls, LP
+Red Lion Europe GmbH
+Redswitch Inc.
+Regenersis (Glenrothes) Ltd
+Reolink Innovation Limited
+Resource Data Management Ltd
+Resurgent Health & Medical
+Rexgen Inc.
+Ridgeline Instruments
+Rigel Engineering
+Rigel Engineering, LLC
+Rising Edge Technologies
+RiverDelta Networks
+Rockridgesound Technology Co.
+Rockwell Automation
+Rockwell Collins Canada
+Rodgers Instruments US LLC
+Rosenberger Technologies Co.,Ltd.
+Royal Way General Trading LLC
+Rugged Controls
+Rugged Logic, Inc.
+Rugged Monitoring
+Rugged Science
+Rugged Video LLC
+RuggedCom
+RuggedCom Inc.
+RuggedTek Hangzhou Co., Ltd
+Rutledge Omni Services Pte Ltd
+Ruwisch & Kollegen GmbH
+S I Sistemas Inteligentes Eletrônicos Ltda
+S2C limited
+SAFETY MANAGEMENT SYSTEMS
+SAGE Glass
+SAGE INFOTECH LTD.
+SAI TECHNOLOGY
+SAIA Burgess Controls AG
+SAMA NextGen PTE Limited
+SCHLUMBERGER TECHNOLOGIES RETAIL PETROLEUM SYSTEMS
+SCHLUMBERGER WELL SERVICES
+SCI Innovations Ltd
+SECURITE COMMUNICATIONS / HONEYWELL
+SEGGER Microcontroller GmbH & Co. KG
+SELSIUS SYSTEMS, INC.
+SERCOM Regeltechniek
+SERIAL IMAGE INC.
+SEV Tidsystem AB
+SEVERIN Elektrogeräte GmbH
+SFERA srl
+SHANGHAI MOAAN INTELLIGENT TECHNOLOGY CO.,LTD
+SHANGHAI SIMCOM LIMITED
+SHENZHEN EMEET INTELLIGENT TECHNOLOGY CO., LTD.
+SHENZHEN EX-LINK TECHNOLOGY CO.,LTD
+SHENZHEN HEXINDA SUPPLY CHAIN MANAGEMENT CO.LTD
+SHENZHEN JUNGE TECHNOLOGY CO.,LTD
+SHENZHEN SANMI INTELLIGENT CO.,LTD
+SHENZHEN UNIVERSAL INTELLISYS PTE LTD
+SHENZHEN YUNJI INTELLIGENT TECHNOLOGY CO.,LTD
+SHINDENGEN ELECTRIC MFG. CO., LTD.
+SHINSUNG DELTATECH CO.,LTD.
+SHUTTLE, INC.
+SICHUAN HUAKUN ZHENYU INTELLIGENT TECHNOLOGY CO.,LTD
+SICK AG
+SIEMENS AG
+SIEMENS AG, Digital Factory, Motion Control System
+SIEMENS AS
+SIEMENS BUILDING
+SIEMENS ENERGY AUTOMATION
+SIEMENS TELECOMMUNICATION SYSTEMS LIMITED
+SIMTEK INC.
+SISMODULAR - Engenharia, Lda
+SKS Automaatio oy
+SM-Electronic GmbH
+SMA REGELSYSTEME GMBH
+SMART Storage Systems
+SMARTBRIDGES PTE. LTD.
+SOCIEDAD IBERICA DE CONSTRUCCIONES ELECTRICAS, S.A. (SICE)
+SOGESTMATIC
+SOtM
+STATE GRID INTELLIGENCE TECHNOLOGY CO.,LTD.
+STORAGE COMPUTER CORPORATION
+STR Elektronik Josef Schlechtinger GmbH
+STRONG Ges.m.b.H.
+STUDIO GEN INC.
+STUHL Regelsysteme GmbH
+SUN ELECTRONICS CORP.
+SUNGROW POWER SUPPLY CO.,LTD.
+SYSGEN
+SafeOwl, Inc.
+Safety System Product GmbH & Co. KG
+Sage Co., Ltd.
+Sage Consultants
+Sage Electronic Engineering LLC
+Sage Instruments Inc.
+Sage Systems
+Sage Technologies Inc.
+SageTV, LLC
+Sagemcom Broadband SAS
+Sagetech Corporation
+Saia Burgess Controls AG
+Saia-Burgess Controls AG
+Sangean Electronics Inc.
+Sanrad Intelligence Storage Communications (2000) Ltd.
+Schlumberger
+Schlumberger K.K.
+Schneider Displaytechnik GmbH
+Schneider Electric
+Schneider Electric (Australia)
+Schneider Electric Asia Pacific Ltd
+Schneider Electric Canada Inc
+Schneider Electric Fire & Security Oy
+Schneider Electric GmbH
+Schneider Electric Japan Holdings Ltd.
+Schneider Electric Korea
+Schneider Electric Motion
+Schneider Electric Motion USA
+Schneider Electric Motion, Inc. USA
+Schneider Electric USA
+Schneider Electric Ultra Terminal
+Schneider-Electric(China)Co.Ltd,Shenzhen Branch
+Scope Information Management, Ltd.
+Sea Air and Land Communications Ltd
+SeaTech Intelligent Technology (Shanghai) Co., LTD
+Seabridge
+Seabridge Ltd.
+Seachange international
+Sector Alarm Tech S.L.
+SecuGen Corporation
+Secure Works, Inc.
+Seine Image Int'l Co., Ltd
+SekureTrak Inc. dba TraknProtect
+SelectTech GeoSpatial, LLC
+Selesta Ingegneria S.p.A.
+Seneco A/S
+Sensor to Image GmbH
+Sentry 360 Security
+Sevis Systems
+ShanDong Domor Intelligent S&T CO.,Ltd
+Shandong Intelligent Optical Communication Development Co., Ltd.
+Shandong Luneng Intelligence Technology CO., Ltd
+ShangHai Aigentoo Information Technology Co., Ltd
+ShangHai Zhousheng Intelligent Technology Co., Ltd
+Shanghai AiGentoo Information Technology Co.,Ltd.
+Shanghai Chint low voltage electrical technology Co.,Ltd.
+Shanghai DGE Co., Ltd
+Shanghai Gaviota Intelligent Technology Co.,Ltd.
+Shanghai Genvision Industries Co.,Ltd
+Shanghai Gfanxvision Intelligent Technology Co.Ltd
+Shanghai HITE-BELDEN Network Technology Co., Ltd.
+Shanghai Hyco Genyong Technology Co., Ltd.
+Shanghai Ingeek Technology Co., Ltd
+Shanghai SEARI Intelligent System Co., Ltd
+Shanghai Sansi Electronic Engineering Co., Ltd.
+Shanghai Sigen New Energy Technology Co., Ltd
+Shanghai Tigercel Communication Technology Co.,Ltd
+Shanghai Vic Lab Intelligent Technology Co.,Ltd.
+Shanghai Wise-Tech Intelligent Technology Co.,Ltd.
+Shanghai Xinyuzhou Intelligent Technology Co., Ltd.
+Shangyin Intelligence Technology Shandong Co.,Ltd
+ShareGate, Inc.
+ShenZhen Arts Changhua Intelligent Technology Co., Ltd
+ShenZhen Linked-Z Intelligent Display Co., Ltd
+Shenzhen Bao Lai Wei Intelligent Technology Co., L
+Shenzhen C-DIGI Technology Co.,Ltd.
+Shenzhen DO Intelligent Technology Co., Ltd
+Shenzhen DOOGEE Hengtong Technology CO., LTD
+Shenzhen DOOGEE Hengtong Technology CO.,LTD
+Shenzhen Dandelion Intelligent Cloud Technology Development Co., LTD
+Shenzhen Dingsheng Intelligent Technology Co., Ltd
+Shenzhen Dttek Technology Co., Ltd.
+Shenzhen Duubee Intelligent Technologies Co.,LTD.
+Shenzhen E-Life Intelligence Technology Co.,Ltd.
+Shenzhen EMTEK Storage Technology Co.,Ltd
+Shenzhen Fengruixiang Intelligent Technology Co., Ltd.
+Shenzhen Fsan Intelligent Technology Co.,Ltd
+Shenzhen General Measure Technology Co., Ltd
+Shenzhen Geniatech Inc, Ltd
+Shenzhen Geshem Technology Co Ltd
+Shenzhen H&T Intelligent Control Co.,Ltd.
+Shenzhen Haichuan Intelligent Information Technology Co., Ltd.
+Shenzhen Huabai Intelligent Technology Co., Ltd.
+Shenzhen IBD Intelligence Technology Co,.Ltd.
+Shenzhen IP3 Century Intelligent Technology CO.,Ltd
+Shenzhen IP3 Century Intelligent Technology Co., Ltd
+Shenzhen ITLONG Intelligent Technology Co.,Ltd
+Shenzhen Intellifusion Technologies Co., Ltd.
+Shenzhen Intellirocks Tech. Co. Ltd.
+Shenzhen JMicron Intelligent Technology Developmen
+Shenzhen Jointelli Technologies Co.,Ltd
+Shenzhen King Will Technology Co., LTD
+Shenzhen MEK Intellisys Pte Ltd
+Shenzhen MiaoMing  Intelligent Technology Co.,Ltd
+Shenzhen MiaoMing Intelligent Technology Co.,Ltd
+Shenzhen NORCO lntelligent Technology Co.,Ltd
+Shenzhen NeaTech Intelligence Technology Co., Ltd.
+Shenzhen New Chip Intelligence Co.,LTD
+Shenzhen Ogemray Technology Co., Ltd.
+Shenzhen Ogemray Technology Co.,Ltd
+Shenzhen One-Nine Intelligent Electronic Science and Technology Co., Ltd
+Shenzhen Orange Digital Technology Co.,Ltd
+Shenzhen Powerleader  Storage Technology Co., Ltd.
+Shenzhen Qianfenyi Intelligent Technology Co.,LTD
+Shenzhen Qichang Intelligent Technology Co., Ltd.
+Shenzhen Qihoo Intelligent Technology Co.,Ltd
+Shenzhen Qihu Intelligent Technology Company Limited
+Shenzhen RB-LINK Intelligent Technology Co.Ltd
+Shenzhen Smart Intelligent Technology Co.Ltd
+Shenzhen Sunwoda intelligent hardware Co.,Ltd
+Shenzhen Vplus Communication Intelligent Co., Ltd.
+Shenzhen Wangliantong Intelligent Technology Co.,Lte
+Shenzhen Webridge Technology Co.,Ltd
+Shenzhen Wei Da Intelligent Technology Go.,Ltd
+Shenzhen Xiaoqi Intelligent Technology Co., Ltd.
+Shenzhen Xingyi Intelligent Technology Co.,Ltd
+Shenzhen Xinwei Intelligent Co., Ltd
+Shenzhen Xtooltech Intelligent Co.,Ltd.
+Shenzhen Yidao Intelligent Technology Co.,Ltd.
+Shenzhen Yinwang Intelligent Technologies Co., Ltd.
+Shenzhen Yinwang Intelligent Technologies Co.,Ltd.
+Shenzhen Zenith Intelligent Technology Co., Ltd.
+Shenzhen Zhongruixin Intelligent Technology Co., Ltd.
+Shenzhen bankledger Technology Co, Ltd
+Shenzhen xiaosha  Intelligence  Technology Co. Ltd
+Shenzhen LTIME In-Vehicle Entertainment System Company Limited
+Shoogee GmbH & Co. KG
+Siact Hinton (Beijing) Intelligent Control Technology Co., Ltd.
+Sichuan Gengyuan Technology Co.,Ltd
+Sichuan Haige Actec Communication Technology Co.,Ltd.
+Sichuan Huakun Zhenyu Intelligent Technology Co., Ltd
+Sichuan Huidian Qiming Intelligent Technology Co.,Ltd
+Siemens AG
+Siemens AG - Siemens Deutschland Mobility
+Siemens AG Austria
+Siemens AG Energy Management Division
+Siemens AG I IA PP PRM
+Siemens AG ICM MP UC RD IT KLF1
+Siemens AG,
+Siemens AG, Automations & Drives,
+Siemens AG, DI PA AE
+Siemens AG, Healthcare Sector
+Siemens AG, MO MLT BG
+Siemens AG, Sector Industry, Drive Technologies, Motion Control Systems
+Siemens AG, Transportation Systems
+Siemens Building Technologies AG,
+Siemens Canada
+Siemens Canada Limited
+Siemens Convergence Creators GmbH&Co.KG
+Siemens Energy Global GmbH & Co. KG
+Siemens Energy Global GmbH & Co.KG - GT PRM
+Siemens Healthcare Diagnostics
+Siemens Healthcare Diagnostics Manufacturing Ltd
+Siemens Healthcare Diagnostics, Inc
+Siemens Home & Office Comm. Devices
+Siemens Industrial Automation Products Ltd., Chengdu
+Siemens Industries, Inc, Retail & Commercial Systems
+Siemens Industry Software Inc.
+Siemens Industry, Inc.
+Siemens Low Voltage & Products
+Siemens Ltd.
+Siemens Mobility GmbH - MO TI SPA
+Siemens Mobility Limited
+Siemens NV (Belgium)
+Siemens Network Convergence LLC
+Siemens Numerical Control Ltd., Nanjing
+Siemens Power Automation Ltd.
+Siemens Rail Automation SAU
+Siemens Sensors & Communication Ltd.
+Siemens Switzerland Ltd., I B T HVP
+Sinotech Engineering Consultants, Inc.  Geotechnical Enginee
+Sintela Ltd
+Sisgeo Srl
+Sistemas de Gestión Energética S.A. de C.V
+Sivantos GmbH
+Skywave Technology Co,.Ltd.
+Smart Data (Shenzhen) Intelligent System Co., Ltd.
+Smart Gadgets Global LLC
+Smart Tech Inc
+SoGEME
+Softgent sp. z o.o.
+Sogecam Industrial, S.A.
+Solar Manager AG
+SolarEdge Technologies
+Solarbridge Technologies
+Solaredge LTD.
+Solid State Storage Technology Corporation
+SolidGear Corporation
+Solteras, Inc.
+Sonotronic Nagel GmbH
+SoundBridge
+Source Technologies, LLC
+SpaceBridge Semiconductor Corp.
+Spectrum Management, LC
+Spellman High Voltage Electronics Corp
+Spintronica LLC
+Stage One International Co., Ltd.
+Stage Tec Entwicklungsgesellschaft für professionelle Audio
+Stage Tec Entwicklungsgesellschaft für professionelle Audiotechnik mbH
+Standard Change Makers
+Stange Elektronik GmbH
+Stanley Security Solutions
+StarBridge, Inc.
+StarTop Era (Shanghai ) Intelligent Technology Co., Ltd.
+Starboard Storage Systems
+Starbridge Networks
+Stavecho Intelligence Technology (Beijing) Co., Ltd
+Stoneridge Electronics AB
+Storage Appliance Corporation
+Storage Apps
+Storage Concepts
+Storagedata
+StoreAge Networking Technologies
+Strahlenschutz- Entwicklungs- und Ausruestungsgesellschaft mbH
+SuZhou Ruishengwei Intelligent Technology Co.,Ltd
+Summit Data Communications
+Super Micro Computer, Inc.
+Supervision Test et Pilotage
+Surge Networks, Inc.
+Surpedia Technologies Co., Ltd.
+Suzhou AIDomex Intelligent Technology Co., Ltd.
+Suzhou Huaqi Intelligent Technology Co., Ltd.
+Suzhou Laisai Intelligence Technology Co.,Ltd
+Suzhou Torchstar Intelligent Technology Co.,Ltd
+Suzhou XiongLi Technology Inc.
+Switchgear and Instrumentation Ltd
+Synergies Intelligent Systems Inc.
+Systec Intelligent Building Technology (Tianjin) Co.,Ltd.
+SystemGear Co., Ltd.
+Systems With Intelligence Inc.
+Syswan Technologies Inc.
+Sörgel Elektronik
+T 1 Engineering
+T-CHIP INTELLIGENT TECHNOLOGY CO.,LTD.
+TAALEX Systemtechnik GmbH
+TBB Renewable (Xiamen) Co Ltd
+TDM Ingénierie
+TECHPLUS-LINK Technology Co.,Ltd
+TECHWARE SYSTEMS CORP.
+TELCO systems, s.r.o.
+TELE Haase Steuergeräte Ges.m.b.H
+TELEMECANIQUE ELECTRIQUE
+TELETASK BELGIUM
+TELGEN CORPORATION
+TELNET Redes Inteligentes S.A.
+TGE Co., Ltd.
+TGS Geophysical Company (UK) Limited
+THE SAGE GROUP PLC
+TKR Spezialwerkzeuge GmbH
+TMT&D Corporation
+TOSHIBA MITSUBISHI-ELECTRIC INDUSTRIAL SYSTEMS CORPORATION
+TP Vision Belgium N.V. - innovation site Brugge
+TRIAX-HIRSCHMANN Multi-Media GmbH
+TRIGEM COMPUTER, INC.
+TRUMPF Huttinger GmbH + Co. KG,
+TRUTOUCH TECHNOLOGIES INC
+TSB REAL TIME LOCATION SYSTEMS S.L.
+TTC Next-generation Home Network System WG
+TTE Germany GmbH
+TURCK, Inc.
+Tacom Projetos Bilhetagem Inteligente ltda
+Tagarno AS
+Taizhou convergence Information technology Co.,LTD
+Takiguchi Corporation
+Tandberg Storage ASA
+TangRen C&S CO., Ltd
+Tangent Design Engineering
+Targeted Technologies, LLC
+Taseon, Inc.
+Team Enginers
+TechPLEX Inc.
+Techvision Intelligent Technology Limited
+Teco Image Systems Co., Ltd.
+Tecogen Inc.
+Teenage Engineering AB
+Tekpea, Inc.
+TelcoBridges Inc.
+Telegenix
+Telegesis
+Telematica Sistems Inteligente
+Telerob Gesellschaft für Fernhantierungs
+Tenor Networks, Inc.
+Teq Diligent Product Solutions Pvt. Ltd.
+TeraMage Technologies Co., Ltd.
+Terabytes Server Storage Tech Corp
+Terragene
+Terragene S.A
+The Advantage Group
+The Kroger Co.
+The Trane Company
+Thermalimage
+Tianjin Beebox Intelligent Technology Co.,Ltd.
+Tianjin Geneuo Technology Co.,Ltd
+Tianjin Jinmu Intelligent Control Technology Co., Ltd
+Ticom Geomatics, Inc.
+Tiger NetCom
+Time Management, Inc.
+Tinkerforge GmbH
+Tintel Hongkong Co.Ltd
+TollBridge Technologies, Inc.
+Toshiba Samsung Storage Technolgoy Korea Corporation
+Toyou Feiji Electronics Co., Ltd.
+Transelektronik Messgeräte GmbH
+Transenna AB
+Transports Publics Genevois
+TrexEdge, Inc.
+Tributary Systems, Inc.
+Trilux Group Management GmbH
+Trinity College Dublin
+Trumpf Hüttinger
+Tsinghua Tongfang Legend Silicon Tech. Co., Ltd.
+U3storage Technologies Co., Ltd
+UAVISION Engenharia de Sistemas
+UBSTORAGE Co.,Ltd.
+UGENE SOLUTION inc.
+UNETCONVERGENCE CO., LTD
+UNGERMANN-BASS INC.
+UNIFAT TECHNOLOGY LTD.
+UNIWORLD VISION PVT LTD
+US Beverage Net
+Ufispace Co., LTD.
+Umeox Innovations Co.,Ltd
+Unetconvergence Co., Ltd.
+Unigen Corporation
+Unigen DataStorage Corporation
+Union Image Co.,Ltd
+Unitronux(Shenzhen) Intelligence Technology Co.,Ltd
+Universal Access Technology, Inc.
+University Of Groningen
+University of Geneva - Department of Particle Physics
+Unplugged Technologies Ltd.
+Uwe Schneider GmbH
+VANTAGE INTEGRATED SECURITY SOLUTIONS PVT LTD
+VILLAGE TRONIC ENTWICKLUNG
+VMware, Inc.
+VTQ Videtronik GmbH
+Valeo Siemens eAutomotive Norway
+Vantage Controls
+Vantageo Private Limited
+Vantiva Connected Home - Orange Belgium
+Vebo Genossenschaft
+Velorum B.V
+Verge.io
+ViGEM GmbH
+Videogenix
+Village Networks, Inc. (VNI)
+Villiger Security Solutions AG
+Viogem Limited
+Virbiage Pty Ltd
+Visable Genetics, Inc.
+Visioneered Image Systems
+Visualedge Technology Co., Ltd.
+Volkswagen Group of America
+Vonger Electronic Technology Co.,Ltd.
+Voyage Audio LLC
+Vuzix / Lenovo
+WAGO Kontakttechnik GmbH
+WEATHERNEWS INC.
+WEBGEAR, INC.
+WUHAN JINGCHEN INTELLIGENT IDENTIFICATION TECHNOLOGY CO.,LTD
+Wall Box Chargers, S.L.
+Wartsila Voyage Oy
+Wasp artificial intelligence(Shenzhen) Co.,ltd
+Watermark Estate Management Services, LLC
+Wegener Communications, Inc.
+Weightech Com. Imp. Exp. Equip. Pesagem Ltda
+Weinberger Deutschland GmbH
+Weinmann Geräte für Medizin GmbH + Co. KG
+Weishi Intelligent Information Technology (Guangzhou) Co., LTD
+Werbeagentur Jürgen Siebert
+WestfaliaSurge GmbH
+White Rodgers Division
+Wi-Gear Inc.
+Wilcoxon Research, Inc.
+Willow Garage, Inc.
+Wittmann Kunststoffgeräte GmbH
+Wuhan Glory Road Intelligent Technology Co., Ltd.
+Wuhan Guangying Intelligence Technology Co., Ltd
+Wuhan Huagong Genuine Optics Technology Co., Ltd
+Wuhan Linptech Co. ,Ltd.
+Wuxi Yikesen Intelligent Technology Co., Ltd
+X2gen Digital Corp. Ltd
+XD-GE Automation CO.,LTD
+XGEM SAS
+XIAMEN VANN INTELLIGENT CO., LTD
+XIAMEN YEALINK NETWORK TECHNOLOGY CO.,LTD
+XIAMEN ZHIXIAOJIN INTELLIGENT TECHNOLOGY CO., LTD
+Xiamen Mage Information Technology Co.,Ltd.
+Xiamen Rgblink Science & Technology Co., Ltd.
+Xiaoxinge (Tangshan) Electronic Technology Co., Ltd.
+Xintai Automobile Intelligent Network Technology
+Xovis Germany GmbH
+YAMATAKE-HONEYWELL CO., LTD.
+YAMATECH SCIENTIFIC LTD.
+YORK Refrigeration, Marine & Controls
+YUGE Information technology Co. Ltd
+Yantai Jahport Electronic Technology Co., Ltd.
+Yobiiq Intelligence B.V.
+Young Generation International Corp.
+Yuanzhou Intelligent (Shenzhen) Co., Ltd.
+Yunjing lntelligent Technology(Dongguan).,Ltd
+Yuyao Sunny Optical Intelligence Technology Co., Ltd
+ZACCESS Systems
+ZELPOS
+ZHEJIANG AIKE INTELLIGENTTECHNOLOGY CO.LTD
+ZHEJIANG MOORGEN INTELLIGENT TECHNOLOGY CO.,LTD
+ZHS ZEITMANAGEMENTSYSTEME
+ZIGEN Lighting Solution co., ltd.
+ZPSYS CO.,LTD. (Planning&Management)
+ZSK Stickmaschinen GmbH
+Zabbly
+Zadara Storage Ltd.
+Zahner-Elektrik Ingeborg Zahner-Schiller GmbH & Co. KG.
+Zellweger Analytics, Inc.
+Zengge Co., Limited
+Zenway enterprise ltd
+Zhejiang Cainiao Supply Chain Management Co., Ltd
+Zhejiang Cainiao Supply Chain Management Co.,Ltd
+Zhejiang Eternal Automation Sci-Tec Co., Ltd
+Zhejiang Huazhou Intelligent Equipment Co,. Ltd
+Zhejiang Moorgen Intelligence Technology Co., Ltd
+Zhejiang Ruiyi lntelligent Technology Co. Ltd
+Zhejiang Send Intelligent Technology,Ltd
+Zhejiang Tengen Electric Co.,Ltd.
+Zhejiang Wanyou Intelligent Technology Co.,Ltd.
+Zhejiang Weilai Jingling Artificial Intelligence Technology Co., Ltd.
+Zhejiang Wellsun Intelligent Technology Co.,Ltd.
+Zhengzhou Reform Intelligent Device Co., Ltd
+Zhixiang Technology Co., Ltd.
+Zhiyue Xingchen(shanghai) Intelligent Terminal Co.,Ltd.
+Zhong Ge Smart Technology Co., Ltd.
+Zhongge Smart Technology(Shanghai) Co., Ltd
+Zhongshan General K-mate Electronics Co., Ltd
+Zhongshan K-mate General Electronics Co.,Ltd
+Zhongxin Intelligent Times (Shenzhen) Co., Ltd.
+Zhouhai Intelligence(Shenzhen).,Ltd
+Zhuhai TOP Intelligence Electric Co., Ltd.
+Zhuhai Yunzhou Intelligence Technology Ltd.
+Zigen Corp
+Zigencorp, Inc
+Zmodo Technology Corporation
+bentrup Industriesteuerungen
+boger electronics gmbh
+byd:sign Corporation
+chargeBIG
+cheilelectric
+db Broadcast Products Ltd
+dieEntwickler Elektronik GmbH
+digEcor
+din Dietmar Nocker Facilitymanagement GmbH
+duagon Germany GmbH
+e-generis
+eGauge Systems LLC
+edgeflow Canada Inc.
+eks Engel GmbH & Co. KG
+exceet electronics GesmbH
+eyrise B.V.
+gekartel AG
+gemalto e-Payment
+genua GmbH
+global moisture management system
+gt german telematics gmbh
+guangzhou huiqun intelligent technology co. LTD
+hangzhou zhiyi communication co., ltd
+iCE-Intelligent Controlled Environments
+iGentAI Computing Technology(Shenzhen) Co., Ltd.
+iKnowledge Integration Corp.
+iRF - Intelligent RF Solutions, LLC
+iSmart electronic technology co.,LTD
+ideaForge Technology Limited
+ifm electronic gmbh
+infoplan Gesellschaftfür  Informationssysteme mbH
+inoage GmbH
+ioBridge, Inc.
+ioIMAGE Ltd.
+ipUnplugged AB
+iris-GmbH infrared & intelligent sensors
+legendsky tech
+lignex1
+managee GmbH & Co KG
+manageon
+nac Image Technology, Inc.
+nexgenwave
+osf Hansjuergen Meier GmbH & Co. KG
+shanghai Rinlink  Intelligent Technology Co., Ltd.
+shanghai trend intelligent systems CO.,LTD
+shenzhen newbridge communication equipment CO.,LTD
+slash dev slash agents, inc
+sonoscape
+ssolgrid
+tcloud intelligence
+tecget GmbH
+«Intellect module» LLC

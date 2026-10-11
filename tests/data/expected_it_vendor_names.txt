@@ -1,0 +1,45 @@
+# Registry vendor names from registry_vendor_names.txt classified IT; reviewed by the project owner
+Apple, Inc.
+Cisco Meraki
+Cisco SPVTG
+Cisco Systems Inc
+Cisco Systems, Inc
+Cisco-Linksys, LLC
+Dell
+Dell EMC
+Dell Inc.
+Dell Technologies
+Dell'Orto S.P.A.
+HP GLOBALES MEXICO
+HP Inc.
+HP Tuners LLC
+Hewlett Packard
+Hewlett Packard Enterprise
+Intel Corporate
+Intel Corporation
+Intel Wireless Network Group
+Italdata Ingegneria dell'Idea S.p.A.
+LENOVO(BEIJING)CO., LTD.
+Lenovo
+Lenovo (Beijing) Co., Ltd.
+Lenovo (Beijing) Limited.
+Lenovo Data Center Group
+Lenovo Future Communication Technology (Chongqing) Company Limited
+Lenovo Image(Tianjin) Technology Ltd.
+Lenovo India Private Limited
+Lenovo Information Products (Shenzhen)Co.,Ltd
+Lenovo Mobile Communication (Wuhan) Company Limited
+Lenovo Mobile Communication Technology Ltd.
+MICROSOFT CORP.
+Microsoft
+Microsoft Corp.
+Microsoft Corporation
+Microsoft Mobile Oy
+Microsoft Research
+Microsoft XCG
+Motorola Mobility LLC, a Lenovo Company
+Notebook Development Lab.  Lenovo Japan Ltd.
+ProCurve Networking by HP
+Super Micro Computer, Inc.
+VMware, Inc.
+Vuzix / Lenovo

@@ -1,0 +1,48 @@
+# Registry vendor names from registry_vendor_names.txt classified NEUTRAL; reviewed by the project owner
+APC by Schneider Electric
+Belden
+Belden Deutschland GmbH
+Belden Hirschmann industries (Suzhou) Limited
+Belden India Private Limited
+Belden Mooresville
+Belden Singapore Pte. Ltd.
+Current, powered by GE
+Delta Electronics
+Delta Electronics, Inc.
+DigiBoard
+Eaton Corp. Electrical Group Data Center Solutions - Pulizzi
+Emerson Network Power (India) Pvt. Ltd.
+Emerson Network Power Co.,Ltd
+Emerson Network Power, Avocent Division
+GE
+GE AVIC Civil Avionics Systems Company Limited
+GE Appliances
+GE Aviation Cheltenham
+GE Aviation System
+GE Energy
+GE Lighting
+GE Medical System China Co. Ltd.
+GE Medical System(China) Co., Ltd.
+GE Power Management
+GE Security
+GE Security Kampro
+GE Security-Kampro
+GE Transportation Systems
+GE Vernova
+GENERAL ELECTRIC CORPORATION
+Ge Ruili Intelligent Technology ( Beijing ) Co., Ltd.
+General Electric Company
+General Electric Consumer and Industrial
+General Electric Global Research
+General Electric Water & Process Technologies
+Grass Valley, A Belden Brand
+HIRSCHMANN AUSTRIA GMBH
+Hirschmann Automation
+Hirschmann Automation and Control GmbH
+Honeywell Video Systems
+Lantronix
+SECURITE COMMUNICATIONS / HONEYWELL
+Shanghai HITE-BELDEN Network Technology Co., Ltd.
+Siemens Industry Software Inc.
+XD-GE Automation CO.,LTD
+Zhong Ge Smart Technology Co., Ltd.

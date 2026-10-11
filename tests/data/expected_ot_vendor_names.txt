@@ -1,0 +1,173 @@
+# Registry vendor names from registry_vendor_names.txt classified OT; reviewed by the project owner
+ABB
+ABB AB PGHV
+ABB AB, Cewe-Control
+ABB AG
+ABB AS, Division Automation Products
+ABB Australia
+ABB Automation products GmbH
+ABB Bomem, Inc.
+ABB EVI SPA
+ABB Electrification Smart Power (ELSP)
+ABB Genway Xiamen Electrical Equipment CO., LTD
+ABB Global Industries and Services Private Limited
+ABB INDUSTRIAL SYSTEMS AB
+ABB Inc.
+ABB Inc/Totalflow
+ABB LV Installation Materials Co., Ltd. Beijing
+ABB Ltd
+ABB Oy
+ABB Oy / Medium Voltage Products
+ABB Oy Drives
+ABB POWER T&D COMPANY, INC.
+ABB Power Systems Power Generation
+ABB Power Technologies S.p.A.  Unità  Operativa SACE (PTMV)
+ABB Robotics
+ABB S.p.A.
+ABB SPA - DMPC
+ABB SPA, ABB SACE DIV.
+ABB SpA - DIN Rail
+ABB Switzerland Inc
+ABB Switzerland Ltd
+ABB Switzerland Ltd.
+ABB T&D Spa
+ABB Transmission and Distribution Automation Equipment (Xiamen) Co., Ltd.
+ABB Xiamen Low Voltage Equipment Co.,Ltd.
+ABB Xiamen Switchgear Co. Ltd.
+ABB n.v. Power Quality Products
+ADVANTECH CO., LTD.
+ADVANTECH TECHNOLOGIES CO.,LTD
+Advantech AMT Inc.
+Advantech Czech
+Advantech Technology (CHINA) Co., Ltd.
+B&R Industrial Automation GmbH
+Beckhoff Automation GmbH
+CONTEMPORARY CONTROL
+DELTA CONTROLS, INC.
+EATON FHF Funke + Huster Fernsig GmbH
+Eaton Automation AG
+Eaton Bussmann
+Eaton Corporation
+Eaton Industries GmbH
+Emerson
+Emerson Automation FCP Kft.
+Emerson Climate Technologies GmbH
+Emerson Energy Systems AB
+Emerson Process Management Power & Water Solutions, Inc.
+Emerson Rosemount Analytical
+Endress & Hauser GmbH & Co
+Foxboro Eckardt Development GmbH
+General Electric Digital Energy
+HMS Industrial Networks
+HMS Industrial Networks SLU
+Hilscher GmbH
+Honeywell
+Honeywell (China) Co., LTD
+Honeywell Analytics
+Honeywell Analytics Ltd
+Honeywell CMSS
+Honeywell Co., Ltd. (KOREA)
+Honeywell Connected Building
+Honeywell Environmental & Combustion Controls
+Honeywell Environmental & Combustion Controls (Tianjin) Co., Ltd.
+Honeywell Fire System (Shanghai) Co,. Ltd.
+Honeywell GNO
+Honeywell GmbH
+Honeywell International
+Honeywell International Inc
+Honeywell Life Safety
+Honeywell SPS
+Honeywell Safety Products (Shanghai) Co.,Ltd
+Honeywell Safety Products USA, Inc
+Honeywell Security (China) Co., Ltd.
+Honeywell Sensotec
+Honeywell spol. s.r.o. HTS CZ o.z.
+IFM Electronic gmbh
+Invensys
+Invensys Controls Network Systems
+Invensys Controls UK Limited
+Invensys Energy Systens (NZ) Limited
+MITSUBISHI ELECTRIC AUTOMATION (CHINA) LTD.
+MITSUBISHI ELECTRIC INDIA PVT. LTD.
+MITSUBISHI ELECTRIC SYSTEM & SERVICE CO.,LTD.
+MOXA TECHNOLOGIES CORP., LTD.
+Mitsubishi Electric Corporation
+Mitsubishi Electric Europe B.V UK Branch
+Mitsubishi Electric India PVT. LTD
+Mitsubishi Electric India Pvt. Ltd.
+Mitsubishi Electric Klimat Transportation Systems S.p.A.
+Mitsubishi Electric Micro-Computer Application Software Co.,Ltd.
+Mitsubishi Electric System & Service Co., Ltd.
+Mitsubishi Electric US, Inc.
+Moxa.Inc
+Murrelektronik GmbH
+OMRON Corporation
+OMRON SENTECH CO., LTD.
+OMRON TATEISI ELECTRONICS CO.
+OPTO-22
+Pepperl+Fuchs GmbH
+Phoenix Contact GmbH & Co. KG
+Pilz GmbH & Co.
+Prosoft Technology, Inc
+Red Lion Controls Inc.
+Red Lion Controls, LP
+Red Lion Europe GmbH
+Rockwell Automation
+SICK AG
+SIEMENS AG
+SIEMENS AG, Digital Factory, Motion Control System
+SIEMENS AS
+SIEMENS BUILDING
+SIEMENS ENERGY AUTOMATION
+Schneider Electric
+Schneider Electric (Australia)
+Schneider Electric Asia Pacific Ltd
+Schneider Electric Canada Inc
+Schneider Electric Fire & Security Oy
+Schneider Electric GmbH
+Schneider Electric Japan Holdings Ltd.
+Schneider Electric Korea
+Schneider Electric Motion
+Schneider Electric Motion USA
+Schneider Electric Motion, Inc. USA
+Schneider Electric USA
+Schneider Electric Ultra Terminal
+Schneider-Electric(China)Co.Ltd,Shenzhen Branch
+Siemens AG
+Siemens AG - Siemens Deutschland Mobility
+Siemens AG Austria
+Siemens AG Energy Management Division
+Siemens AG I IA PP PRM
+Siemens AG ICM MP UC RD IT KLF1
+Siemens AG,
+Siemens AG, Automations & Drives,
+Siemens AG, DI PA AE
+Siemens AG, MO MLT BG
+Siemens AG, Sector Industry, Drive Technologies, Motion Control Systems
+Siemens AG, Transportation Systems
+Siemens Building Technologies AG,
+Siemens Canada
+Siemens Canada Limited
+Siemens Convergence Creators GmbH&Co.KG
+Siemens Energy Global GmbH & Co. KG
+Siemens Energy Global GmbH & Co.KG - GT PRM
+Siemens Industrial Automation Products Ltd., Chengdu
+Siemens Industries, Inc, Retail & Commercial Systems
+Siemens Industry, Inc.
+Siemens Low Voltage & Products
+Siemens Ltd.
+Siemens Mobility GmbH - MO TI SPA
+Siemens Mobility Limited
+Siemens NV (Belgium)
+Siemens Network Convergence LLC
+Siemens Numerical Control Ltd., Nanjing
+Siemens Power Automation Ltd.
+Siemens Rail Automation SAU
+Siemens Sensors & Communication Ltd.
+Siemens Switzerland Ltd., I B T HVP
+TELEMECANIQUE ELECTRIQUE
+TOSHIBA MITSUBISHI-ELECTRIC INDUSTRIAL SYSTEMS CORPORATION
+TURCK, Inc.
+WAGO Kontakttechnik GmbH
+YAMATAKE-HONEYWELL CO., LTD.
+ifm electronic gmbh

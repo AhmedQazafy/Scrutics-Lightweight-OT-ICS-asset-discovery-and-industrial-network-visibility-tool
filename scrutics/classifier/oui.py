@@ -13,6 +13,7 @@ The bundled database covers vendor identification without any outbound connectio
 """
 
 import os
+import unicodedata
 import json
 import re
 import datetime
@@ -42,25 +43,29 @@ VENDOR_CLASS_IT = "IT"
 VENDOR_CLASS_NEUTRAL = "NEUTRAL"
 VENDOR_CLASS_UNKNOWN = "UNKNOWN"
 
-# Authoritative mapping of vendor substring patterns to vendor classes.
+# Vendor keys and the class each one gives a vendor name. A key matches a name only as whole
+# consecutive words after normalisation (see _vendor_tokens), never as a substring, so "abb" does
+# not match "Abbott" and "intel" does not match "Bintel". Keys are written already normalised.
 # Vendor classification is an evidence input, not the final asset classification.
 VENDOR_CLASS_MAPPING = {
     # Pure OT / Industrial Automation
     "siemens": VENDOR_CLASS_OT,
-    "schneider": VENDOR_CLASS_OT,
+    "schneider electric": VENDOR_CLASS_OT,   # not "schneider" alone: Schneider Displaytechnik
+    "telemecanique": VENDOR_CLASS_OT,        # Schneider Electric brand; registry holder of 00:80:F4
     "rockwell": VENDOR_CLASS_OT,
-    "allen-bradley": VENDOR_CLASS_OT,
+    "allen bradley": VENDOR_CLASS_OT,
     "moxa": VENDOR_CLASS_OT,
     "phoenix contact": VENDOR_CLASS_OT,
     "beckhoff": VENDOR_CLASS_OT,
     "advantech": VENDOR_CLASS_OT,
     "wago": VENDOR_CLASS_OT,
     "hilscher": VENDOR_CLASS_OT,
-    "prosoft": VENDOR_CLASS_OT,
+    "hms industrial networks": VENDOR_CLASS_OT,   # registry holder of 00:30:11
+    "prosoft technology": VENDOR_CLASS_OT,   # not "prosoft" alone: Prosoft Systems is unrelated
     "red lion": VENDOR_CLASS_OT,
     "kepware": VENDOR_CLASS_OT,
     "opto 22": VENDOR_CLASS_OT,
-    "b&r": VENDOR_CLASS_OT,
+    "b r industrial automation": VENDOR_CLASS_OT,  # B&R; "b r" alone also matches B. R. Electronics
     "pilz": VENDOR_CLASS_OT,
     "sick": VENDOR_CLASS_OT,
     "turck": VENDOR_CLASS_OT,
@@ -70,22 +75,38 @@ VENDOR_CLASS_MAPPING = {
     "honeywell": VENDOR_CLASS_OT,
     "emerson": VENDOR_CLASS_OT,
     "yokogawa": VENDOR_CLASS_OT,
-    "ge": VENDOR_CLASS_OT,
-    "mitsubishi": VENDOR_CLASS_OT,
+    "ge fanuc": VENDOR_CLASS_OT,
+    "ge intelligent platforms": VENDOR_CLASS_OT,
+    "ge multilin": VENDOR_CLASS_OT,
+    "ge grid": VENDOR_CLASS_OT,
+    "ge digital energy": VENDOR_CLASS_OT,
+    "general electric digital energy": VENDOR_CLASS_OT,  # Multilin relays; more specific than "general electric"
+    "mitsubishi electric": VENDOR_CLASS_OT,  # not "mitsubishi" alone: Mitsubishi Chemical, Heavy Industries
     "omron": VENDOR_CLASS_OT,
-    "delta": VENDOR_CLASS_OT,
+    "delta controls": VENDOR_CLASS_OT,       # building automation; not "delta" alone: Delta Networks, Delta Dore
     "invensys": VENDOR_CLASS_OT,
     "foxboro": VENDOR_CLASS_OT,
     "endress": VENDOR_CLASS_OT,
     "ifm": VENDOR_CLASS_OT,
     "pepperl": VENDOR_CLASS_OT,
     "contemporary controls": VENDOR_CLASS_OT,
+    "contemporary control": VENDOR_CLASS_OT,  # the registry spells it "CONTEMPORARY CONTROL"
 
     # Neutral / Dual-use / Industrial Network Infrastructure
     "belden": VENDOR_CLASS_NEUTRAL,
     "hirschmann": VENDOR_CLASS_NEUTRAL,
     "lantronix": VENDOR_CLASS_NEUTRAL,
     "digi international": VENDOR_CLASS_NEUTRAL,
+    "digiboard": VENDOR_CLASS_NEUTRAL,             # registry name for Digi International's 00:40:9D
+    "delta electronics": VENDOR_CLASS_NEUTRAL,     # power supplies and automation products
+    "apc by schneider electric": VENDOR_CLASS_NEUTRAL,  # UPS maker; more specific than "schneider electric"
+    "general electric": VENDOR_CLASS_NEUTRAL,      # conglomerate; OT only through the GE automation names
+    "ge": VENDOR_CLASS_NEUTRAL,                    # conglomerate; whole word only
+    "siemens industry software": VENDOR_CLASS_NEUTRAL,      # engineering software, not field devices
+    "honeywell video systems": VENDOR_CLASS_NEUTRAL,        # video surveillance
+    "securite communications honeywell": VENDOR_CLASS_NEUTRAL,  # security communications
+    "emerson network power": VENDOR_CLASS_NEUTRAL,          # data-centre power and Avocent KVM
+    "eaton corp electrical group data center solutions": VENDOR_CLASS_NEUTRAL,  # data-centre power (Pulizzi)
 
     # IT / Enterprise Networking / Computing
     # Cisco is classified as IT/networking signal, not OT.
@@ -99,7 +120,47 @@ VENDOR_CLASS_MAPPING = {
     "microsoft": VENDOR_CLASS_IT,
     "vmware": VENDOR_CLASS_IT,
     "supermicro": VENDOR_CLASS_IT,
+    "super micro": VENDOR_CLASS_IT,          # the registry spells it "Super Micro Computer, Inc."
+    "super micro computer": VENDOR_CLASS_IT,  # registry spelling of Supermicro
 }
+
+# Names containing a vendor key that are not that vendor's automation business. A matching
+# exclusion that is more specific than every matching key makes the name UNKNOWN.
+VENDOR_NAME_EXCLUSIONS = {
+    "ge healthcare": "medical devices, not GE automation",
+    "fujitsu siemens": "Fujitsu Siemens Computers, a PC maker",
+    "nokia siemens": "Nokia Siemens Networks, telecom equipment",
+    "omron healthcare": "medical devices, not Omron automation",
+    "rockwell collins": "avionics, not Rockwell Automation",
+    "siemens healthcare diagnostics": "medical diagnostics, not Siemens automation",
+    "siemens ag healthcare sector": "medical devices, not Siemens automation",
+    "digiboard eletronica": "unrelated Brazilian electronics maker, not Digi International",
+    "siemens home office comm devices": "home and office telephones",
+    "valeo siemens": "automotive drive trains (Valeo Siemens eAutomotive)",
+    "siemens telecommunication systems": "telecom equipment",
+    "honeywell dating": "unrelated registrant named HONEYWELL-DATING",
+    "emerson appliance motors": "appliance motors, not Emerson automation",
+    "hirschmann multimedia": "consumer antennas, not Hirschmann industrial networking",
+    "triax hirschmann": "consumer antennas (TRIAX-HIRSCHMANN Multi-Media)",
+}
+
+# Keys that no IEEE registry organisation name contains. They are kept for vendor names that
+# reach classify_vendor from other sources: sessions saved with older bundled vendor data (for
+# example "GE Fanuc Automation"), user OUI files, and names written by hand. Every other key and
+# exclusion matches at least one registry name.
+#   ge fanuc, ge multilin, ge grid, ge digital energy: names used before GE's registrations were
+#     renamed; GE Intelligent Platforms became part of Emerson in 2019
+#   kepware: a software vendor without an assignment
+#   yokogawa: no Yokogawa organisation in the registry (00:00:64 is now DTS INSIGHT Corporation)
+#   allen bradley: a Rockwell brand without its own assignment
+#   digi international: registered as "DigiBoard" (00:40:9D)
+#   contemporary controls: registered as "CONTEMPORARY CONTROL"
+#   supermicro: registered as "Super Micro Computer, Inc."
+NAMES_OUTSIDE_REGISTRY = frozenset({
+    "ge fanuc", "ge intelligent platforms", "ge multilin", "ge grid", "ge digital energy",
+    "kepware", "yokogawa", "allen bradley", "digi international", "contemporary controls",
+    "supermicro",
+})
 
 # Backward compatibility set of OT vendors (frozenset)
 OT_VENDORS = frozenset(k for k, v in VENDOR_CLASS_MAPPING.items() if v == VENDOR_CLASS_OT)
@@ -254,21 +315,45 @@ def lookup_vendor(mac: str, oui_db: dict) -> str:
     return "Unknown"
 
 
+def _vendor_tokens(text: str) -> tuple:
+    """Lower-case words of a vendor name: accents removed, every other character a separator."""
+    folded = unicodedata.normalize("NFKD", text.casefold())
+    folded = "".join(c for c in folded if not unicodedata.combining(c))
+    return tuple(re.sub(r"[^0-9a-z]+", " ", folded).split())
+
+
+def _contains_words(name: tuple, key: tuple) -> bool:
+    n = len(key)
+    return any(name[i:i + n] == key for i in range(len(name) - n + 1))
+
+
+_VENDOR_KEYS = tuple(
+    [(_vendor_tokens(k), v) for k, v in VENDOR_CLASS_MAPPING.items()]
+    + [(_vendor_tokens(k), VENDOR_CLASS_UNKNOWN) for k in VENDOR_NAME_EXCLUSIONS]
+)
+
+
 def classify_vendor(vendor: str | None) -> str:
     """
     Determine vendor classification ('OT', 'IT', 'NEUTRAL', 'UNKNOWN') from vendor string.
     Authoritative mechanism for determining vendor class from a vendor identity.
     Vendor classification is an evidence input, NOT the final asset classification.
+
+    A key matches only as whole consecutive words of the normalised name. When several keys
+    match, the most specific wins (the one with the most words); if the most specific matches
+    disagree on the class, or the winner is an exclusion, the result is UNKNOWN. The result does
+    not depend on the order of the mapping.
     """
     if not vendor or not vendor.strip() or vendor.strip().lower() == "unknown":
         return VENDOR_CLASS_UNKNOWN
 
-    vendor_lower = vendor.strip().lower()
-    for pattern, vclass in VENDOR_CLASS_MAPPING.items():
-        if pattern in vendor_lower:
-            return vclass
-
-    return VENDOR_CLASS_UNKNOWN
+    name = _vendor_tokens(vendor)
+    matches = [(len(key), vclass) for key, vclass in _VENDOR_KEYS if _contains_words(name, key)]
+    if not matches:
+        return VENDOR_CLASS_UNKNOWN
+    best = max(words for words, _ in matches)
+    classes = {vclass for words, vclass in matches if words == best}
+    return classes.pop() if len(classes) == 1 else VENDOR_CLASS_UNKNOWN
 
 
 def is_ot_vendor(vendor: str) -> bool:
