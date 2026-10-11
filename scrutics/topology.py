@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import scrutics
 from scrutics.protocol_display import protocol_display_text
+from scrutics.vendor_display import vendor_note
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,7 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
             "color": NODE_COLORS[ntype],
             "size": max(14, min(36, 14 + confidence // 4)),
             "vendor": _safe_text(getattr(asset, "vendor", None)),
+            "vendor_note": vendor_note(asset),
             "protocol": protocol_display_text(asset),
             "role": _safe_text(getattr(asset, "role", None), "Unclassified"),
             "confidence": confidence,
@@ -873,6 +875,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       `ID: ${node.id}<br>` +
       `Type: ${node.type}<br>` +
       `Vendor: ${node.vendor}<br>` +
+      (node.vendor_note ? `Vendor note: ${node.vendor_note}<br>` : "") +
       `Protocol: ${node.protocol}<br>` +
       `Role: ${node.role}<br>` +
       `MAC: ${node.mac}<br>` +
@@ -989,6 +992,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       "IP": n.id,
       "MAC": n.mac || "",
       "Vendor": n.vendor || "",
+      "Vendor note": n.vendor_note || "",
       "Protocol": n.protocol || "",
       "Role": n.role || "",
       "Type": n.type,

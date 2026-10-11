@@ -194,7 +194,7 @@ def _saved_rows(tmp_path, inv):
 def test_csv_keeps_served_protocols_and_saves_display_entries_last(tmp_path):
     inv, hmi = _client_hmi_inventory()
     row = _saved_rows(tmp_path, inv)[0]
-    assert list(row)[-1] == "protocol_display"
+    assert list(row)[-2:] == ["protocol_display", "vendor_note"]
     assert row["protocol"] == "Unknown"
     assert row["protocol_display"] == (
         "Modbus TCP (client)|S7comm / IEC 61850 MMS / ICCP (client, port)"

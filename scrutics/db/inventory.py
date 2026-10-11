@@ -10,6 +10,7 @@ import time
 
 from scrutics.capture.cooldown import Cooldowns
 from scrutics.protocol_display import DISPLAY_SEPARATOR, protocol_display_entries
+from scrutics.vendor_display import vendor_note
 
 # Evidence weights (moved here for central definition)
 EVIDENCE_WEIGHT_OT_VENDOR = 30
@@ -719,6 +720,8 @@ class Asset:
         })
         # Displayed protocol text, last; "protocol" keeps the served protocols only
         right["protocol_display"] = DISPLAY_SEPARATOR.join(protocol_display_entries(self))
+        # Display note for an OT-associated vendor without an observed OT service, last
+        right["vendor_note"] = vendor_note(self)
         return {**left, **right}
 
 

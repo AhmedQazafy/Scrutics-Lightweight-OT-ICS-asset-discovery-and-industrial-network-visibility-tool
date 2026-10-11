@@ -41,6 +41,7 @@ from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 from scrutics.diagnostics import VERSION
 from scrutics.topology import export_topology
+from scrutics.vendor_display import vendor_note
 from scrutics.protocol_display import (
     PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text, split_display_column,
 )
@@ -1878,6 +1879,15 @@ _RULE_DESCRIPTIONS = {
 NOT_RECORDED = "not recorded"
 
 
+def asset_identity_lines(asset) -> list:
+    """Detail-panel lines naming the device: MAC and vendor, then the vendor note when it applies."""
+    lines = [f"MAC: {asset.mac}    Vendor: {asset.vendor}"]
+    note = vendor_note(asset)
+    if note:
+        lines.append(f"Vendor note: {note}")
+    return lines
+
+
 def classification_basis_lines(asset) -> list:
     """Detail-panel lines explaining the classification: confidence, rule, reason, conflicts."""
     rule = getattr(asset, "classification_rule", "")
@@ -1985,7 +1995,7 @@ class DetailScreen(ModalScreen):
 
             lines.append(f"[bold]Asset Details: {asset.ip}[/bold]")
             lines.append("")
-            lines.append(f"MAC: {asset.mac}    Vendor: {asset.vendor}")
+            lines.extend(asset_identity_lines(asset))
             lines.append("")
 
             # Liveness status
@@ -2068,6 +2078,7 @@ class DetailScreen(ModalScreen):
             "ip": asset.ip,
             "mac": asset.mac,
             "vendor": asset.vendor,
+            "vendor_note": vendor_note(asset),
             "protocols": asset.protocols,
             "protocol_display": protocol_display_entries(asset),
             "role": asset.role,

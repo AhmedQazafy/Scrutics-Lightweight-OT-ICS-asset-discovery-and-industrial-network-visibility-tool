@@ -40,6 +40,7 @@ from scrutics.diagnostics import (
 )
 from scrutics.db.inventory import AssetInventory, limit_summary_line
 from scrutics.protocol_display import PROTOCOL_COLUMN_WIDTH, protocol_display_text
+from scrutics.vendor_display import VENDOR_NOTE, count_vendor_notes
 from scrutics.topology import export_topology
 
 SESSION_FLUSH_INTERVAL = 15.0
@@ -837,6 +838,10 @@ def run_headless(args) -> int:
         # Entries a device did not keep because a per-device retention limit was reached
         limits = inventory.limit_totals()
         print(f"[{'!' if any(limits.values()) else '+'}] {limit_summary_line(limits)}")
+        # Devices whose vendor is OT-associated but where this capture showed no OT service
+        noted = count_vendor_notes(inventory.get_all())
+        if noted:
+            print(f"[*] {noted} device(s) noted: {VENDOR_NOTE}")
 
         print(f"\n[+] Session saved to: {session_dir}")
         if topology_paths:
