@@ -770,41 +770,86 @@ def install_oui_database(source_data_or_file: str | bytes, source_type: str,
         return False, f"Installation error: {e}", None
 
 
+class OUIDownloadError(Exception):
+    """The OUI database could not be downloaded; the message says why."""
+
+
+def _download_user_agent() -> str:
+    """User-Agent for registry downloads: the product name and installed version."""
+    try:
+        from importlib.metadata import version
+        return f"Scrutics/{version('scrutics')}"
+    except Exception:
+        return "Scrutics"
+
+
+def fetch_oui_database(url: str = IEEE_OUI_URL, timeout: int = 30) -> tuple[bytes, str | None]:
+    """
+    Download an OUI database and return (raw bytes, source date "YYYY-MM-DD" or None).
+    Network access is ONLY made when this function is explicitly invoked.
+
+    The IEEE server answers some client User-Agents (for example python-requests' default) with
+    HTTP 418, so the request names Scrutics and its version. Raises OUIDownloadError when the
+    server refuses the request, the network fails, or the body is shorter than the server's
+    Content-Length.
+    """
+    import http.client
+    import urllib.error
+    import urllib.request
+    from email.utils import parsedate_to_datetime
+
+    req = urllib.request.Request(url, headers={"User-Agent": _download_user_agent()})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            status = getattr(response, "status", None)
+            if isinstance(status, int) and status != 200:
+                raise OUIDownloadError(f"the server answered HTTP {status} instead of the file")
+            data = response.read()
+            expected = response.headers.get("Content-Length")
+            if expected and str(expected).isdigit() and int(expected) != len(data):
+                raise OUIDownloadError(f"the download is incomplete ({len(data):,} of {int(expected):,} bytes)")
+            source_date = None
+            last_mod = response.headers.get("Last-Modified")
+            if last_mod:
+                try:
+                    source_date = parsedate_to_datetime(last_mod).strftime("%Y-%m-%d")
+                except Exception:
+                    pass
+            return data, source_date
+    except OUIDownloadError:
+        raise
+    except urllib.error.HTTPError as e:
+        raise OUIDownloadError(f"the server refused the download (HTTP {e.code} {e.reason})") from e
+    except http.client.IncompleteRead as e:
+        raise OUIDownloadError(f"the download is incomplete ({len(e.partial):,} bytes received)") from e
+    except urllib.error.URLError as e:
+        raise OUIDownloadError(f"network error: {e.reason}") from e
+    except (OSError, http.client.HTTPException) as e:
+        raise OUIDownloadError(f"network error: {e}") from e
+
+
 def download_ieee_oui(url: str = IEEE_OUI_URL, timeout: int = 30) -> tuple[bool, str, dict | None]:
     """
     Download IEEE OUI database from URL and install to ~/.scrutics/oui.txt.
     Network access is ONLY made when this function is explicitly invoked.
+    A failed download or a file that fails validation leaves the installed database unchanged.
     """
-    import urllib.request
-    import urllib.error
-    from email.utils import parsedate_to_datetime
-
     try:
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": "Scrutics/v0.5.0"},
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            data = response.read()
-            last_mod = response.headers.get("Last-Modified")
-            source_date = None
-            if last_mod:
-                try:
-                    dt = parsedate_to_datetime(last_mod)
-                    source_date = dt.strftime("%Y-%m-%d")
-                except Exception:
-                    pass
-
-        return install_oui_database(
-            source_data_or_file=data,
-            source_type=url,
-            source_date=source_date,
-            min_entries=1000,
-        )
-    except urllib.error.URLError as e:
-        return False, f"Network error downloading OUI database: {e}", None
-    except Exception as e:
-        return False, f"Error updating OUI database: {e}", None
+        data, source_date = fetch_oui_database(url, timeout)
+    except OUIDownloadError as e:
+        return (False, f"Could not download the OUI database: {e}. {OUI_USER_PATH} was not changed. "
+                       f"To install it offline, download {url} in a browser and run "
+                       f"'scrutics oui import <file>'.", None)
+    ok, msg, report = install_oui_database(
+        source_data_or_file=data,
+        source_type=url,
+        source_date=source_date,
+        min_entries=1000,
+    )
+    if not ok and report is not None:
+        # Rejected by the validator before anything was replaced
+        msg = f"{msg}. {OUI_USER_PATH} was not changed."
+    return ok, msg, report
 
 
 def import_oui_file(filepath: str) -> tuple[bool, str, dict | None]:
