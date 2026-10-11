@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 import scrutics
 from scrutics.protocol_display import protocol_display_text
-from scrutics.vendor_display import vendor_note
+from scrutics.vendor_display import display_vendor_name, vendor_note
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,9 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
             "type": ntype,
             "color": NODE_COLORS[ntype],
             "size": max(14, min(36, 14 + confidence // 4)),
+            # Stored registry name (exports) and the name shown on the page
             "vendor": _safe_text(getattr(asset, "vendor", None)),
+            "vendor_display": _safe_text(display_vendor_name(getattr(asset, "vendor", None))),
             "vendor_note": vendor_note(asset),
             "protocol": protocol_display_text(asset),
             "role": _safe_text(getattr(asset, "role", None), "Unclassified"),
@@ -314,7 +316,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
   if (isolatedNodes.length > 0) {
     isolatedNodes.forEach(node => {
       const li = document.createElement("li");
-      li.innerHTML = `<span class="ip">${node.label}</span> <span class="detail">${node.vendor || 'Unknown'}</span> <span class="detail">${node.protocol || 'Unknown'}</span> <span class="detail">${node.confidence}%</span>`;
+      li.innerHTML = `<span class="ip">${node.label}</span> <span class="detail">${node.vendor_display || 'Unknown'}</span> <span class="detail">${node.protocol || 'Unknown'}</span> <span class="detail">${node.confidence}%</span>`;
       isolatedList.appendChild(li);
     });
   } else {
@@ -874,7 +876,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       `<b>${node.label}</b><br>` +
       `ID: ${node.id}<br>` +
       `Type: ${node.type}<br>` +
-      `Vendor: ${node.vendor}<br>` +
+      `Vendor: ${node.vendor_display}<br>` +
       (node.vendor_note ? `Vendor note: ${node.vendor_note}<br>` : "") +
       `Protocol: ${node.protocol}<br>` +
       `Role: ${node.role}<br>` +
@@ -1329,7 +1331,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (ot.length > 0) {
       lines.push("\nOT devices:");
       ot.slice(0, 20).forEach(function (n) {
-        lines.push("  " + (n.label||n.id||"?") + " | " + (n.vendor||"Unknown") + " | " + (n.protocol||"no protocol") + " | conf: " + (n.confidence||"?") + "%");
+        lines.push("  " + (n.label||n.id||"?") + " | " + (n.vendor_display||"Unknown") + " | " + (n.protocol||"no protocol") + " | conf: " + (n.confidence||"?") + "%");
       });
       if (ot.length > 20) lines.push("  ...and " + (ot.length - 20) + " more");
     }

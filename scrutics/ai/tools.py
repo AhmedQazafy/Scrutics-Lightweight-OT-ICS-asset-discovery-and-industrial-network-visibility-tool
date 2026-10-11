@@ -12,7 +12,7 @@ from typing import Any
 
 from scrutics.db.inventory import split_conflicts
 from scrutics.protocol_display import split_display_column
-from scrutics.vendor_display import vendor_note_for
+from scrutics.vendor_display import display_vendor_name, vendor_note_for
 from scrutics.topology import read_manifest
 
 
@@ -206,7 +206,7 @@ def get_assets(
         results.append({
             "ip": a["ip"],
             "mac": a["mac"],
-            "vendor": a["vendor"],
+            "vendor": display_vendor_name(a["vendor"]),
             "vendor_note": a.get("vendor_note", ""),
             "role": a["role"],
             "type": a["type"],
@@ -233,6 +233,7 @@ def get_asset(ctx: SessionContext, ip: str) -> dict[str, Any]:
     for a in ctx.assets:
         if a.get("ip") == target_ip:
             detail = dict(a.get("_raw", {}))
+            detail["vendor"] = display_vendor_name(a.get("vendor", "Unknown"))
             detail["vendor_note"] = a.get("vendor_note", "")
             detail["classification_reason"] = a.get("classification_reason", "")
             detail["classification_conflicts"] = list(a.get("classification_conflicts", []))

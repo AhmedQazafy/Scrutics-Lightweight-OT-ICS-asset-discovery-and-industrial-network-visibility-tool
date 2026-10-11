@@ -40,7 +40,7 @@ from scrutics.diagnostics import (
 )
 from scrutics.db.inventory import AssetInventory, limit_summary_line
 from scrutics.protocol_display import PROTOCOL_COLUMN_WIDTH, protocol_display_text
-from scrutics.vendor_display import VENDOR_NOTE, count_vendor_notes
+from scrutics.vendor_display import VENDOR_NOTE, count_vendor_notes, display_vendor_name
 from scrutics.topology import export_topology
 
 SESSION_FLUSH_INTERVAL = 15.0
@@ -535,7 +535,7 @@ def _print_table(inventory: AssetInventory):
     for a in assets:
         proto  = protocol_display_text(a, w)
         type_s = "OT" if a.is_ot is True else "IT" if a.is_ot is False else "?"
-        print(f"{a.ip:<18} {a.mac:<20} {a.vendor[:22]:<22} {proto:<{w}} "
+        print(f"{a.ip:<18} {a.mac:<20} {display_vendor_name(a.vendor)[:22]:<22} {proto:<{w}} "
               f"{a.role[:28]:<28} {a.confidence_pct:<7}% {type_s}")
     print(f"{'─'*(92 + w)}")
     print(f"Total: {inventory.count()} assets\n")

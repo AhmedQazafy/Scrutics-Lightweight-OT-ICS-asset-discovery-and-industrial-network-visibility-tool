@@ -1,17 +1,27 @@
 """
-Vendor note shown and exported for an asset.
+Vendor text shown and exported for an asset. Display only: classification never reads it, and it
+adds no evidence and changes no score, class, role or confidence.
 
-Display only: classification never reads it, and it adds no evidence and changes no score, class,
-role or confidence. It says that the MAC prefix belongs to an OT-associated vendor while the
-capture showed no OT service on the device. It never states that the device is OT, nor that it
-has no OT service.
+Vendor name: stored and exported exactly as the IEEE registry gives it, which can end in a comma
+("Siemens AG,"). Screens, the CLI table, the topology page text and the assistant's tool results
+show display_vendor_name instead, which drops only trailing commas and whitespace; CSV and JSON
+exports keep the stored name.
 
+Vendor note: says that the MAC prefix belongs to an OT-associated vendor while the capture showed
+no OT service on the device. It never states that the device is OT, nor that it has no OT service.
 Every surface (asset CSV, TUI detail panel and asset export, topology page, AI tools, CLI summary)
 takes the text from vendor_note_for, so they always agree. A saved session keeps its stored vendor
 data, so its note follows the vendor stored with it.
 """
 
 VENDOR_NOTE = "OT-associated vendor; no OT service observed in this capture"
+
+
+def display_vendor_name(name):
+    """The vendor name as shown to people: trailing commas and whitespace removed, nothing else."""
+    if not isinstance(name, str):
+        return name
+    return name.rstrip(", \t\r\n")
 
 
 def vendor_note_for(vendor_class, classification_type) -> str:

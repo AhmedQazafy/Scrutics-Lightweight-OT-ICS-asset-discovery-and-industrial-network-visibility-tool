@@ -41,7 +41,7 @@ from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 from scrutics.diagnostics import VERSION
 from scrutics.topology import export_topology
-from scrutics.vendor_display import vendor_note
+from scrutics.vendor_display import display_vendor_name, vendor_note
 from scrutics.protocol_display import (
     PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text, split_display_column,
 )
@@ -1879,9 +1879,14 @@ _RULE_DESCRIPTIONS = {
 NOT_RECORDED = "not recorded"
 
 
+def vendor_cell(asset, width: int) -> str:
+    """Vendor text for an asset table cell: the displayed name, cut to the column width."""
+    return display_vendor_name(asset.vendor)[:width]
+
+
 def asset_identity_lines(asset) -> list:
     """Detail-panel lines naming the device: MAC and vendor, then the vendor note when it applies."""
-    lines = [f"MAC: {asset.mac}    Vendor: {asset.vendor}"]
+    lines = [f"MAC: {asset.mac}    Vendor: {display_vendor_name(asset.vendor)}"]
     note = vendor_note(asset)
     if note:
         lines.append(f"Vendor note: {note}")
@@ -2946,7 +2951,7 @@ class ScruticsApp(App):
         if len(assets) == table.row_count:
             for i, asset in enumerate(assets):
                 try:
-                    table.update_cell_at((i, 2), asset.vendor[:20])
+                    table.update_cell_at((i, 2), vendor_cell(asset, 20))
                     table.update_cell_at((i, 3), protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH))
                     table.update_cell_at((i, 4), asset.role[:26])
                     table.update_cell_at((i, 5), f"{asset.confidence_pct}%")
@@ -2960,7 +2965,7 @@ class ScruticsApp(App):
             for asset in assets:
                 mac = _sanitize_mac(asset.mac)
                 table.add_row(
-                    asset.ip, mac, asset.vendor[:20],
+                    asset.ip, mac, vendor_cell(asset, 20),
                     protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
                     asset.role[:26], f"{asset.confidence_pct}%",
                     _baseline_display(asset.baseline_status),
@@ -3057,7 +3062,7 @@ class ScruticsApp(App):
                 table.add_row(
                     asset.ip,
                     asset.mac[:17],
-                    asset.vendor[:16],
+                    vendor_cell(asset, 16),
                     protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
                     asset.role[:16],
                     f"{asset.classification_confidence_pct}%",
