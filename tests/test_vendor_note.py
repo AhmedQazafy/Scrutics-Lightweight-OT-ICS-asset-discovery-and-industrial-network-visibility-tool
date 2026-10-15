@@ -2,7 +2,9 @@
 An asset whose vendor is OT-associated but that this capture did not show serving OT carries the
 display note "OT-associated vendor; no OT service observed in this capture".
 
-The note is set only when vendor_class is OT and classification_type is not OT. It is display
+The note is set only when vendor_class is OT, classification_type is not OT, and no OT service was
+observed on the asset (no served OT-signature port, no validated OT protocol answered as the
+server). It is display
 text only: it adds no evidence and changes no score, class, role or confidence. One function
 (scrutics.vendor_display) supplies it to every surface, so the asset CSV, the TUI detail panel and
 asset export, the topology page and the AI tools always agree.
@@ -136,3 +138,53 @@ def test_topology_page_shows_the_note_in_the_tooltip_and_export():
     from scrutics.topology import HTML_TEMPLATE
     assert "Vendor note: ${node.vendor_note}" in HTML_TEMPLATE
     assert '"Vendor note": n.vendor_note || ""' in HTML_TEMPLATE
+
+
+def test_user_rule_classifying_an_ot_server_as_it_does_not_get_the_note(monkeypatch):
+    from scrutics.classifier import protocol
+    rule = {"name": "Lab gateway", "port": 502, "classify_as": "Lab Modbus gateway",
+            "role": "Lab gateway", "is_ot": False}
+    monkeypatch.setattr(protocol, "_USER_RULES", [rule])
+    engine = CaptureEngine(inventory=AssetInventory())
+    engine.no_baseline = True
+    engine._ingest_packet(_tcp(*OT_PLC, "10.0.0.98", 502, 40002, "SA"), "pcap")
+    gateway = engine.inventory.get(OT_PLC[1])
+    assert gateway.classification_rule == "user_rule" and gateway.classification_type == "IT"
+    assert gateway.vendor_class == "OT" and 502 in gateway.ports_seen
+    assert vendor_note(gateway) == ""
+    assert gateway.to_dict()["vendor_note"] == ""
+
+
+@pytest.mark.parametrize("ports_seen, summaries, expected", [
+    ({502}, {}, ""),                                                            # OT signature port
+    (set(), {"Modbus TCP": SimpleNamespace(answers_as_server=True)}, ""),       # validated server
+    (set(), {"Modbus TCP": SimpleNamespace(answers_as_server=False)}, VENDOR_NOTE),   # requests only
+    ({443}, {}, VENDOR_NOTE),                                                   # non-OT service
+])
+def test_an_observed_ot_service_suppresses_the_note(ports_seen, summaries, expected):
+    asset = SimpleNamespace(vendor_class="OT", classification_type="IT",
+                            ports_seen=ports_seen, protocol_summaries=summaries)
+    assert vendor_note(asset) == expected
+
+
+def test_saved_sessions_without_the_column_use_their_saved_ports(inventory, tmp_path, monkeypatch):
+    from scrutics.classifier import protocol
+    monkeypatch.setattr(protocol, "_USER_RULES", [{"name": "Lab gateway", "port": 502,
+                                                    "classify_as": "Lab", "role": "Lab", "is_ot": False}])
+    gateway = inventory.get(OT_PLC[1])
+    from scrutics.classifier.asset_classifier import classify_asset
+    classify_asset(gateway)
+    assert gateway.classification_type == "IT"
+    inventory.export_csv(str(tmp_path / "assets.csv"))
+    with open(tmp_path / "assets.csv", encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    with open(tmp_path / "assets.csv", "w", encoding="utf-8", newline="") as f:
+        fields = [k for k in rows[0] if k != "vendor_note"]
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({k: r[k] for k in fields})
+    write_manifest(str(tmp_path))
+    ctx = SessionContext(str(tmp_path))
+    assert get_asset(ctx, OT_PLC[1])["vendor_note"] == ""
+    assert get_asset(ctx, OT_CLIENT[1])["vendor_note"] == VENDOR_NOTE

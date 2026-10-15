@@ -12,8 +12,14 @@ from typing import Any
 
 from scrutics.db.inventory import split_conflicts
 from scrutics.protocol_display import split_display_column
-from scrutics.vendor_display import display_vendor_name, vendor_note_for
+from scrutics.vendor_display import display_vendor_name, ot_service_observed, vendor_note_for
 from scrutics.topology import read_manifest
+
+
+def _saved_ports(text) -> list:
+    """Ports from a saved "ports_seen" cell ("502|80"); anything that is not a number is skipped."""
+    parts = (part.strip() for part in str(text or "").split("|"))
+    return [int(part) for part in parts if part.isascii() and part.isdigit()]
 
 
 class SessionContext:
@@ -88,7 +94,8 @@ class SessionContext:
                         "protocol_display": protocol_display,
                         # Sessions written before the vendor_note column: derived from the stored values
                         "vendor_note": (row.get("vendor_note") or "") if "vendor_note" in row else
-                                       vendor_note_for(row.get("vendor_class"), row.get("classification_type")),
+                                       vendor_note_for(row.get("vendor_class"), row.get("classification_type"),
+                                                       ot_service_observed(_saved_ports(row.get("ports_seen")))),
                         "classification_reason": row.get("classification_reason", "") or "",
                         "classification_conflicts": split_conflicts(row.get("classification_conflicts", "")),
                         "_raw": row,
