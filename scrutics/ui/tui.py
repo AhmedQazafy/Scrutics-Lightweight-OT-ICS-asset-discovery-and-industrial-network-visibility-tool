@@ -21,6 +21,7 @@ import time
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
+from textual.coordinate import Coordinate
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import (
@@ -1969,6 +1970,25 @@ def _session_protocol_display(row: dict) -> list:
     return [p for p in served if p and p != "Unknown"]
 
 
+def _asset_by_key(inventory, key: str):
+    """The asset whose primary key (MAC identity, or IP when no MAC is known) is `key`."""
+    for asset in inventory.get_all():
+        if asset.primary_key == key:
+            return asset
+    return None
+
+
+def _detail_asset(screen):
+    """
+    The asset a detail screen shows: by primary key when one was given, since several assets
+    can share an IP (a replaced device keeps its own asset); otherwise the current asset at the IP.
+    """
+    key = getattr(screen, "_asset_key", None)
+    if key is not None:
+        return _asset_by_key(screen._inventory, key)
+    return screen._inventory.get(screen._asset_ip)
+
+
 class DetailScreen(ModalScreen):
     """Full-page asset detail view -- does NOT pause capture."""
     BINDINGS = [
@@ -1977,14 +1997,16 @@ class DetailScreen(ModalScreen):
         Binding("e", "export_asset", "Export", show=False),
     ]
 
-    def __init__(self, asset_ip: str, inventory: AssetInventory, engine: CaptureEngine):
+    def __init__(self, asset_ip: str, inventory: AssetInventory, engine: CaptureEngine,
+                 asset_key: str | None = None):
         super().__init__()
         self._asset_ip = asset_ip
+        self._asset_key = asset_key
         self._inventory = inventory
         self._engine = engine
 
     def compose(self) -> ComposeResult:
-        asset = self._inventory.get(self._asset_ip)
+        asset = _detail_asset(self)
         if not asset:
             yield Label("Asset not found")
             return
@@ -2069,7 +2091,7 @@ class DetailScreen(ModalScreen):
 
     @on(Button.Pressed, "#export-btn")
     def export_asset(self):
-        asset = self._inventory.get(self._asset_ip)
+        asset = _detail_asset(self)
         if not asset:
             self.app.notify("Asset not found", severity="error")
             return
@@ -2206,16 +2228,15 @@ class ScruticsApp(App):
         if row >= table.row_count:
             return
         try:
-            row_data = table.get_row_at(row)
-            ip = row_data[0]
+            key = table.coordinate_to_cell_key(Coordinate(row, 0)).row_key.value
         except Exception:
             return
         if not self.inventory:
             return
-        asset = self.inventory.get(ip)
+        asset = _asset_by_key(self.inventory, key)
         if not asset:
             return
-        self.push_screen(DetailScreen(ip, self.inventory, self.engine))
+        self.push_screen(DetailScreen(asset.ip, self.inventory, self.engine, asset_key=key))
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
@@ -2948,9 +2969,14 @@ class ScruticsApp(App):
             ip = a.get("ip", "")
             anomaly_counts[ip] = anomaly_counts.get(ip, 0) + 1
 
-        if len(assets) == table.row_count:
+        # Rows are keyed by primary key: two assets can share an IP (a device replaced on the
+        # same address keeps its own asset). Cells are updated in place only while the rows
+        # still hold the same assets in the same order; anything else rebuilds the table.
+        keys = [asset.primary_key for asset in assets]
+        if keys == [row_key.value for row_key in table.rows]:
             for i, asset in enumerate(assets):
                 try:
+                    table.update_cell_at((i, 0), asset.ip)
                     table.update_cell_at((i, 2), vendor_cell(asset, 20))
                     table.update_cell_at((i, 3), protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH))
                     table.update_cell_at((i, 4), asset.role[:26])
@@ -2971,7 +2997,7 @@ class ScruticsApp(App):
                     _baseline_display(asset.baseline_status),
                     str(anomaly_counts.get(asset.ip, 0)),
                     _type_label(asset.is_ot),
-                    key=asset.ip,
+                    key=asset.primary_key,
                 )
 
     def _drain_event_log(self):
@@ -3069,7 +3095,7 @@ class ScruticsApp(App):
                     _baseline_display(asset.baseline_status),
                     str(len(asset.evidence)),
                     asset.classification_type[:8],
-                    key=asset.ip,
+                    key=asset.primary_key,
                 )
 
         elog = self.query_one("#event-log", Log)
