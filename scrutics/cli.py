@@ -567,25 +567,38 @@ def _periodic_table(inventory: AssetInventory, done_event: threading.Event,
             _print_table(inventory)
 
 
-def _checkpoint_session(inventory, engine, session_dir, lock, final: bool = False):
+def _checkpoint_session(inventory, engine, session_dir, lock, final: bool = False,
+                        reported: dict | None = None):
     """
     Checkpoint for headless mode: rewrite the snapshot files (assets, evidence, topology,
     connections) and the manifest. events.csv and anomalies.csv are appended by RollingWriter
     during capture and are never rewritten here. Returns the export result, or None.
+
+    Write failures are printed at a checkpoint (not at the final export, whose summary covers
+    them), once per file each time its failure count changes; `reported` keeps the counts
+    already printed across checkpoints.
     """
     if not session_dir or not inventory:
         return None
-    from scrutics.db.session_export import write_session_snapshot
+    from scrutics.db.session_export import APPEND_FILES, write_session_snapshot
     with lock:
         result = write_session_snapshot(
             session_dir, inventory, engine,
             capture_started=getattr(engine, "capture_started", None) if engine else None,
             final=final)
-    failed = [e for e in result["export_errors"] if not e["recovered"]] + (
-        [] if result["manifest_ok"] else [{"file": "manifest.json"}])
-    if failed and not final:
-        print(f"\r[!] Checkpoint failed: {', '.join(sorted({e['file'] for e in failed}))} not written",
-              flush=True)
+    if final:
+        return result
+    reported = {} if reported is None else reported
+    for error in result["export_errors"]:
+        name, count = error["file"], error["count"]
+        if error["recovered"] or reported.get(name) == count:
+            continue
+        reported[name] = count
+        if name in APPEND_FILES.values():
+            message = f"{count} row{'s' if count != 1 else ''} not written to {name}"
+        else:
+            message = f"{name} not written ({count} failed write{'s' if count != 1 else ''})"
+        print(f"\r[!] {message} (first error: {error['first_error']})", flush=True)
     return result
 
 # ── Main headless runner ───────────────────────────────────────────────────────
@@ -659,13 +672,15 @@ def run_headless(args) -> int:
     checkpoint_lock = threading.Lock()
     # Write an initial checkpoint immediately so Scrutics AI in other terminals
     # can immediately recognize and query the active session
-    _checkpoint_session(inventory, engine, session_dir, checkpoint_lock)
+    reported_failures: dict = {}   # write-failure counts already printed at a checkpoint
+    _checkpoint_session(inventory, engine, session_dir, checkpoint_lock, reported=reported_failures)
 
     def checkpoint_loop():
         while not stop_event.is_set():
             stop_event.wait(SESSION_FLUSH_INTERVAL)
             if not stop_event.is_set():
-                _checkpoint_session(inventory, engine, session_dir, checkpoint_lock)
+                _checkpoint_session(inventory, engine, session_dir, checkpoint_lock,
+                                    reported=reported_failures)
 
     checkpoint_thread = threading.Thread(target=checkpoint_loop, daemon=True)
     checkpoint_thread.start()

@@ -170,6 +170,9 @@ def write_session_snapshot(session_dir: str, inventory, engine, capture_started=
     if manifest_errors:
         log.failed("manifest.json", manifest_errors[0])
         complete = False
+        # Not in the manifest itself (it could not be written), but returned to the caller
+        export_errors = ([e for e in export_errors if e["file"] != "manifest.json"]
+                         + [e for e in log.errors() if e["file"] == "manifest.json"])
     elif "manifest.json" in log.unrecovered():
         log.run("manifest.json", lambda: None)
     return {"records": records, "export_complete": complete, "export_errors": export_errors,

@@ -306,3 +306,55 @@ def test_an_unwritable_events_file_never_stops_capture(tmp_path):
     events = result["records"]["events"]
     assert events["exported"] == 0 and events["dropped"] == events["observed"] > 500
     assert result["export_complete"] is False
+
+
+# ── headless checkpoint messages ──────────────────────────────────────────────
+
+def _checkpoint_lines(capsys, engine, session_dir, reported):
+    _checkpoint_session(engine.inventory, engine, str(session_dir), threading.Lock(), reported=reported)
+    return [line.lstrip("\r") for line in capsys.readouterr().out.splitlines() if line.strip()]
+
+
+def test_checkpoint_reports_lost_rows_only_when_the_count_changes(tmp_path, capsys):
+    engine = _session_engine(tmp_path)
+    blocked = tmp_path / "blocked"
+    blocked.mkdir()
+    engine.writer._anomalies_path = str(blocked)               # every anomaly append fails
+    frames = _moved_device_frames()
+    reported = {}
+    _feed(engine, frames[:3 * HOSTS + 3])                        # one device moves: one lost row
+    capsys.readouterr()                                          # drop setup output
+    [line] = _checkpoint_lines(capsys, engine, tmp_path, reported)
+    assert line.startswith("[!] 1 row not written to anomalies.csv (first error: [Errno 21] Is a directory")
+    assert _checkpoint_lines(capsys, engine, tmp_path, reported) == []       # unchanged: silent
+    assert _checkpoint_lines(capsys, engine, tmp_path, reported) == []
+    _feed(engine, frames[3 * HOSTS + 3:3 * HOSTS + 30])           # 9 more devices move
+    [line] = _checkpoint_lines(capsys, engine, tmp_path, reported)
+    assert line.startswith("[!] 10 rows not written to anomalies.csv (first error: [Errno 21] Is a directory")
+    assert "Checkpoint failed" not in line
+    assert _checkpoint_lines(capsys, engine, tmp_path, reported) == []
+
+
+def test_checkpoint_reports_a_snapshot_failure_and_stays_silent_once_it_recovers(tmp_path, capsys, monkeypatch):
+    engine = _session_engine(tmp_path)
+    _feed(engine, _moved_device_frames()[:30])
+    original = AssetInventory.export_csv
+    monkeypatch.setattr(AssetInventory, "export_csv",
+                        lambda self, path: (_ for _ in ()).throw(PermissionError(13, "Permission denied")))
+    reported = {}
+    capsys.readouterr()                                          # drop setup output
+    assert _checkpoint_lines(capsys, engine, tmp_path, reported) == [
+        "[!] assets.csv not written (1 failed write) (first error: [Errno 13] Permission denied)"]
+    monkeypatch.setattr(AssetInventory, "export_csv", original)
+    assert _checkpoint_lines(capsys, engine, tmp_path, reported) == []        # recovered: silent
+
+
+def test_the_final_export_prints_no_checkpoint_message(tmp_path, capsys):
+    engine = _session_engine(tmp_path)
+    blocked = tmp_path / "blocked"
+    blocked.mkdir()
+    engine.writer._anomalies_path = str(blocked)
+    _feed(engine, _moved_device_frames())
+    capsys.readouterr()                                          # drop setup output
+    result = _checkpoint_session(engine.inventory, engine, str(tmp_path), threading.Lock(), final=True)
+    assert capsys.readouterr().out == "" and result["export_complete"] is False
