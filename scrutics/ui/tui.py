@@ -2818,6 +2818,10 @@ class ScruticsApp(App):
             self.notify(stats.summary_line(), severity="warning", markup=False)
         if stats and stats.capture_file_line():
             self.notify(stats.capture_file_line(), severity="warning", markup=False)
+        if stats:
+            # The lines describe the capture this engine ran, so count the assets it built
+            for severity, text in stats.frame_lines(self.engine.inventory.count()):
+                self.notify(text, severity=severity, markup=False)
         if limits and any(limits.values()):
             self.notify(limit_summary_line(limits), severity="warning", markup=False)
         self.query_one("#btn-pause", Button).label = "Pause =P"

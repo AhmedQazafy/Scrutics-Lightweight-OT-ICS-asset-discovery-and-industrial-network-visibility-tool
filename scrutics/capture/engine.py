@@ -10,7 +10,8 @@ import threading
 from collections import deque
 
 from scrutics.db.inventory import AssetInventory
-from scrutics.capture.ingest_stats import IngestStats
+from scrutics.capture.frame_kinds import frame_kind
+from scrutics.capture.ingest_stats import FILTERED_MAC, FILTERED_SCOPE, IngestStats
 from scrutics.capture.cooldown import Cooldowns
 from scrutics.baseline.baselineengine import BaselineEngine
 from scrutics.baseline.scorer import oui_score, protocol_score, confidence_pct, confidence_from_evidence
@@ -91,6 +92,7 @@ class CaptureEngine:
         socket. KeyboardInterrupt and SystemExit are not caught.
         """
         self._ingest_index += 1
+        self.ingest_stats.frames_read += 1
         self._current_item = (path, self._ingest_index)
         try:
             self._process_packet(pkt)
@@ -153,11 +155,16 @@ class CaptureEngine:
         if proto == "UDP" and (src_port in (67, 68) or dst_port in (67, 68)):
             self._process_dhcp_packet(pkt, now_ts)
 
+        # Frames that cannot produce an asset are counted by kind, never dropped silently
         if not src_ip or not src_mac:
+            self.ingest_stats.unsupported_frame(frame_kind(pkt))
             return
+        self.ingest_stats.frames_supported += 1
         if not self.inventory.is_asset_ip(src_ip):
+            self.ingest_stats.filtered_frame(FILTERED_SCOPE)
             return
         if src_mac in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"):
+            self.ingest_stats.filtered_frame(FILTERED_MAC)
             return
 
         # Extract TTL for OS fingerprinting hints
@@ -1054,6 +1061,7 @@ class CaptureEngine:
         from scapy.all import sniff
 
         self._stop_event.clear()
+        self.ingest_stats.frame_source = "live"
         self._log(f"Passive capture started on {interface}", "cyan")
 
         deadline = time.monotonic() + timeout if timeout > 0 else None
@@ -1083,6 +1091,7 @@ class CaptureEngine:
         import scapy.all  # noqa: F401  (registers every link-layer and protocol dissector)
         from scrutics.capture.capture_file import CaptureFile
         self._stop_event.clear()
+        self.ingest_stats.frame_source = "pcap"
         self._log(f"Streaming PCAP: {filepath}", "cyan")
         count = 0
         with CaptureFile(filepath) as capture:

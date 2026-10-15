@@ -22,6 +22,11 @@ MESSAGE_LIMIT = 200
 
 _PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Captured frames that can produce an asset, and why such a frame may still be left out
+SUPPORTED_FRAMES = "Ethernet with an IPv4 or ARP source address"
+FILTERED_SCOPE = "source address outside the inventory scope"
+FILTERED_MAC = "broadcast or zero source MAC"
+
 # Paths that number their items as packets; the others number lines
 _PACKET_PATHS = ("live", "pcap")
 
@@ -77,6 +82,13 @@ class IngestStats:
         self.warned_total = 0
         self.warned_by_reason: dict = {}   # items processed, with a field that was not used
         self.capture_file_problem = None   # CaptureFileProblem when a capture file ended early
+        # Captured frames (pcap and live only): how many were read, how many carried a source
+        # MAC and an IPv4/ARP source address, and why the others could not produce an asset
+        self.frame_source = None           # "pcap" or "live" once a capture runs
+        self.frames_read = 0
+        self.frames_supported = 0
+        self.unsupported_by_kind: dict = {}    # keys from scrutics.capture.frame_kinds.KINDS
+        self.filtered_by_reason: dict = {}     # keys FILTERED_SCOPE, FILTERED_MAC
 
     @property
     def contained_total(self) -> int:
@@ -98,6 +110,48 @@ class IngestStats:
         """Record that a capture file was not read to its end (see scrutics.capture.capture_file)."""
         self.capture_file_problem = problem
         self.reject(problem.reason, "pcap", problem.packets_read + 1, label=problem.location)
+
+    def unsupported_frame(self, kind: str) -> None:
+        self.unsupported_by_kind[kind] = self.unsupported_by_kind.get(kind, 0) + 1
+
+    def filtered_frame(self, reason: str) -> None:
+        self.filtered_by_reason[reason] = self.filtered_by_reason.get(reason, 0) + 1
+
+    @property
+    def unsupported_total(self) -> int:
+        return sum(self.unsupported_by_kind.values())
+
+    def _kind_counts(self) -> str:
+        from scrutics.capture.frame_kinds import KINDS
+        return ", ".join(f"{kind}: {self.unsupported_by_kind[kind]}"
+                         for kind in KINDS if self.unsupported_by_kind.get(kind))
+
+    def frame_lines(self, asset_count: int) -> list:
+        """
+        Summary lines about the captured frames, as (severity, text): "warning" for a capture
+        that produced no assets, "information" for the kind counts. Empty for log input, and for
+        a capture file that stopped early (its own line explains the result). The lines state
+        observed counts only.
+        """
+        if self.frame_source is None:
+            return []
+        lines = []
+        kinds = self._kind_counts()
+        if asset_count == 0 and self.capture_file_problem is None:
+            if self.frames_read == 0:
+                return [("warning", "No assets: the capture contains no frames.")]
+            if self.frames_supported == 0:
+                return [("warning", f"No assets: {self.frames_read} frames read, none of a kind Scrutics "
+                                    f"builds assets from ({SUPPORTED_FRAMES}). Frames seen: {kinds}.")]
+            filtered = ", ".join(f"{r}: {n}" for r, n in sorted(self.filtered_by_reason.items()))
+            lines.append(("warning", f"No assets: {self.frames_read} frames read, "
+                                     f"{self.frames_supported} of a supported kind ({SUPPORTED_FRAMES}); "
+                                     f"none produced an asset"
+                                     + (f" ({filtered})." if filtered else ".")))
+        if kinds:
+            lines.append(("information", f"Frames of kinds Scrutics does not build assets from: "
+                                         f"{self.unsupported_total} ({kinds})."))
+        return lines
 
     def capture_file_line(self) -> str:
         """The run summary line for a capture file not read to its end, or "" when it was."""
