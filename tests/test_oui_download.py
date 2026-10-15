@@ -101,7 +101,14 @@ def test_a_complete_download_is_installed(user_db):
     assert json.loads((user_db / "oui_meta.json").read_text(encoding="utf-8"))["source_date"] == "2026-10-11"
     [req] = sent
     assert req.full_url == oui.IEEE_OUI_URL
-    assert req.get_header("User-agent").startswith("Scrutics/")
+    # The installed version when the package is installed; the bare product name when it runs
+    # from a source tree without package metadata
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+        expected = f"Scrutics/{version('scrutics')}"
+    except PackageNotFoundError:
+        expected = "Scrutics"
+    assert req.get_header("User-agent") == expected
 
 
 def _http_error(code, reason, body=b""):

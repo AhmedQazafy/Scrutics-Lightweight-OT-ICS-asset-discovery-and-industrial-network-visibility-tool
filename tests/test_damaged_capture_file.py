@@ -227,3 +227,44 @@ def test_a_gzip_compressed_capture_is_checked_the_same_way(tmp_path):
     assert (problem.kind, problem.offset) == (DAMAGED, offsets[1000])   # offset in the decompressed data
     clean, _ = _run(tmp_path, gzip.compress(data), "clean_gz.pcap")
     assert clean.ingest_stats.capture_file_problem is None
+
+
+def _read_sizes_asked(path):
+    """Read a capture through CaptureFile; return (packets, problem, sizes asked of the real file)."""
+    import scapy.all  # noqa: F401
+    from scrutics.capture.capture_file import CaptureFile
+    asked = []
+    with CaptureFile(str(path)) as capture:
+        inner = capture._tracker.inner
+
+        class Spy:
+            def read(self, size=-1):
+                asked.append(size)
+                return inner.read(size)
+
+            def __getattr__(self, name):
+                return getattr(inner, name)
+        capture._tracker.inner = Spy()
+        packets = sum(1 for _ in capture)
+    return packets, capture.problem, asked
+
+
+@pytest.mark.parametrize("caplen", [0x7FFFFFFF, 0xFFFFFFFF])
+def test_a_huge_record_length_never_asks_for_more_than_the_file_holds(tmp_path, caplen):
+    data, offsets = _pcap()
+    path = tmp_path / "huge.pcap"
+    path.write_bytes(_set_u32(data, offsets[1000] + 8, caplen))
+    packets, problem, asked = _read_sizes_asked(path)
+    assert packets == 1000 and problem.kind == DAMAGED
+    assert asked and max(asked) <= len(data) and min(asked) >= 0
+
+
+def test_a_huge_record_length_in_a_gzip_capture_is_read_in_bounded_chunks(tmp_path):
+    import gzip
+    from scrutics.capture.capture_file import _ReadTracker
+    data, offsets = _pcap()
+    path = tmp_path / "huge_gz.pcap"
+    path.write_bytes(gzip.compress(_set_u32(data, offsets[1000] + 8, 0xFFFFFFFF)))
+    packets, problem, asked = _read_sizes_asked(path)
+    assert packets == 1000 and problem.kind == DAMAGED
+    assert max(asked) <= _ReadTracker._CHUNK

@@ -27,6 +27,8 @@ Known limit: a pcapng file with exactly four stray bytes after its last complete
 a clean file, so it is not reported.
 """
 
+import gzip
+import os
 import struct
 from collections import deque
 from dataclasses import dataclass
@@ -77,7 +79,18 @@ class CaptureFileProblem:
 
 
 class _ReadTracker:
-    """File object wrapper that records each read: bytes asked for, returned, and a short prefix."""
+    """
+    File object wrapper that records the reader's reads, per read_packet() call: bytes asked for,
+    bytes returned, a short prefix and the start position. Decisions use the call's own reads (its
+    first read is the record header), so they do not depend on how a Scapy version splits the
+    record data into reads.
+
+    A read never asks the file for more than it holds: a corrupted length field can ask for up
+    to 4 GiB, so reads are capped at the bytes left in a plain file and done in bounded chunks
+    for a compressed one. The data returned is the same as an unbounded read.
+    """
+
+    _CHUNK = 1 << 20
 
     def __init__(self, inner):
         self.inner = inner
@@ -86,18 +99,46 @@ class _ReadTracker:
             self.pos = inner.tell()
         except (OSError, ValueError, AttributeError):
             self.pos = 0
-        self.reads = 0
+        try:
+            self._size = None if isinstance(inner, gzip.GzipFile) else os.fstat(inner.fileno()).st_size
+        except (OSError, ValueError, AttributeError):
+            self._size = None
         self.partial = False                 # a read returned some but not all bytes asked for
         self.recent = deque(maxlen=3)        # (asked, returned, first bytes, start position)
+        self.begin_call()
+
+    def begin_call(self):
+        self.call_first = None               # first read of the current read_packet() call
+        self.call_short = False              # a read of the current call came back short
+
+    def _bounded_read(self, size):
+        if size is None or size < 0:
+            return self.inner.read()
+        if self._size is not None:
+            return self.inner.read(max(0, min(size, self._size - self.pos)))
+        if size <= self._CHUNK:
+            return self.inner.read(size)
+        parts, left = [], size
+        while left > 0:
+            part = self.inner.read(min(left, self._CHUNK))
+            if not part:
+                break
+            parts.append(part)
+            left -= len(part)
+        return b"".join(parts)
 
     def read(self, size=-1):
         start = self.pos
-        data = self.inner.read(size)
+        data = self._bounded_read(size)
         self.pos += len(data)
-        self.reads += 1
-        if size is not None and 0 < len(data) < size:
+        short = size is not None and size >= 0 and len(data) < size
+        if short and data:
             self.partial = True
-        self.recent.append((size, len(data), data[:_EPB_FIXED], start))
+        self.call_short = self.call_short or short
+        entry = (size, len(data), data[:_EPB_FIXED], start)
+        if self.call_first is None:
+            self.call_first = entry
+        self.recent.append(entry)
         return data
 
     def last(self, back: int = 1):
@@ -137,74 +178,80 @@ class CaptureFile:
         from scapy.error import Scapy_Exception
         tracker = self._tracker
         while True:
-            start, reads_before = tracker.pos, tracker.reads
+            start = tracker.pos
+            tracker.begin_call()
             try:
                 pkt = self.reader.read_packet()
-            except EOFError:
+            except (EOFError, Scapy_Exception):
+                # Only the reader is guarded. Depending on the Scapy version, a pcapng block
+                # shorter than its length field ends with EOFError or Scapy_Exception
                 self.problem = self._end_problem(start)
                 return
-            except Scapy_Exception:
-                # Only the reader is guarded: a pcapng block shorter than its length field says
-                self.problem = self._pcapng_short_block(start)
-                return
-            if not self.pcapng and self._classic_short_read(reads_before):
+            if not self.pcapng and tracker.call_short:
                 self.problem = self._classic_short_record(start)
                 return
             self.packets_read += 1
             yield pkt
 
     # ── classic pcap ──────────────────────────────────────────────────────
-    def _classic_short_read(self, reads_before: int) -> bool:
-        count = self._tracker.reads - reads_before
-        if count <= 0:
-            return False
-        record_reads = list(self._tracker.recent)[-count:]
-        return any(asked is not None and got < asked for asked, got, _, _ in record_reads)
+    def _classic_header_within_limits(self, header) -> bool:
+        _, _, caplen, wirelen = struct.unpack(self.reader.endian + "IIII", header[:_CLASSIC_HEADER])
+        snaplen = getattr(self.reader, "snaplen", 0)
+        return caplen <= wirelen and (not snaplen or caplen <= snaplen)
 
     def _classic_short_record(self, start: int) -> CaptureFileProblem:
-        header = self._tracker.last(2)
+        """A record whose data ran past the end of the file; its header is the call's first read."""
+        header = self._tracker.call_first
         kind = DAMAGED
-        if header is not None and header[1] == _CLASSIC_HEADER:
-            _, _, caplen, wirelen = struct.unpack(self.reader.endian + "IIII", header[2][:_CLASSIC_HEADER])
-            snaplen = getattr(self.reader, "snaplen", 0)
-            if caplen <= wirelen and (not snaplen or caplen <= snaplen):
-                kind = INCOMPLETE
+        if header is not None and header[1] == _CLASSIC_HEADER and self._classic_header_within_limits(header[2]):
+            kind = INCOMPLETE
         return CaptureFileProblem(kind, False, self.packets_read, start)
 
     # ── end of iteration ──────────────────────────────────────────────────
     def _end_problem(self, start: int):
-        last = self._tracker.last()
-        if last is None:
-            return None
-        asked, got, _, _ = last
+        tracker = self._tracker
         if self.pcapng:
-            if got == 0 and not self._tracker.partial:
+            short_block = self._pcapng_short_block(start)
+            if short_block is not None:
+                return short_block
+            last = tracker.last()
+            if last is None or (last[1] == 0 and not tracker.partial):
                 return None
+            asked, got, _, _ = last
             # A block header cut short by the end of the file is the last block, incomplete;
             # a complete read followed by the reader giving up means the block is inconsistent
             kind = INCOMPLETE if 0 < got < (asked or 0) else DAMAGED
             return CaptureFileProblem(kind, True, self.packets_read, start)
-        # Classic pcap reads alternate header (16 bytes) and record data; the end is clean only
-        # when a header read returns nothing
-        if got == 0 and asked == _CLASSIC_HEADER:
+        # Classic pcap: the end is clean only when the call's header read returns nothing
+        first = tracker.call_first
+        if first is None or (first[1] == 0 and first[0] == _CLASSIC_HEADER):
             return None
-        kind = INCOMPLETE if 0 < got < _CLASSIC_HEADER and asked == _CLASSIC_HEADER else DAMAGED
+        asked, got, _, _ = first
+        kind = INCOMPLETE if asked == _CLASSIC_HEADER and 0 < got < _CLASSIC_HEADER else DAMAGED
         return CaptureFileProblem(kind, False, self.packets_read, start)
 
     # ── pcapng block shorter than its length field ────────────────────────
-    def _pcapng_short_block(self, start: int) -> CaptureFileProblem:
+    def _pcapng_short_block(self, start: int):
+        """
+        A block whose body came back shorter than its length field says: the last three reads are
+        its type (4 bytes), its length (4 bytes) and the short body. None for any other end.
+        """
         body, length, block_type = (self._tracker.last(i) for i in (1, 2, 3))
+        if not (body and length and block_type and length[1] == 4 and block_type[1] == 4
+                and length[0] == 4 and block_type[0] == 4 and body[0] is not None and body[1] < body[0]):
+            return None
+        endian = self.reader.endian
+        btype = struct.unpack(endian + "I", block_type[2][:4])[0]
+        blocklen = struct.unpack(endian + "I", length[2][:4])[0]
+        if body[0] != blocklen - 12:
+            return None
+        got = body[1]
         kind = DAMAGED
-        if body and length and block_type and length[1] == 4 and block_type[1] == 4:
-            endian = self.reader.endian
-            btype = struct.unpack(endian + "I", block_type[2][:4])[0]
-            blocklen = struct.unpack(endian + "I", length[2][:4])[0]
-            got = body[1]
-            if btype == _PCAPNG_PACKET_BLOCKS:
-                if got < _EPB_FIXED:
+        if btype == _PCAPNG_PACKET_BLOCKS:
+            if got < _EPB_FIXED:
+                kind = INCOMPLETE
+            else:
+                caplen = struct.unpack(endian + "I", body[2][12:16])[0]
+                if _EPB_FIXED + 12 + caplen <= blocklen and got < _EPB_FIXED + caplen:
                     kind = INCOMPLETE
-                else:
-                    caplen = struct.unpack(endian + "I", body[2][12:16])[0]
-                    if _EPB_FIXED + 12 + caplen <= blocklen and got < _EPB_FIXED + caplen:
-                        kind = INCOMPLETE
         return CaptureFileProblem(kind, True, self.packets_read, start)
