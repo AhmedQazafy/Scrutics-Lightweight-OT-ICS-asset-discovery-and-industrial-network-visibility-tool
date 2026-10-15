@@ -201,11 +201,12 @@ class CaptureEngine:
         else:
             return
 
-        asset.add_os_hint(
+        # One event per hint the asset gains, not one per packet
+        if asset.add_os_hint(
             f"{os_hint} (observed TTL: {ttl}, inferred initial: {inferred_initial})",
             confidence=confidence
-        )
-        self._log(f"{ip} -> OS hint: {os_hint} (TTL: {ttl})", "dim white")
+        ):
+            self._log(f"{ip} -> OS hint: {os_hint} (TTL: {ttl})", "dim white")
 
     def _process_discovery_packet(self, src_ip, dst_ip, dst_port, pkt, ts):
         """
@@ -427,8 +428,8 @@ class CaptureEngine:
                     confidence="MEDIUM",
                     detail=f"DHCP Option 55 fingerprint match: {os_match}"
                 )
-                asset.add_os_hint(f"DHCP fingerprint: {os_match}", confidence="MEDIUM")
-                self._log(f"{asset.ip} -> DHCP OS fingerprint: {os_match}", "dim white")
+                if asset.add_os_hint(f"DHCP fingerprint: {os_match}", confidence="MEDIUM"):
+                    self._log(f"{asset.ip} -> DHCP OS fingerprint: {os_match}", "dim white")
 
         # Option 60: Vendor Class Identifier
         if "vendor_class_id" in enrichment:

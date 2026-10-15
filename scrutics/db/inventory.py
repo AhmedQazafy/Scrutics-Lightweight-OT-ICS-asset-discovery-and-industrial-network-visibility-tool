@@ -566,11 +566,11 @@ class Asset:
                 return ev.confidence
         return None
 
-    def add_os_hint(self, hint: str, confidence: str = "LOW"):
-        """Add a tentative OS hint, deduplicated by value."""
+    def add_os_hint(self, hint: str, confidence: str = "LOW") -> bool:
+        """Add a tentative OS hint, deduplicated by value. Returns whether the hint is new."""
         # Check if this exact hint already exists in evidence
         if self.has_evidence("os_hint", hint):
-            return
+            return False
         # If not, add it; the hint is listed only when its evidence record was stored
         if self.add_evidence(
             evidence_type="os_hint",
@@ -581,6 +581,8 @@ class Asset:
             detail="Tentative OS hint from passive observation"
         ):
             self.os_hints.append(hint)
+            return True
+        return False
 
     def is_stale(self, now_epoch: float | None = None, timeout: float = 30.0) -> bool:
         """Check if asset has not sent traffic in > timeout seconds (online/offline liveness)."""
