@@ -31,8 +31,6 @@ import signal
 import datetime
 import threading
 import time
-import json
-import csv
 
 from scrutics.diagnostics import (
     VERSION, check_dependencies, full_report,
@@ -40,6 +38,7 @@ from scrutics.diagnostics import (
 )
 from scrutics.db.inventory import AssetInventory, limit_summary_line
 from scrutics.protocol_display import PROTOCOL_COLUMN_WIDTH, protocol_display_text
+from scrutics.db.session_export import export_summary_line
 from scrutics.seconds_input import baseline_option, duration_option
 from scrutics.vendor_display import VENDOR_NOTE, count_vendor_notes, display_vendor_name
 from scrutics.topology import export_topology
@@ -568,60 +567,26 @@ def _periodic_table(inventory: AssetInventory, done_event: threading.Event,
             _print_table(inventory)
 
 
-def _checkpoint_session(inventory, engine, session_dir, lock):
-    """Atomic checkpoint for headless mode – writes all data + topology."""
+def _checkpoint_session(inventory, engine, session_dir, lock, final: bool = False):
+    """
+    Checkpoint for headless mode: rewrite the snapshot files (assets, evidence, topology,
+    connections) and the manifest. events.csv and anomalies.csv are appended by RollingWriter
+    during capture and are never rewritten here. Returns the export result, or None.
+    """
     if not session_dir or not inventory:
-        return
+        return None
+    from scrutics.db.session_export import write_session_snapshot
     with lock:
-        try:
-            # 1. Write standard inventory & evidence
-            inventory.export_csv(os.path.join(session_dir, "assets.csv"))
-            
-            evidence_path = os.path.join(session_dir, "evidence.json")
-            evidence_data = {}
-            for asset in inventory.get_all():
-                if asset.evidence:
-                    evidence_data[asset.ip] = [ev.to_dict() for ev in asset.evidence]
-            if evidence_data:
-                with open(evidence_path, "w", encoding="utf-8") as f:
-                    json.dump(evidence_data, f, indent=2)
-            
-            # Events & anomalies
-            if engine:
-                events_path = os.path.join(session_dir, "events.csv")
-                with open(events_path, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["timestamp", "message", "type"])
-                    for ts, msg, typ in engine.event_log:
-                        writer.writerow([ts, msg, typ])
-                
-                anomalies_path = os.path.join(session_dir, "anomalies.csv")
-                with open(anomalies_path, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["timestamp", "ip", "severity", "type", "detail"])
-                    for anom in engine.baseline.get_anomalies():
-                        writer.writerow([
-                            datetime.datetime.fromtimestamp(anom.get("timestamp", 0)).isoformat(),
-                            anom.get("ip", ""),
-                            anom.get("severity", ""),
-                            anom.get("type", ""),
-                            anom.get("detail", ""),
-                        ])
-            
-            # 2. Now call export_topology for topology files
-            from scrutics.topology import export_topology, write_manifest
-            export_topology(inventory, engine.topology_edges if engine else None, session_dir)
-
-            # 3. Write manifest
-            write_manifest(session_dir, metadata={
-                "inventory": inventory,
-                "edges": engine.topology_edges if engine else None,
-                "engine": engine,
-                "capture_started": getattr(engine, "capture_started", None) if engine else None,
-            })
-            
-        except Exception as e:
-            print(f"\r[!] Checkpoint failed: {e}", flush=True)
+        result = write_session_snapshot(
+            session_dir, inventory, engine,
+            capture_started=getattr(engine, "capture_started", None) if engine else None,
+            final=final)
+    failed = [e for e in result["export_errors"] if not e["recovered"]] + (
+        [] if result["manifest_ok"] else [{"file": "manifest.json"}])
+    if failed and not final:
+        print(f"\r[!] Checkpoint failed: {', '.join(sorted({e['file'] for e in failed}))} not written",
+              flush=True)
+    return result
 
 # ── Main headless runner ───────────────────────────────────────────────────────
 
@@ -813,16 +778,14 @@ def run_headless(args) -> int:
             print(f"[!] Error: {file_error[0]}")
             return 1
 
-    # ── Final checkpoint ─────────────────────────────────────────────────────
-    _checkpoint_session(inventory, engine, session_dir, checkpoint_lock)
+    # ── Final export ─────────────────────────────────────────────────────────
+    export = _checkpoint_session(inventory, engine, session_dir, checkpoint_lock, final=True)
+    topology_paths = export["topology_paths"] if export else {}
 
     print()
     _print_table(inventory)
 
     try:
-        # Ensure final export (non-atomic) for cleanliness
-        from scrutics.topology import export_topology
-        topology_paths = export_topology(inventory, engine.topology_edges, session_dir)
 
         if not engine.no_baseline:
             anomaly_count = len(engine.baseline.get_anomalies())
@@ -845,6 +808,10 @@ def run_headless(args) -> int:
         # Entries a device did not keep because a per-device retention limit was reached
         limits = inventory.limit_totals()
         print(f"[{'!' if any(limits.values()) else '+'}] {limit_summary_line(limits)}")
+        # Records that did not reach the session files (the manifest has the full counts)
+        incomplete = export_summary_line(export)
+        if incomplete:
+            print(f"[!] {incomplete}")
         # Devices whose vendor is OT-associated but where this capture showed no OT service
         noted = count_vendor_notes(inventory.get_all())
         if noted:

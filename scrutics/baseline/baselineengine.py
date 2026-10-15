@@ -9,6 +9,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
+from scrutics.db.session_export import CountingDeque
+
 
 @dataclass
 class DeviceBaseline:
@@ -120,7 +122,8 @@ class BaselineEngine:
     def __init__(self, observation_window: int = 60):
         self.observation_window = observation_window
         self._devices: dict = {}
-        self.anomaly_log: deque = deque(maxlen=100)
+        # The newest 100 anomalies for display; .appended counts every anomaly recorded
+        self.anomaly_log: deque = CountingDeque(maxlen=100)
 
     def device(self, ip: str) -> DeviceBaseline:
         """The baseline of the device at ip, created on first use."""

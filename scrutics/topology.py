@@ -65,8 +65,19 @@ def _edge_label(protocols: Any) -> str:
     return ", ".join(useful or values)
 
 
-def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int = 2000) -> dict:
-    """Convert an inventory and edge counter into serializable topology data."""
+# Why an edge is left out of the topology graph (connections.csv still lists every edge)
+EDGE_DROP_ENDPOINT = "endpoint not in the inventory"
+EDGE_DROP_SAME_DEVICE = "both ends are the same device"
+EDGE_DROP_VIEW_LIMIT = "topology view limit ({})"
+
+
+def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int = 2000,
+                     drops: dict | None = None) -> dict:
+    """
+    Convert an inventory and edge counter into serializable topology data. When `drops` is a
+    dict, the edges left out of the graph are counted in it by reason.
+    """
+    drops = {} if drops is None else drops
     assets = sorted(inventory.get_all(), key=_asset_sort_key)
 
     # Index by Asset.primary_key for edge resolution, with IP fallback lookup
@@ -119,7 +130,11 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
         dst_str = str(dst_k)
         s_asset = asset_by_pk.get(src_str) or asset_by_ip.get(src_str)
         d_asset = asset_by_pk.get(dst_str) or asset_by_ip.get(dst_str)
-        if not s_asset or not d_asset or s_asset.primary_key == d_asset.primary_key:
+        if not s_asset or not d_asset:
+            drops[EDGE_DROP_ENDPOINT] = drops.get(EDGE_DROP_ENDPOINT, 0) + 1
+            continue
+        if s_asset.primary_key == d_asset.primary_key:
+            drops[EDGE_DROP_SAME_DEVICE] = drops.get(EDGE_DROP_SAME_DEVICE, 0) + 1
             continue
         count = int((info or {}).get("count", 1) or 1)
         graph_edges.append({
@@ -136,6 +151,7 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
             f"Topology truncated: {len(graph_edges)} edges reduced to {max_edges}. "
             f"Adjust max_edges parameter or increase limit."
         )
+        drops[EDGE_DROP_VIEW_LIMIT.format(max_edges)] = len(graph_edges) - max_edges
         graph_edges = graph_edges[:max_edges]
 
     return {
@@ -1545,7 +1561,7 @@ def generate_topology_html(graph: dict) -> str:
     return page.replace("__GRAPH_JSON__", graph_json.replace("</", "<\\/"))
 
 
-def export_connections_csv(edges: dict, output_path: str) -> None:
+def export_connections_csv(edges: dict, output_path: str) -> int:
     """Export connections to a CSV file at the given path.
 
     Edge keys are now (src_primary_key, dst_primary_key) but CSV columns
@@ -1554,8 +1570,9 @@ def export_connections_csv(edges: dict, output_path: str) -> None:
     IPs are read from edge metadata (source_ip/destination_ip).
     """
     if not edges:
-        return
+        return 0
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    rows = 0
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["source", "destination", "protocol", "count",
@@ -1573,11 +1590,19 @@ def export_connections_csv(edges: dict, output_path: str) -> None:
                 info.get("src_port", ""),
                 info.get("dst_port", ""),
             ])
+            rows += 1
+    return rows
 
 
-def export_topology(inventory: Any, edges: dict | None, session_dir: str) -> dict:
-    """Write topology.json, topology.html, connections.csv, and copy SheetJS library."""
-    graph = build_graph_data(inventory, edges)
+def export_topology(inventory: Any, edges: dict | None, session_dir: str, stats: dict | None = None) -> dict:
+    """
+    Write topology.json, topology.html, connections.csv, and copy SheetJS library. When `stats`
+    is a dict it receives "edges_exported", "edge_drops" and "connections_written".
+    """
+    stats = {} if stats is None else stats
+    drops: dict = {}
+    graph = build_graph_data(inventory, edges, drops=drops)
+    stats.update(edges_exported=len(graph["edges"]), edge_drops=drops, connections_written=0)
     if not graph["nodes"] and not graph["isolated_nodes"]:
         return {}
 
@@ -1601,7 +1626,7 @@ def export_topology(inventory: Any, edges: dict | None, session_dir: str) -> dic
     # Connections CSV
     csv_path = os.path.join(session_dir, "connections.csv")
     if edges:
-        export_connections_csv(edges, csv_path)
+        stats["connections_written"] = export_connections_csv(edges, csv_path)
 
     # Manifest
     write_manifest(session_dir, metadata={"inventory": inventory, "edges": edges})
@@ -1610,11 +1635,14 @@ def export_topology(inventory: Any, edges: dict | None, session_dir: str) -> dic
     return result
 
 
-def write_manifest(session_dir: str, metadata: dict | None = None) -> str:
+def write_manifest(session_dir: str, metadata: dict | None = None, errors: list | None = None) -> str:
     """
     Write manifest.json to the session directory.
     Returns the path to the manifest file.
-    Never raises on failure; logs/ignores per existing checkpoint pattern.
+    Never raises on failure; a failure is logged and, when `errors` is a list, appended to it.
+
+    A session export passes "records", "export_complete" and "export_errors" in `metadata`
+    (see scrutics.db.session_export); the manifest always carries those keys.
     """
     manifest_path = os.path.join(session_dir, "manifest.json")
     try:
@@ -1693,7 +1721,11 @@ def write_manifest(session_dir: str, metadata: dict | None = None) -> str:
                 except Exception:
                     pass
 
-            if "anomaly_count" in meta:
+            records = meta.get("records") or {}
+            if "anomalies" in records:
+                # Anomalies written to anomalies.csv, not the newest ones kept for display
+                stats["anomaly_count"] = int(records["anomalies"]["exported"])
+            elif "anomaly_count" in meta:
                 try:
                     stats["anomaly_count"] = int(meta["anomaly_count"])
                 except Exception:
@@ -1726,6 +1758,9 @@ def write_manifest(session_dir: str, metadata: dict | None = None) -> str:
             "scope": scope,
             "files": files,
             "stats": stats,
+            "records": meta.get("records") or {},
+            "export_complete": meta.get("export_complete"),
+            "export_errors": meta.get("export_errors") or [],
         }
 
         tmp_path = os.path.join(session_dir, f".manifest.json.tmp.{os.getpid()}")
@@ -1744,6 +1779,8 @@ def write_manifest(session_dir: str, metadata: dict | None = None) -> str:
         return manifest_path
     except Exception as e:
         logger.debug("Failed to write manifest: %s", e)
+        if errors is not None:
+            errors.append(str(e))
         return manifest_path
 
 

@@ -42,6 +42,7 @@ from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 from scrutics.diagnostics import VERSION
 from scrutics.topology import export_topology
+from scrutics.db.session_export import export_summary_line
 from scrutics.seconds_input import MIN_BASELINE, MIN_DURATION, parse_whole_seconds
 from scrutics.vendor_display import display_vendor_name, vendor_note
 from scrutics.protocol_display import (
@@ -2824,6 +2825,10 @@ class ScruticsApp(App):
                 self.notify(text, severity=severity, markup=False)
         if limits and any(limits.values()):
             self.notify(limit_summary_line(limits), severity="warning", markup=False)
+        # Records that did not reach the session files (the manifest has the full counts)
+        incomplete = export_summary_line(getattr(self, "_export_result", None))
+        if incomplete:
+            self.notify(incomplete, severity="warning", markup=False)
         self.query_one("#btn-pause", Button).label = "Pause =P"
         self._paused = False
 
@@ -2891,92 +2896,30 @@ class ScruticsApp(App):
             self.notify("No data to save", severity="warning")
 
     def _export_session(self):
-        """Final export of all session data."""
+        """
+        Final export: rewrite the snapshot files and the manifest. events.csv and anomalies.csv
+        are appended by RollingWriter during capture and are never rewritten here.
+        """
         if not self._session_dir or not self.inventory:
             return
-        # Export assets CSV
-        self.inventory.export_csv(os.path.join(self._session_dir, "assets.csv"))
-
-        # Export evidence as JSON
-        evidence_path = os.path.join(self._session_dir, "evidence.json")
-        evidence_data = {}
-        for asset in self.inventory.get_all():
-            if asset.evidence:
-                evidence_data[asset.ip] = [ev.to_dict() for ev in asset.evidence]
-        if evidence_data:
-            with open(evidence_path, "w", encoding="utf-8") as f:
-                json.dump(evidence_data, f, indent=2)
-
-        if self.engine:
-            from scrutics.topology import export_topology, write_manifest
-            export_topology(self.inventory, self.engine.topology_edges, self._session_dir)
-            write_manifest(self._session_dir, metadata={
-                "inventory": self.inventory,
-                "edges": self.engine.topology_edges,
-                "engine": self.engine,
-                "capture_started": getattr(self, "_capture_started", None),
-            })
-        else:
-            from scrutics.topology import write_manifest
-            write_manifest(self._session_dir, metadata={
-                "inventory": self.inventory,
-                "capture_started": getattr(self, "_capture_started", None),
-            })
+        from scrutics.db.session_export import write_session_snapshot
+        with self._checkpoint_lock:
+            self._export_result = write_session_snapshot(
+                self._session_dir, self.inventory, self.engine,
+                capture_started=getattr(self, "_capture_started", None), final=True)
 
     def _checkpoint_session(self):
-        """Periodic checkpoint - writes all session data + topology."""
+        """Periodic checkpoint: the same snapshot files and manifest, marked as not final."""
         if not self._capture_running.is_set():
             return
         if not self._session_dir or not self.inventory:
             return
+        from scrutics.db.session_export import write_session_snapshot
         with self._checkpoint_lock:
-            try:
-                # 1. Write standard inventory & evidence files
-                self.inventory.export_csv(os.path.join(self._session_dir, "assets.csv"))
-
-                # Evidence JSON
-                evidence_path = os.path.join(self._session_dir, "evidence.json")
-                evidence_data = {}
-                for asset in self.inventory.get_all():
-                    if asset.evidence:
-                        evidence_data[asset.ip] = [ev.to_dict() for ev in asset.evidence]
-                if evidence_data:
-                    with open(evidence_path, "w", encoding="utf-8") as f:
-                        json.dump(evidence_data, f, indent=2)
-
-                # Events are written continuously by RollingWriter during capture --
-                # do NOT overwrite events.csv here or drained events will be lost.
-                # Only checkpoint anomalies (held in BaselineEngine, not the draining deque).
-                if self.engine:
-
-                    anomalies_path = os.path.join(self._session_dir, "anomalies.csv")
-                    with open(anomalies_path, "w", newline="", encoding="utf-8") as f:
-                        writer = csv.writer(f)
-                        writer.writerow(["timestamp", "ip", "severity", "type", "detail"])
-                        for anom in self.engine.baseline.get_anomalies():
-                            writer.writerow([
-                                datetime.datetime.fromtimestamp(anom.get("timestamp", 0)).isoformat(),
-                                anom.get("ip", ""),
-                                anom.get("severity", ""),
-                                anom.get("type", ""),
-                                anom.get("detail", ""),
-                            ])
-
-                # 2. Now call export_topology for topology.json, topology.html, connections.csv
-                from scrutics.topology import export_topology, write_manifest
-                export_topology(self.inventory, self.engine.topology_edges if self.engine else None, self._session_dir)
-
-                # 3. Write manifest
-                write_manifest(self._session_dir, metadata={
-                    "inventory": self.inventory,
-                    "edges": self.engine.topology_edges if self.engine else None,
-                    "engine": self.engine,
-                    "capture_started": getattr(self, "_capture_started", None),
-                })
-
-            except Exception:
-                # Silently ignore to avoid disrupting the UI
-                pass
+            # Write errors are recorded in the export result and reported when capture ends
+            write_session_snapshot(
+                self._session_dir, self.inventory, self.engine,
+                capture_started=getattr(self, "_capture_started", None))
 
     # ── Display refresh ───────────────────────────────────────────────────────
 

@@ -10,6 +10,7 @@ import threading
 from collections import deque
 
 from scrutics.db.inventory import AssetInventory
+from scrutics.db.session_export import CountingDeque
 from scrutics.capture.frame_kinds import frame_kind
 from scrutics.capture.ingest_stats import FILTERED_MAC, FILTERED_SCOPE, IngestStats
 from scrutics.capture.cooldown import Cooldowns
@@ -53,7 +54,9 @@ class CaptureEngine:
         self._packet_count = 0
         self._oui_db = None
         self.baseline = BaselineEngine(observation_window=baseline_window)
-        self.event_log: deque = deque(maxlen=500)
+        # The newest 500 events for display; .appended counts every event logged
+        self.event_log: deque = CountingDeque(maxlen=500)
+        self.snapshot_log = None   # session snapshot write results (scrutics.db.session_export)
         self._logged_dst_ports: dict = {}   # ip -> set of dst ports already logged
         self.writer      = None   # RollingWriter, attached by caller before capture
         self.sink_manager = None  # SinkManager, attached by caller before capture
