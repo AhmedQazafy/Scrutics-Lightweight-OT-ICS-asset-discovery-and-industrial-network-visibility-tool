@@ -160,11 +160,19 @@ All output is saved under `output/scrutics_TIMESTAMP/`.
 | File              | When written             | Contents                                              |
 |-------------------|--------------------------|-------------------------------------------------------|
 | `assets.csv`      | Every 15s / session end  | IP, MAC, vendor, protocols, role, confidence, anomaly count |
-| `events.csv`      | Every 15s / session end  | Classification events                                 |
-| `anomalies.csv`   | Every 15s / session end  | Behavioral anomalies                                  |
+| `events.csv`      | As each event happens    | Classification events (`timestamp,message`)           |
+| `anomalies.csv`   | As each anomaly happens  | Behavioral anomalies (`timestamp,ip,type,severity,detail`) |
 | `connections.csv` | Every 15s / session end  | Source, destination, protocol, packet count           |
 | `topology.json`   | Every 15s / session end  | Machine-readable graph data                           |
 | `topology.html`   | Every 15s / session end  | Interactive topology map                              |
+
+`events.csv` and `anomalies.csv` are appended record by record and never rewritten, so they hold
+every event and anomaly of the session. `manifest.json` states, for events, anomalies, evidence,
+connections and topology edges, how many were observed, exported and dropped (with the reason),
+lists any write error, and sets `export_complete` to true only when nothing is missing from the
+final files. `topology.json` and the topology page show the 2,000 busiest connections;
+`connections.csv` lists all of them. `evidence.json` lists evidence by IP address, so when two
+devices share an address only one device's evidence is written; the manifest counts the others.
 
 ### Per-device limits
 
