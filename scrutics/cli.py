@@ -40,6 +40,7 @@ from scrutics.diagnostics import (
 )
 from scrutics.db.inventory import AssetInventory, limit_summary_line
 from scrutics.protocol_display import PROTOCOL_COLUMN_WIDTH, protocol_display_text
+from scrutics.seconds_input import baseline_option, duration_option
 from scrutics.vendor_display import VENDOR_NOTE, count_vendor_notes, display_vendor_name
 from scrutics.topology import export_topology
 
@@ -200,9 +201,9 @@ config:
                       help="network interface to capture on (e.g. eth0, br-abc123)")
     mode.add_argument("--file", metavar="FILEPATH",
                       help="file to analyze (.pcap, .pcapng, .log, .json)")
-    parser.add_argument("--duration", type=int, default=60, metavar="SECONDS",
+    parser.add_argument("--duration", type=duration_option, default=60, metavar="SECONDS",
                         help="capture duration. 0 = run until Ctrl+C (default: 60)")
-    parser.add_argument("--baseline", type=int, default=60, metavar="SECONDS",
+    parser.add_argument("--baseline", type=baseline_option, default=60, metavar="SECONDS",
                         help="baseline observation window in seconds (default: 60)")
     parser.add_argument("--output", default="output", metavar="DIR",
                         help="output directory (default: ./output)")

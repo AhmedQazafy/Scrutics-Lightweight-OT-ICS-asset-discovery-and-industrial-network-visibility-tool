@@ -42,6 +42,7 @@ from scrutics.capture.engine import CaptureEngine
 from scrutics.parsers.detector import SUPPORTED_EXTENSIONS
 from scrutics.diagnostics import VERSION
 from scrutics.topology import export_topology
+from scrutics.seconds_input import MIN_BASELINE, MIN_DURATION, parse_whole_seconds
 from scrutics.vendor_display import display_vendor_name, vendor_note
 from scrutics.protocol_display import (
     PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text, split_display_column,
@@ -461,6 +462,12 @@ AIAssistantModal {
 .hint {
     color: $text-muted;
     text-style: italic;
+}
+
+.field-error {
+    width: 100%;
+    color: $error;
+    margin-top: 1;
 }
 
 .dialog-actions {
@@ -932,6 +939,14 @@ class ChoiceListModal(ModalScreen):
 
 # ── Live Capture Setup Modal ───────────────────────────────────────────────────
 
+# Same default capture duration as the CLI --duration option
+DEFAULT_LIVE_DURATION = 60
+DEFAULT_BASELINE_WINDOW = 60
+
+DURATION_ERROR = "Duration must be a whole number of seconds, 0 or more (0 = run until stopped)."
+BASELINE_ERROR = "Baseline must be a whole number of seconds, 1 or more."
+
+
 class LiveCaptureModal(SetupModalMixin, ModalScreen):
     FIELD_IDS = ["#iface-choice", "#duration-input", "#baseline-input", "#start-btn"]
     BUTTON_IDS = ["#cancel-btn", "#start-btn"]
@@ -961,9 +976,14 @@ class LiveCaptureModal(SetupModalMixin, ModalScreen):
             yield Label("Network Interface", classes="field-label")
             yield ChoiceField(self._interfaces, default, id="iface-choice")
             yield Label("Duration in seconds  (0 = run until stopped)", classes="field-label")
-            yield FormInput(value=str(self._prefill.get("duration", "120")), id="duration-input")
+            yield FormInput(value=str(self._prefill.get("duration", DEFAULT_LIVE_DURATION)),
+                            id="duration-input")
             yield Label("Baseline observation window in seconds", classes="field-label")
-            yield FormInput(value=str(self._prefill.get("baseline", "60")), id="baseline-input")
+            yield FormInput(value=str(self._prefill.get("baseline", DEFAULT_BASELINE_WINDOW)),
+                            id="baseline-input")
+            error = Label("", id="setup-error", classes="field-error")
+            error.display = False
+            yield error
             with Horizontal(classes="dialog-actions"):
                 yield FormButton("Cancel",        id="cancel-btn")
                 yield FormButton("Start Capture", id="start-btn", variant="primary")
@@ -974,10 +994,23 @@ class LiveCaptureModal(SetupModalMixin, ModalScreen):
     @on(Button.Pressed, "#start-btn")
     def start(self):
         iface    = self.query_one("#iface-choice", ChoiceField).value
-        duration = int(self.query_one("#duration-input", FormInput).value or "120")
-        baseline = int(self.query_one("#baseline-input", FormInput).value or "60")
+        duration = parse_whole_seconds(self.query_one("#duration-input", FormInput).value, MIN_DURATION)
+        baseline = parse_whole_seconds(self.query_one("#baseline-input", FormInput).value, MIN_BASELINE)
+        # Invalid input keeps the dialog open with a message next to the fields
+        if duration is None:
+            self._show_error(DURATION_ERROR, "#duration-input")
+            return
+        if baseline is None:
+            self._show_error(BASELINE_ERROR, "#baseline-input")
+            return
         self.dismiss({"mode": "live", "iface": iface,
                       "duration": duration, "baseline": baseline})
+
+    def _show_error(self, message: str, field_id: str):
+        error = self.query_one("#setup-error", Label)
+        error.update(message)
+        error.display = True
+        self.query_one(field_id).focus()
 
     def action_confirm_field(self):
         focused = self.app.focused
@@ -2295,8 +2328,8 @@ class ScruticsApp(App):
             self.set_timer(0.4, lambda: self.push_screen(
                 LiveCaptureModal(prefill={
                     "iface":    auto_live,
-                    "duration": int(os.environ.get("SCRUTICS_AUTO_DURATION", "120")),
-                    "baseline": int(os.environ.get("SCRUTICS_AUTO_BASELINE", "60")),
+                    "duration": os.environ.get("SCRUTICS_AUTO_DURATION", DEFAULT_LIVE_DURATION),
+                    "baseline": os.environ.get("SCRUTICS_AUTO_BASELINE", DEFAULT_BASELINE_WINDOW),
                 }),
                 self._on_capture_config
             ))
