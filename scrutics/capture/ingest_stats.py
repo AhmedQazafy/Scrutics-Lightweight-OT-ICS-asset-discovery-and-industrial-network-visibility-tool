@@ -76,19 +76,32 @@ class IngestStats:
         self.contained_overflow = 0        # occurrences of kinds beyond CONTAINED_KEY_LIMIT
         self.warned_total = 0
         self.warned_by_reason: dict = {}   # items processed, with a field that was not used
+        self.capture_file_problem = None   # CaptureFileProblem when a capture file ended early
 
     @property
     def contained_total(self) -> int:
         return sum(e.count for e in self.contained.values()) + self.contained_overflow
 
-    def reject(self, reason: str, path: str, item: int) -> None:
-        """Record an item dropped by validation. One event log entry per new reason."""
+    def reject(self, reason: str, path: str, item: int, label: str | None = None) -> None:
+        """
+        Record an item dropped by validation. One event log entry per new reason. `label` names
+        the location when "<path> packet/line <item>" would not be exact.
+        """
         self.rejected_total += 1
         first = reason not in self.rejected_by_reason
         self.rejected_by_reason[reason] = self.rejected_by_reason.get(reason, 0) + 1
         if first:
-            self._emit(f"Rejected input at {_item_label(path, item)}: {reason}; "
+            self._emit(f"Rejected input at {label or _item_label(path, item)}: {reason}; "
                        "further rejections of this kind are counted")
+
+    def capture_file_ended_early(self, problem) -> None:
+        """Record that a capture file was not read to its end (see scrutics.capture.capture_file)."""
+        self.capture_file_problem = problem
+        self.reject(problem.reason, "pcap", problem.packets_read + 1, label=problem.location)
+
+    def capture_file_line(self) -> str:
+        """The run summary line for a capture file not read to its end, or "" when it was."""
+        return self.capture_file_problem.summary() if self.capture_file_problem else ""
 
     def warn(self, reason: str, path: str, item: int) -> None:
         """Record an item that was processed but whose `reason` field or evidence was not used.

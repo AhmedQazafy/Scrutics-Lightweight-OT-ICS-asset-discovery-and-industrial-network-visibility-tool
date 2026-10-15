@@ -2816,6 +2816,8 @@ class ScruticsApp(App):
         if stats and stats.has_issues():
             # The summary can carry input text: show it without markup parsing
             self.notify(stats.summary_line(), severity="warning", markup=False)
+        if stats and stats.capture_file_line():
+            self.notify(stats.capture_file_line(), severity="warning", markup=False)
         if limits and any(limits.values()):
             self.notify(limit_summary_line(limits), severity="warning", markup=False)
         self.query_one("#btn-pause", Button).label = "Pause =P"

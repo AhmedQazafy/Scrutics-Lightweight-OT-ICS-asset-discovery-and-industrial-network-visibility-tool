@@ -836,6 +836,9 @@ def run_headless(args) -> int:
             print(f"[!] {engine.ingest_stats.summary_line()}")
         else:
             print("[+] Input: 0 rejected | 0 contained errors")
+        # A capture file that was not read to its end
+        if engine.ingest_stats.capture_file_line():
+            print(f"[!] {engine.ingest_stats.capture_file_line()}")
         # Entries a device did not keep because a per-device retention limit was reached
         limits = inventory.limit_totals()
         print(f"[{'!' if any(limits.values()) else '+'}] {limit_summary_line(limits)}")

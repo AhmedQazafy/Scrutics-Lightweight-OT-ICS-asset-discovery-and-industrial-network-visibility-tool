@@ -1080,17 +1080,21 @@ class CaptureEngine:
     def start_pcap(self, filepath: str):
         from scrutics.passive import enforce_passive
         enforce_passive()
-        from scapy.all import PcapReader
+        import scapy.all  # noqa: F401  (registers every link-layer and protocol dissector)
+        from scrutics.capture.capture_file import CaptureFile
         self._stop_event.clear()
         self._log(f"Streaming PCAP: {filepath}", "cyan")
         count = 0
-        with PcapReader(filepath) as packets:
-            for pkt in packets:
+        with CaptureFile(filepath) as capture:
+            for pkt in capture:
                 if self._stop_event.is_set():
                     break
                 self._ingest_packet(pkt, "pcap")
                 count += 1
         self._log(f"Processed {count} packets", "dim white")
+        # A file that ended at a damaged or incomplete record is counted and stated, never silent
+        if capture.problem is not None:
+            self.ingest_stats.capture_file_ended_early(capture.problem)
 
     def start_zeek(self, filepath: str):
         from scrutics.parsers.zeek import iter_zeek_flows
