@@ -60,6 +60,13 @@ class LLMProvider(ABC):
     Callers depend only on this interface, never on a concrete provider class directly.
     """
 
+    # Called as (attempt, total, delay_seconds[, reason]) while a request is retried
+    retry_callback: Any = None
+
+    def set_retry_callback(self, cb: Any) -> None:
+        """Register or clear the retry status callback."""
+        self.retry_callback = cb
+
     @abstractmethod
     def chat(
         self,

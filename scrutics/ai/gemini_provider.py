@@ -15,9 +15,7 @@ expected by run_agent_loop():
 from __future__ import annotations
 
 import json
-import random
 import re
-import time
 from typing import Any, Callable, Iterator
 
 import requests
@@ -31,11 +29,9 @@ from scrutics.ai.provider import (
     LLMProviderError,
 )
 from scrutics.ai.redact import describe_error, redact
+from scrutics.ai.retry import send_with_retry
 
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-_RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
-_MAX_RETRY_ATTEMPTS = 4
-_MAX_BACKOFF_DELAY = 60.0
 
 
 def _extract_retry_delay(resp: requests.Response | None) -> float | None:
@@ -52,7 +48,10 @@ def _extract_retry_delay(resp: requests.Response | None) -> float | None:
         return None
     if not isinstance(data, dict):
         return None
-    error = data.get("error", {})
+    # Proxies and gateways can answer with "error" as a string or null
+    error = data.get("error")
+    if not isinstance(error, dict):
+        return None
     details = error.get("details", [])
     if not isinstance(details, list):
         return None
@@ -384,99 +383,42 @@ class GeminiProvider(LLMProvider):
                 "functionCallingConfig": {"mode": "auto"}
             }
 
-        attempt = 0
-        last_error: Exception | None = None
-
-        while attempt < _MAX_RETRY_ATTEMPTS:
-            attempt += 1
-            if attempt > 1 and effective_cb:
-                try:
-                    effective_cb(attempt, _MAX_RETRY_ATTEMPTS, 0.0)
-                except Exception:
-                    pass
-
-            resp: requests.Response | None = None
-            try:
-                resp = requests.post(
+        secrets = (self._api_key,)
+        try:
+            resp = send_with_retry(
+                lambda: requests.post(
                     self._endpoint_url(),
                     json=payload,
                     headers=self._auth_headers(),
                     timeout=effective_timeout,
-                )
-            except requests.exceptions.Timeout as e:
-                last_error = LLMTimeoutError(
-                    f"Request to Gemini timed out after {effective_timeout}s "
-                    f"({describe_error(e, (self._api_key,))})."
-                )
-                if attempt >= _MAX_RETRY_ATTEMPTS:
-                    raise last_error from None
-                delay = min(_MAX_BACKOFF_DELAY, (1.0 * (2 ** (attempt - 1))) + random.uniform(0.1, 0.4))
-                if effective_cb:
-                    try:
-                        effective_cb(attempt + 1, _MAX_RETRY_ATTEMPTS, delay)
-                    except Exception:
-                        pass
-                time.sleep(delay)
-                continue
-            except requests.exceptions.ConnectionError as e:
-                last_error = LLMConnectionError(
-                    f"Cannot connect to Google Gemini API ({describe_error(e, (self._api_key,))})."
-                )
-                if attempt >= _MAX_RETRY_ATTEMPTS:
-                    raise last_error from None
-                delay = min(_MAX_BACKOFF_DELAY, (1.0 * (2 ** (attempt - 1))) + random.uniform(0.1, 0.4))
-                if effective_cb:
-                    try:
-                        effective_cb(attempt + 1, _MAX_RETRY_ATTEMPTS, delay)
-                    except Exception:
-                        pass
-                time.sleep(delay)
-                continue
-            except requests.exceptions.RequestException as e:
-                raise LLMProviderError(
-                    f"HTTP request to Gemini failed: {describe_error(e, (self._api_key,))}"
-                ) from None
+                ),
+                "Gemini",
+                on_retry=effective_cb,
+                server_delay=_extract_retry_delay,
+                detail=lambda r: _format_gemini_error(r, self.model, secrets),
+                secrets=secrets,
+            )
+        except requests.exceptions.Timeout as e:
+            raise LLMTimeoutError(
+                f"Request to Gemini timed out after {effective_timeout}s "
+                f"({describe_error(e, secrets)})."
+            ) from None
+        except requests.exceptions.ConnectionError as e:
+            raise LLMConnectionError(f"Cannot connect to Google Gemini API ({describe_error(e, secrets)}).") from None
+        except requests.exceptions.RequestException as e:
+            raise LLMProviderError(f"HTTP request to Gemini failed: {describe_error(e, secrets)}") from None
 
-            # Immediate client failure: non-retryable
-            if resp.status_code in (400, 401, 403, 404):
-                error_msg = _format_gemini_error(resp, self.model, (self._api_key,))
-                raise LLMResponseError(error_msg)
+        if resp.status_code != 200:
+            raise LLMResponseError(_format_gemini_error(resp, self.model, secrets))
 
-            # Retryable server or rate limit errors
-            if resp.status_code in _RETRYABLE_STATUS_CODES:
-                if attempt < _MAX_RETRY_ATTEMPTS:
-                    server_delay = _extract_retry_delay(resp)
-                    if server_delay is not None:
-                        delay = min(_MAX_BACKOFF_DELAY, max(0.5, server_delay))
-                    else:
-                        delay = min(_MAX_BACKOFF_DELAY, (1.0 * (2 ** (attempt - 1))) + random.uniform(0.1, 0.5))
-                    if effective_cb:
-                        try:
-                            effective_cb(attempt + 1, _MAX_RETRY_ATTEMPTS, delay)
-                        except Exception:
-                            pass
-                    time.sleep(delay)
-                    continue
-                else:
-                    error_msg = _format_gemini_error(resp, self.model, (self._api_key,))
-                    raise LLMResponseError(error_msg)
+        try:
+            data = resp.json()
+        except Exception as e:
+            raise LLMResponseError("Malformed JSON response from Gemini.") from e
 
-            if resp.status_code != 200:
-                error_msg = _format_gemini_error(resp, self.model, (self._api_key,))
-                raise LLMResponseError(error_msg)
+        if not isinstance(data, dict):
+            raise LLMResponseError(
+                f"Unexpected top-level response type from Gemini: {type(data).__name__}"
+            )
 
-            try:
-                data = resp.json()
-            except Exception as e:
-                raise LLMResponseError("Malformed JSON response from Gemini.") from e
-
-            if not isinstance(data, dict):
-                raise LLMResponseError(
-                    f"Unexpected top-level response type from Gemini: {type(data).__name__}"
-                )
-
-            return _normalize_gemini_response(data)
-
-        if last_error:
-            raise last_error
-        raise LLMResponseError("Gemini request failed after maximum retry attempts.")
+        return _normalize_gemini_response(data)

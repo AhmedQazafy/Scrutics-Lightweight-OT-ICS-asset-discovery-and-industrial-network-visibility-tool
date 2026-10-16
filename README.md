@@ -148,6 +148,8 @@ python3 -m scrutics ask --session output/scrutics_20260914_120000
 
 **Another provider for one run** : `scrutics ai --provider openai` (also with `--diagnose`) uses that provider's own key, read from its environment variable (`GEMINI_API_KEY`, `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`; Ollama needs none), and that provider's default model unless `--model` is given. The configured key, model and base URL are never passed to a different provider; of the other settings only `max_tokens` carries over, and timeout and temperature take that provider's defaults. If the variable is not set, Scrutics stops before sending anything and names the variable to set.
 
+**Retries** : when a provider answers HTTP 429, 502, 503 or 529, or cannot be connected to, the assistant and the topology chat retry up to 4 attempts, waiting at most 30 seconds at a time and 60 seconds in total. A provider's `Retry-After` is honoured within those limits. Timeouts after the request was sent and HTTP 500, 504 and 408 are not retried, so a reply is never generated twice.
+
 **Keys on the command line** : `list-models PROVIDER --key KEY` puts the key on the command line, where other users of the machine can see it while the command runs (for example with `ps`) and where your shell history keeps it. Prefer setting the provider's environment variable, which `list-models` reads when `--key` is not given.
 
 The AI assistant only reads session data, it never modifies assets, injects packets, or writes to the network.

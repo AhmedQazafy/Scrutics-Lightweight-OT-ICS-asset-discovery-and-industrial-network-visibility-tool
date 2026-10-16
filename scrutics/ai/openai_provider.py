@@ -76,4 +76,5 @@ class OpenAIProvider(OpenAICompatMixin, LLMProvider):
             timeout=effective_timeout,
             provider_name="OpenAI",
             secrets=(self._api_key,),
+            retry=True,
         )

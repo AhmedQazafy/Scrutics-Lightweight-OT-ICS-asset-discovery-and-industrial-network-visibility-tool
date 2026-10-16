@@ -190,6 +190,46 @@ def test_diagnose_network_errors_keep_the_type_and_the_redacted_reason(provider_
     _assert_clean(output)
 
 
+def _retry_outcomes():
+    from urllib3.exceptions import MaxRetryError, NewConnectionError
+
+    def body_status(code, headers=None):
+        def behaviour(url, headers_sent):
+            resp = _status(code)(url, headers_sent)
+            resp.headers = headers or {}
+            return resp
+        return behaviour
+
+    def refused(url, headers_sent):
+        reason = NewConnectionError(None, f"refused for {url}?key={CANARY}")
+        raise requests.exceptions.ConnectionError(MaxRetryError(None, f"{url}?key={CANARY}", reason=reason))
+
+    cases = [(f"HTTP {code} exhausted", body_status(code)) for code in (429, 502, 503, 529)]
+    cases += [("Retry-After too long", body_status(429, {"Retry-After": "120"})),
+              ("total wait cap", body_status(503, {"Retry-After": "25"})),
+              ("never sent", refused)]
+    return cases
+
+
+_RETRY_OUTCOMES = _retry_outcomes()
+
+
+@pytest.mark.parametrize("provider_name", ["gemini", "anthropic", "openai"])
+@pytest.mark.parametrize("label,behaviour", _RETRY_OUTCOMES, ids=[c[0] for c in _RETRY_OUTCOMES])
+def test_retry_messages_never_carry_the_key(provider_name, label, behaviour, debug_logs):
+    provider = _providers()[provider_name]()
+    progress = []
+    provider.set_retry_callback(lambda *args: progress.append(" ".join(map(str, args))))
+    recorder = _Recorder(behaviour)
+    out, err = io.StringIO(), io.StringIO()
+    with mock.patch("requests.post", recorder), redirect_stdout(out), redirect_stderr(err):
+        with pytest.raises(LLMProviderError) as info:
+            provider.chat([{"role": "user", "content": "hi"}])
+    assert len(recorder.calls) >= 1
+    _assert_clean(out.getvalue(), err.getvalue(), *progress, *debug_logs, *_exception_texts(info.value))
+    _assert_urls_clean(recorder)
+
+
 def test_gemini_key_travels_only_in_the_header():
     provider = _providers()["gemini"]()
     recorder = _Recorder(_status(503))
@@ -509,6 +549,8 @@ def test_topology_chat_sends_the_gemini_key_only_in_a_header(tmp_path):
         "function fetch(url, init) { calls.push({url: url, headers: init.headers});"
         " return Promise.resolve({ok: true, status: 200, json: function () {"
         " return Promise.resolve({candidates: [{content: {parts: [{text: 'ok'}]}}]}); }}); }",
+        "var " + re.search(r"RETRY_POLICY = (\{.*?\});", page).group(0),
+        *(_js_function(page, name) for name in ("errorDetail", "providerError", "retryAfterSeconds", "withRetry")),
         _js_function(page, "callGemini"),
         f"callGemini({json.dumps(CANARY)}, [{{role: 'user', content: 'hi'}}])"
         ".then(function () { console.log(JSON.stringify(calls)); });",

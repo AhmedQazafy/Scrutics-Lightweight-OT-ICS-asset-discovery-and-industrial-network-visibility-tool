@@ -1371,6 +1371,8 @@ document.addEventListener("DOMContentLoaded", function() {
   var AI_MODELS = __AI_MODELS_JSON__;
   // Request fields each default model accepts, from the same rules as the Python providers
   var AI_REQUEST_OPTIONS = __AI_REQUEST_OPTIONS_JSON__;
+  // The retry policy of the Python providers (scrutics/ai/retry.py)
+  var RETRY_POLICY = __AI_RETRY_POLICY_JSON__;
   var aiHistory = [];
   var aiKey = "";
   var aiProvider = "";
@@ -1436,7 +1438,7 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById("ai-chat-send").disabled = true;
     document.getElementById("ai-chat-input").disabled = true;
 
-    callProvider(aiProvider, aiKey, aiHistory)
+    callProvider(aiProvider, aiKey, aiHistory, function (progress) { thinking.textContent = progress; })
       .then(function (reply) {
         thinking.textContent = reply;
         aiHistory.push({ role: "assistant", content: reply });
@@ -1467,10 +1469,10 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 
   // ── Provider API calls ────────────────────────────────────────────────────
-  function callProvider(provider, key, history) {
-    if (provider === "openai")    return callOpenAI(key, history);
-    if (provider === "anthropic") return callAnthropic(key, history);
-    if (provider === "gemini")    return callGemini(key, history);
+  function callProvider(provider, key, history, onProgress) {
+    if (provider === "openai")    return callOpenAI(key, history, onProgress);
+    if (provider === "anthropic") return callAnthropic(key, history, onProgress);
+    if (provider === "gemini")    return callGemini(key, history, onProgress);
     return Promise.reject(new Error("Unknown provider: " + provider));
   }
 
@@ -1478,7 +1480,7 @@ document.addEventListener("DOMContentLoaded", function() {
     "Try a shorter or more specific question.";
 
   // Rejects with the provider's own error type and message, so a refused request can be fixed
-  function providerError(name, r) {
+  function errorDetail(r) {
     return r.json().catch(function () { return null; }).then(function (body) {
       var err = body && body.error;
       var detail = "";
@@ -1487,7 +1489,12 @@ document.addEventListener("DOMContentLoaded", function() {
       } else if (typeof err === "string") {
         detail = err;
       }
-      if (detail.length > 300) detail = detail.slice(0, 300) + "...";
+      return detail.length > 300 ? detail.slice(0, 300) + "..." : detail;
+    });
+  }
+
+  function providerError(name, r) {
+    return errorDetail(r).then(function (detail) {
       var msg = (r.status === 401 || r.status === 403)
         ? "Auth failed: check your " + name + " key"
         : name + " error HTTP " + r.status;
@@ -1495,13 +1502,77 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  function callOpenAI(key, history) {
+  function retryAfterSeconds(r) {
+    // Readable only when the provider exposes the header to the page (CORS)
+    var value = r.headers && r.headers.get ? r.headers.get("Retry-After") : null;
+    if (!value) return null;
+    var seconds = Number(value);
+    if (!isNaN(seconds)) return Math.max(0, seconds);
+    var when = Date.parse(value);
+    return isNaN(when) ? null : Math.max(0, (when - Date.now()) / 1000);
+  }
+
+  // Sends doFetch() under RETRY_POLICY and resolves with the first response not to be retried.
+  // A failed fetch is not retried: the page cannot tell whether the request was sent.
+  function withRetry(name, doFetch, onProgress) {
+    var attempt = 1;
+    var waited = 0;
+    function stop(r, message) {
+      return errorDetail(r).then(function (detail) {
+        throw new Error(detail ? message + " Details: " + detail : message);
+      });
+    }
+    function run() {
+      return doFetch().then(function (r) {
+        if (RETRY_POLICY.statuses.indexOf(r.status) < 0) return r;
+        var text = RETRY_POLICY.statusText[String(r.status)];
+        var advice = r.status === 429 ? RETRY_POLICY.adviceRateLimit : RETRY_POLICY.adviceBusy;
+        var line = name + " returned HTTP " + r.status + " (" + text + ")";
+        if (attempt >= RETRY_POLICY.maxAttempts) {
+          return stop(r, name + " still returned HTTP " + r.status + " (" + text + ") after " + attempt +
+            " attempts over " + Math.round(waited) + "s. " + advice);
+        }
+        var delay;
+        var requested = retryAfterSeconds(r);
+        if (requested !== null) {
+          delay = Math.max(RETRY_POLICY.minServerDelay, requested);
+          if (delay > RETRY_POLICY.maxWait) {
+            return stop(r, line + " and asked to wait " + Math.round(delay) + "s, longer than Scrutics waits (" +
+              RETRY_POLICY.maxWait + "s). Try again later. " + advice);
+          }
+        } else {
+          var base = RETRY_POLICY.baseDelay * Math.pow(2, attempt - 1);
+          delay = Math.min(RETRY_POLICY.maxWait, base + Math.random() * base / 2);
+        }
+        if (waited + delay > RETRY_POLICY.maxTotalWait) {
+          return stop(r, name + " still returned HTTP " + r.status + " (" + text + ") after " + attempt +
+            " attempts; waiting " + Math.round(delay) + "s more would pass Scrutics' " +
+            RETRY_POLICY.maxTotalWait + "s limit on retries. " + advice);
+        }
+        if (onProgress) {
+          onProgress(line + "; retrying in " + Math.round(delay) + "s (attempt " + (attempt + 1) +
+            " of " + RETRY_POLICY.maxAttempts + ")...");
+        }
+        return new Promise(function (resolve) { setTimeout(resolve, delay * 1000); }).then(function () {
+          waited += delay;
+          attempt += 1;
+          return run();
+        });
+      }, function (e) {
+        throw new Error(name + " could not be reached (" + e.message + "). Check your connection; " +
+          "the request was not retried because it may already have been sent.");
+      });
+    }
+    return run();
+  }
+
+  function callOpenAI(key, history, onProgress) {
     var payload = Object.assign({ model: AI_MODELS.openai, messages: history }, AI_REQUEST_OPTIONS.openai);
-    return fetch("https://api.openai.com/v1/chat/completions", {
+    return withRetry("OpenAI", function () { return fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    })
+    }); }, onProgress)
     .then(function (r) {
       if (!r.ok) return providerError("OpenAI", r);
       return r.json();
@@ -1514,16 +1585,16 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  function callAnthropic(key, history) {
+  function callAnthropic(key, history, onProgress) {
     var sys = history.find(function (m) { return m.role === "system"; });
     var msgs = history.filter(function (m) { return m.role !== "system"; });
     var payload = Object.assign({ model: AI_MODELS.anthropic, messages: msgs }, AI_REQUEST_OPTIONS.anthropic);
     if (sys) payload.system = sys.content;
-    return fetch("https://api.anthropic.com/v1/messages", {
+    return withRetry("Anthropic", function () { return fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "content-type": "application/json" },
       body: JSON.stringify(payload),
-    })
+    }); }, onProgress)
     .then(function (r) {
       if (!r.ok) return providerError("Anthropic", r);
       return r.json();
@@ -1535,18 +1606,18 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  function callGemini(key, history) {
+  function callGemini(key, history, onProgress) {
     var sys = history.find(function (m) { return m.role === "system"; });
     var contents = history
       .filter(function (m) { return m.role !== "system"; })
       .map(function (m) { return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }; });
     var payload = { contents: contents, generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } };
     if (sys) payload.systemInstruction = { parts: [{ text: sys.content }] };
-    return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(AI_MODELS.gemini) + ":generateContent", {
+    return withRetry("Gemini", function () { return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(AI_MODELS.gemini) + ":generateContent", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify(payload),
-    })
+    }); }, onProgress)
     .then(function (r) {
       if (!r.ok) return providerError("Gemini", r);
       return r.json();
@@ -1595,6 +1666,8 @@ def generate_topology_html(graph: dict) -> str:
     models = _browser_chat_models()
     # Graph data is substituted last so text inside it is never taken for a placeholder
     page = HTML_TEMPLATE.replace("__AI_MODELS_JSON__", json.dumps(models).replace("</", "<\\/"))
+    from scrutics.ai.retry import policy_for_browser
+    page = page.replace("__AI_RETRY_POLICY_JSON__", json.dumps(policy_for_browser()).replace("</", "<\\/"))
     page = page.replace("__AI_REQUEST_OPTIONS_JSON__",
                         json.dumps(_browser_chat_request_options()).replace("</", "<\\/"))
     for provider, model in models.items():

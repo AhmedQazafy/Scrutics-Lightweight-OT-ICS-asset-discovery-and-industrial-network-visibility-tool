@@ -1111,11 +1111,12 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
     conversation_history: list[tuple[str, str]] = []
     spinner = Spinner("Thinking...")
 
-    def _cli_retry_callback(attempt: int, total: int, delay: float) -> None:
+    def _cli_retry_callback(attempt: int, total: int, delay: float, reason: str = "") -> None:
         if delay > 0:
-            spinner.set_message(f"Waiting {int(round(delay))}s before retry (attempt {attempt} of {total})...")
+            message = f"waiting {int(round(delay))}s before retry (attempt {attempt} of {total})..."
         else:
-            spinner.set_message(f"Retrying (attempt {attempt} of {total})...")
+            message = f"retrying (attempt {attempt} of {total})..."
+        spinner.set_message(f"{reason}; {message}" if reason else message[0].upper() + message[1:])
 
     if hasattr(provider, "set_retry_callback"):
         provider.set_retry_callback(_cli_retry_callback)

@@ -24,6 +24,7 @@ from scrutics.ai.provider import (
 )
 from scrutics.ai.model_rules import DEFAULT_ANTHROPIC_MODEL, anthropic_options
 from scrutics.ai.redact import describe_error, redact
+from scrutics.ai.retry import send_with_retry
 
 _ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_VERSION = "2023-06-01"
@@ -250,12 +251,19 @@ class AnthropicProvider(LLMProvider):
                 "Use stream=False."
             )
 
+        secrets = (self._api_key,)
         try:
-            resp = requests.post(
-                _ANTHROPIC_API_URL,
-                json=payload,
-                headers=self._auth_headers(),
-                timeout=effective_timeout,
+            resp = send_with_retry(
+                lambda: requests.post(
+                    _ANTHROPIC_API_URL,
+                    json=payload,
+                    headers=self._auth_headers(),
+                    timeout=effective_timeout,
+                ),
+                "Anthropic",
+                on_retry=self.retry_callback,
+                detail=lambda r: _anthropic_error_detail(r, secrets),
+                secrets=secrets,
             )
         except requests.exceptions.ConnectionError as e:
             raise LLMConnectionError(

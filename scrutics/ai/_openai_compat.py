@@ -20,6 +20,7 @@ from scrutics.ai.provider import (
     LLMProviderError,
 )
 from scrutics.ai.redact import describe_error, redact
+from scrutics.ai.retry import send_with_retry
 
 
 class OpenAICompatMixin:
@@ -79,12 +80,25 @@ class OpenAICompatMixin:
         timeout: float,
         provider_name: str = "provider",
         secrets: tuple[str, ...] = (),
+        retry: bool = False,
     ) -> str | dict[str, Any] | Iterator[str]:
+
+        def post(**extra: Any) -> requests.Response:
+            send = lambda: requests.post(url, json=payload, headers=headers, timeout=timeout, **extra)
+            if not retry:
+                return send()
+            # The status is checked before any body is read, so a streamed request is retried the same way
+            return send_with_retry(
+                send, provider_name,
+                on_retry=getattr(self, "retry_callback", None),
+                detail=lambda r: redact(self._extract_openai_error(r), secrets),
+                secrets=secrets,
+            )
 
         # ── Non-streaming ──────────────────────────────────────────────────────
         if not stream:
             try:
-                resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+                resp = post()
             except requests.exceptions.ConnectionError as e:
                 raise LLMConnectionError(
                     f"Cannot connect to {provider_name} at {url} ({describe_error(e, secrets)})."
@@ -151,9 +165,7 @@ class OpenAICompatMixin:
 
         # ── Streaming ──────────────────────────────────────────────────────────
         try:
-            resp = requests.post(
-                url, json=payload, headers=headers, timeout=timeout, stream=True
-            )
+            resp = post(stream=True)
         except requests.exceptions.ConnectionError as e:
             raise LLMConnectionError(
                 f"Cannot connect to {provider_name} at {url} ({describe_error(e, secrets)})."

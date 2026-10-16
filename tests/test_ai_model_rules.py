@@ -436,7 +436,8 @@ def _run_chat(tmp_path, function, status, body):
         "function fetch(url, init) { calls.push({url: url, body: JSON.parse(init.body)});"
         " return Promise.resolve({ok: STATUS === 200, status: STATUS,"
         " json: function () { return Promise.resolve(BODY); }}); }",
-        _js_function(page, "providerError"),
+        "var " + re.search(r"RETRY_POLICY = (\{.*?\});", page).group(0),
+        *(_js_function(page, name) for name in ("errorDetail", "providerError", "retryAfterSeconds", "withRetry")),
         _js_function(page, function),
         f"{function}('k', [{{role: 'system', content: 's'}}, {{role: 'user', content: 'hi'}}])"
         ".then(function (r) { console.log(JSON.stringify({calls: calls, reply: r})); },"
