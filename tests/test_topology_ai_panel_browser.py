@@ -190,8 +190,9 @@ def test_gemini_request_shape(browser, page_path):
     call = calls[0]
     assert call["url"] == (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{DEFAULT_GEMINI_MODEL}:generateContent?key={KEY}"
+        f"{DEFAULT_GEMINI_MODEL}:generateContent"
     )
+    assert call["headers"]["x-goog-api-key"] == KEY
     assert call["method"] == "POST"
     body = call["body"]
     assert CONNECTION in body["systemInstruction"]["parts"][0]["text"]

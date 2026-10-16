@@ -29,17 +29,14 @@ from scrutics.ai.provider import (
 from scrutics.ai.config import load_ai_config, build_provider
 from scrutics.ai.tools import SessionContext, get_tool_definitions
 from scrutics.ai.agent import run_agent_loop
+from scrutics.ai.redact import redact
 
 
 def _sanitize_string(s: str, api_key: str = "") -> str:
     """Strip keys, IPs, MACs, and raw cryptographic signatures from diagnostic output."""
     if not s:
         return ""
-    out = s
-    if api_key:
-        out = out.replace(api_key, "[REDACTED_API_KEY]")
-    # Redact common key URL parameters
-    out = re.sub(r"key=[^&\s]+", "key=[REDACTED]", out)
+    out = redact(s, [api_key])
     # Redact IPv4 addresses
     out = re.sub(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[IP_REDACTED]", out)
     # Redact MAC addresses
@@ -68,6 +65,8 @@ def run_ai_diagnostics(
     log("=" * 65)
 
     current_stage = 0
+    # Set once the key is resolved; every failure text is redacted against it
+    resolved_key = ""
 
     def step(name: str) -> None:
         nonlocal current_stage
@@ -80,7 +79,7 @@ def run_ai_diagnostics(
 
     def fail_step(reason: str, layer_hint: str) -> int:
         log("FAIL")
-        log(f"\n[!] Failure at Stage {current_stage}: {reason}")
+        log(f"\n[!] Failure at Stage {current_stage}: {_sanitize_string(reason, resolved_key)}")
         log(f"[!] Layer Guidance: {layer_hint}\n")
         return 1
 
@@ -102,7 +101,6 @@ def run_ai_diagnostics(
     # ── Stage 2: API Key Configuration ────────────────────────────────────────
     step("API key presence & resolution")
     raw_key = cfg.get("api_key", "")
-    resolved_key = ""
     if p_name != "ollama":
         if not raw_key:
             return fail_step(
@@ -180,9 +178,9 @@ def run_ai_diagnostics(
     step("Model availability & authentication")
     if p_name == "gemini":
         import requests
-        auth_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}?key={resolved_key}"
+        auth_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}"
         try:
-            resp = requests.get(auth_url, timeout=10.0)
+            resp = requests.get(auth_url, headers={"x-goog-api-key": resolved_key}, timeout=10.0)
             if resp.status_code == 401:
                 return fail_step(
                     "API key rejected by Google (HTTP 401).",
@@ -200,7 +198,7 @@ def run_ai_diagnostics(
                 )
             pass_step(f"Model '{model_name}' confirmed active")
         except requests.exceptions.RequestException as e:
-            return fail_step(str(e), "Network error verifying model.")
+            return fail_step(f"{type(e).__name__}: {e}", "Network error verifying model.")
     else:
         pass_step("Confirmed")
 
@@ -216,8 +214,7 @@ def run_ai_diagnostics(
             return fail_step("Model returned empty or non-string response.", "Verify model status.")
         pass_step(f"Latency: {elapsed:.2f}s")
     except Exception as e:
-        clean_err = _sanitize_string(str(e), resolved_key)
-        return fail_step(clean_err, "Failed plain completion turn.")
+        return fail_step(str(e), "Failed plain completion turn.")
 
     # ── Stage 8: Tool Declaration Syntax ──────────────────────────────────────
     step("Tool schema declaration")
@@ -251,7 +248,7 @@ def run_ai_diagnostics(
             return fail_step("Incorrect tool selected by model.", "Verify function declaration.")
         pass_step(f"Tool call emitted: {tcs[0]['function']['name']}")
     except Exception as e:
-        return fail_step(_sanitize_string(str(e), resolved_key), "Tool call generation error.")
+        return fail_step(str(e), "Tool call generation error.")
 
     # ── Stage 10: Function-Call Thought Signature Handling ────────────────────
     step("Function-call thought signature check")
@@ -309,7 +306,7 @@ def run_ai_diagnostics(
             )
         pass_step("Tool output accepted; concluded cleanly")
     except Exception as e:
-        return fail_step(_sanitize_string(str(e), resolved_key), "Failed during multi-step tool replay.")
+        return fail_step(str(e), "Failed during multi-step tool replay.")
 
     # ── Stage 13: Full Scrutics Agent Loop Path ───────────────────────────────
     step("Full agent execution loop")
@@ -345,7 +342,7 @@ def run_ai_diagnostics(
                 return fail_step("Agent loop did not return a valid answer string.", "Check agent loop flow.")
             pass_step("Agent executed and answered query")
     except Exception as e:
-        return fail_step(_sanitize_string(str(e), resolved_key), "Agent loop execution failed.")
+        return fail_step(str(e), "Agent loop execution failed.")
 
     # ── Stage 14: Parallel Function Calls & Part Structure ────────────────────
     step("Parallel function call structure & replay")

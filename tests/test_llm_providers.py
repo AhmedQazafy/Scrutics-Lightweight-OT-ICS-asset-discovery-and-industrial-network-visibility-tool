@@ -375,8 +375,8 @@ class TestGeminiProvider(unittest.TestCase):
         self.assertIn("functionDeclarations", result[0])
         self.assertEqual(result[0]["functionDeclarations"][0]["name"], "get_assets")
 
-    def test_api_key_is_query_param_not_header(self):
-        """Verify the API key appears in the URL, not in headers."""
+    def test_api_key_is_header_not_query_param(self):
+        """Verify the API key is sent in the x-goog-api-key header, never in the URL."""
         provider = self._make_provider()
         captured_calls = []
 
@@ -390,10 +390,9 @@ class TestGeminiProvider(unittest.TestCase):
         url = captured_calls[0][0][0] if captured_calls[0][0] else captured_calls[0][1].get("url", "")
         if not url and "url" in captured_calls[0][1]:
             url = captured_calls[0][1]["url"]
-        self.assertIn("key=gemini-test-key", url)
+        self.assertNotIn("gemini-test-key", url)
         headers = captured_calls[0][1].get("headers", {})
-        for v in headers.values():
-            self.assertNotIn("gemini-test-key", str(v))
+        self.assertEqual(headers.get("x-goog-api-key"), "gemini-test-key")
 
 
 # ── env-var resolution tests ──────────────────────────────────────────────────

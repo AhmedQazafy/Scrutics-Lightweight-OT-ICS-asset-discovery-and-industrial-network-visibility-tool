@@ -110,8 +110,11 @@ def _query_models(
     req = requests_module
 
     if provider_id == "gemini":
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-        resp = req.get(url, timeout=timeout)
+        resp = req.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            headers={"x-goog-api-key": api_key},
+            timeout=timeout,
+        )
         if resp.status_code != 200:
             # Raise with detailed error for debugging
             raise RuntimeError(f"Gemini API returned {resp.status_code}: {resp.text[:200]}")

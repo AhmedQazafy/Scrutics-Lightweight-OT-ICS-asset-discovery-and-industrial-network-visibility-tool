@@ -20,6 +20,7 @@ from scrutics.ai.provider import (
     LLMResponseError,
     LLMProviderError,
 )
+from scrutics.ai.redact import describe_error
 
 _ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_VERSION = "2023-06-01"
@@ -230,16 +231,18 @@ class AnthropicProvider(LLMProvider):
             )
         except requests.exceptions.ConnectionError as e:
             raise LLMConnectionError(
-                f"Cannot connect to Anthropic API at {_ANTHROPIC_API_URL}."
-            ) from e
+                f"Cannot connect to Anthropic API at {_ANTHROPIC_API_URL} "
+                f"({describe_error(e, (self._api_key,))})."
+            ) from None
         except requests.exceptions.Timeout as e:
             raise LLMTimeoutError(
-                f"Request to Anthropic timed out after {effective_timeout}s."
-            ) from e
+                f"Request to Anthropic timed out after {effective_timeout}s "
+                f"({describe_error(e, (self._api_key,))})."
+            ) from None
         except requests.exceptions.RequestException as e:
             raise LLMProviderError(
-                f"HTTP request to Anthropic failed: {type(e).__name__}"
-            ) from e
+                f"HTTP request to Anthropic failed: {describe_error(e, (self._api_key,))}"
+            ) from None
 
         if resp.status_code in (401, 403):
             raise LLMResponseError(

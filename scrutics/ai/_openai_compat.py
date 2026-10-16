@@ -4,7 +4,8 @@ Both OllamaProvider (local, OpenAI-compatible endpoint) and OpenAIProvider (clou
 speak the same request/response shape. This mixin holds the common HTTP +
 parsing logic so neither class duplicates it.
 
-IMPORTANT: This mixin never accesses self._api_key and never logs credentials.
+IMPORTANT: This mixin never accesses self._api_key and never logs credentials. Callers pass the
+values to strip from provider error text as `secrets`.
 """
 
 import json
@@ -18,6 +19,7 @@ from scrutics.ai.provider import (
     LLMResponseError,
     LLMProviderError,
 )
+from scrutics.ai.redact import describe_error, redact
 
 
 class OpenAICompatMixin:
@@ -49,11 +51,14 @@ class OpenAICompatMixin:
         return f"HTTP {response.status_code}"
 
     def _check_openai_status(
-        self, response: requests.Response, provider_name: str = "provider"
+        self,
+        response: requests.Response,
+        provider_name: str = "provider",
+        secrets: tuple[str, ...] = (),
     ) -> None:
         if response.status_code == 200:
             return
-        err_msg = self._extract_openai_error(response)
+        err_msg = redact(self._extract_openai_error(response), secrets)
         if response.status_code in (401, 403):
             raise LLMResponseError(
                 f"Authentication failed for {provider_name}. "
@@ -73,6 +78,7 @@ class OpenAICompatMixin:
         stream: bool,
         timeout: float,
         provider_name: str = "provider",
+        secrets: tuple[str, ...] = (),
     ) -> str | dict[str, Any] | Iterator[str]:
 
         # ── Non-streaming ──────────────────────────────────────────────────────
@@ -81,25 +87,25 @@ class OpenAICompatMixin:
                 resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
             except requests.exceptions.ConnectionError as e:
                 raise LLMConnectionError(
-                    f"Cannot connect to {provider_name} at {url}."
-                ) from e
+                    f"Cannot connect to {provider_name} at {url} ({describe_error(e, secrets)})."
+                ) from None
             except requests.exceptions.Timeout as e:
                 raise LLMTimeoutError(
-                    f"Request to {provider_name} timed out after {timeout}s."
-                ) from e
+                    f"Request to {provider_name} timed out after {timeout}s ({describe_error(e, secrets)})."
+                ) from None
             except requests.exceptions.RequestException as e:
                 raise LLMProviderError(
-                    f"HTTP request to {provider_name} failed: {type(e).__name__}"
-                ) from e
+                    f"HTTP request to {provider_name} failed: {describe_error(e, secrets)}"
+                ) from None
 
-            self._check_openai_status(resp, provider_name)
+            self._check_openai_status(resp, provider_name, secrets)
 
             try:
                 data = resp.json()
             except Exception as e:
                 raise LLMResponseError(
                     f"Malformed JSON from {provider_name}."
-                ) from e
+                ) from None
 
             if not isinstance(data, dict) or "choices" not in data or not data["choices"]:
                 raise LLMResponseError(
@@ -139,19 +145,19 @@ class OpenAICompatMixin:
             )
         except requests.exceptions.ConnectionError as e:
             raise LLMConnectionError(
-                f"Cannot connect to {provider_name} at {url}."
-            ) from e
+                f"Cannot connect to {provider_name} at {url} ({describe_error(e, secrets)})."
+            ) from None
         except requests.exceptions.Timeout as e:
             raise LLMTimeoutError(
-                f"Request to {provider_name} timed out after {timeout}s."
-            ) from e
+                f"Request to {provider_name} timed out after {timeout}s ({describe_error(e, secrets)})."
+            ) from None
         except requests.exceptions.RequestException as e:
             raise LLMProviderError(
-                f"HTTP request to {provider_name} failed: {type(e).__name__}"
-            ) from e
+                f"HTTP request to {provider_name} failed: {describe_error(e, secrets)}"
+            ) from None
 
         try:
-            self._check_openai_status(resp, provider_name)
+            self._check_openai_status(resp, provider_name, secrets)
         except Exception:
             resp.close()
             raise
@@ -182,16 +188,16 @@ class OpenAICompatMixin:
                         yield token
             except requests.exceptions.Timeout as e:
                 raise LLMTimeoutError(
-                    f"{provider_name} streaming timed out."
-                ) from e
+                    f"{provider_name} streaming timed out ({describe_error(e, secrets)})."
+                ) from None
             except requests.exceptions.ConnectionError as e:
                 raise LLMConnectionError(
-                    f"Connection lost while streaming from {provider_name}."
-                ) from e
+                    f"Connection lost while streaming from {provider_name} ({describe_error(e, secrets)})."
+                ) from None
             except requests.exceptions.RequestException as e:
                 raise LLMResponseError(
-                    f"Streaming error from {provider_name}: {type(e).__name__}"
-                ) from e
+                    f"Streaming error from {provider_name}: {describe_error(e, secrets)}"
+                ) from None
             finally:
                 resp.close()
 

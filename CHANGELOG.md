@@ -100,6 +100,9 @@ All notable changes to Scrutics are documented here.
 - **Headless checkpoint messages**: during a headless capture, lost rows are printed at the next checkpoint (every 15 seconds) as `N rows not written to anomalies.csv (first error: …)`, and printed again only when the count changes; a snapshot file that could not be written is reported the same way.
 - Known limitation: a write failure during capture is reported at the end of the run (and in the headless checkpoint messages), not when it happens.
 
+### Fixed — AI Key Safety
+- **API keys stay out of URLs, messages and error details**: the Gemini key is sent in the `x-goog-api-key` header instead of the URL, by the assistant, `scrutics ai diagnose`, model listing and the topology page's chat. Every `scrutics ai diagnose` failure message, and the error text that OpenAI and Gemini send back, is cleaned of the key and of anything shaped like a credential before it is shown. A failed request no longer keeps the underlying network error, which described the request, attached to the error Scrutics raises; the message names that error's type and its cleaned reason instead (for example `ConnectionError: ... Connection refused`).
+
 ## [0.6.1] — 2026-09-19
 
 ### Fixed — AI Reliability & Tool-Calling Protocol

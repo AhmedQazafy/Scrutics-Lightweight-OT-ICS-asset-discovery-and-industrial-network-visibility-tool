@@ -1516,9 +1516,9 @@ document.addEventListener("DOMContentLoaded", function() {
       .map(function (m) { return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }; });
     var payload = { contents: contents, generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } };
     if (sys) payload.systemInstruction = { parts: [{ text: sys.content }] };
-    return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(AI_MODELS.gemini) + ":generateContent?key=" + encodeURIComponent(key), {
+    return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(AI_MODELS.gemini) + ":generateContent", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify(payload),
     })
     .then(function (r) {

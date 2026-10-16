@@ -1,7 +1,8 @@
 """Google Gemini generateContent provider for Scrutics Intelligence.
 
 Uses the Gemini REST API at:
-  POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key=...
+  POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+with the API key in the x-goog-api-key header, never in the URL.
 
 Translates between Gemini's native shapes (contents[], functionDeclarations,
 functionCall/functionResponse) and the internal OpenAI-compatible contract
@@ -29,6 +30,7 @@ from scrutics.ai.provider import (
     LLMResponseError,
     LLMProviderError,
 )
+from scrutics.ai.redact import describe_error, redact
 
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 _RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
@@ -74,7 +76,7 @@ def _extract_retry_delay(resp: requests.Response | None) -> float | None:
     return None
 
 
-def _format_gemini_error(resp: requests.Response, model: str) -> str:
+def _format_gemini_error(resp: requests.Response, model: str, secrets: tuple[str, ...] = ()) -> str:
     """Format a sanitized, actionable error message mapping HTTP and Google RPC status codes.
 
     Never exposes API keys, URLs with keys, prompts, IPs, MACs, or raw signatures.
@@ -94,9 +96,8 @@ def _format_gemini_error(resp: requests.Response, model: str) -> str:
     if rpc_status == "INVALID_ARGUMENT" or code == 400:
         msg = f"Gemini rejected the request (HTTP 400 / INVALID_ARGUMENT). Check model '{model}' compatibility or conversation structure."
         if detail:
-            # Sanitize any potential query key leak from error message if Google reflected URL
-            sanitized_detail = re.sub(r"key=[^&\s]+", "key=[REDACTED]", detail)
-            msg += f" Details: {sanitized_detail}"
+            # Google can reflect request details in the message; strip anything credential-shaped
+            msg += f" Details: {redact(detail, secrets)}"
         return msg
     elif rpc_status == "UNAUTHENTICATED" or code == 401:
         return "Authentication failed for Gemini (HTTP 401 / UNAUTHENTICATED). Verify GEMINI_API_KEY is valid."
@@ -342,8 +343,10 @@ class GeminiProvider(LLMProvider):
         self.retry_callback = cb
 
     def _endpoint_url(self) -> str:
-        # API key as query param (Gemini generateContent convention
-        return f"{_GEMINI_BASE_URL}/{self.model}:generateContent?key={self._api_key}"
+        return f"{_GEMINI_BASE_URL}/{self.model}:generateContent"
+
+    def _auth_headers(self) -> dict[str, str]:
+        return {"Content-Type": "application/json", "x-goog-api-key": self._api_key}
 
     def chat(
         self,
@@ -397,15 +400,16 @@ class GeminiProvider(LLMProvider):
                 resp = requests.post(
                     self._endpoint_url(),
                     json=payload,
-                    headers={"Content-Type": "application/json"},
+                    headers=self._auth_headers(),
                     timeout=effective_timeout,
                 )
             except requests.exceptions.Timeout as e:
                 last_error = LLMTimeoutError(
-                    f"Request to Gemini timed out after {effective_timeout}s."
+                    f"Request to Gemini timed out after {effective_timeout}s "
+                    f"({describe_error(e, (self._api_key,))})."
                 )
                 if attempt >= _MAX_RETRY_ATTEMPTS:
-                    raise last_error from e
+                    raise last_error from None
                 delay = min(_MAX_BACKOFF_DELAY, (1.0 * (2 ** (attempt - 1))) + random.uniform(0.1, 0.4))
                 if effective_cb:
                     try:
@@ -416,10 +420,10 @@ class GeminiProvider(LLMProvider):
                 continue
             except requests.exceptions.ConnectionError as e:
                 last_error = LLMConnectionError(
-                    "Cannot connect to Google Gemini API."
+                    f"Cannot connect to Google Gemini API ({describe_error(e, (self._api_key,))})."
                 )
                 if attempt >= _MAX_RETRY_ATTEMPTS:
-                    raise last_error from e
+                    raise last_error from None
                 delay = min(_MAX_BACKOFF_DELAY, (1.0 * (2 ** (attempt - 1))) + random.uniform(0.1, 0.4))
                 if effective_cb:
                     try:
@@ -430,12 +434,12 @@ class GeminiProvider(LLMProvider):
                 continue
             except requests.exceptions.RequestException as e:
                 raise LLMProviderError(
-                    f"HTTP request to Gemini failed: {type(e).__name__}"
-                ) from e
+                    f"HTTP request to Gemini failed: {describe_error(e, (self._api_key,))}"
+                ) from None
 
             # Immediate client failure: non-retryable
             if resp.status_code in (400, 401, 403, 404):
-                error_msg = _format_gemini_error(resp, self.model)
+                error_msg = _format_gemini_error(resp, self.model, (self._api_key,))
                 raise LLMResponseError(error_msg)
 
             # Retryable server or rate limit errors
@@ -454,11 +458,11 @@ class GeminiProvider(LLMProvider):
                     time.sleep(delay)
                     continue
                 else:
-                    error_msg = _format_gemini_error(resp, self.model)
+                    error_msg = _format_gemini_error(resp, self.model, (self._api_key,))
                     raise LLMResponseError(error_msg)
 
             if resp.status_code != 200:
-                error_msg = _format_gemini_error(resp, self.model)
+                error_msg = _format_gemini_error(resp, self.model, (self._api_key,))
                 raise LLMResponseError(error_msg)
 
             try:

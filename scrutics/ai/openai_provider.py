@@ -74,4 +74,5 @@ class OpenAIProvider(OpenAICompatMixin, LLMProvider):
             stream=stream,
             timeout=effective_timeout,
             provider_name="OpenAI",
+            secrets=(self._api_key,),
         )
