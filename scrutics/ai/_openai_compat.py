@@ -118,6 +118,17 @@ class OpenAICompatMixin:
                     f"Missing message in {provider_name} choice."
                 )
 
+            if (data["choices"][0].get("finish_reason") == "length"
+                    and not message.get("tool_calls")
+                    and not str(message.get("content") or "").strip()):
+                # Reasoning tokens count toward the output limit; Scrutics sends no limit here, so the
+                # model's own limit was reached
+                raise LLMResponseError(
+                    f"{provider_name} stopped at the model's output token limit before writing an answer; "
+                    "the model most likely used it on reasoning. Choose a model with reasoning off "
+                    "(the default sends reasoning_effort \"none\")."
+                )
+
             tool_calls = message.get("tool_calls")
             if tool_calls:
                 return {

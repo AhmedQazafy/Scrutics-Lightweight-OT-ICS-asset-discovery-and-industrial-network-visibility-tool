@@ -236,29 +236,26 @@ def run_list_models(args) -> int:
     print(f"\n  Fetching {provider} models...")
     print(f"  {'─' * 60}")
     
-    from scrutics.ai.model_discovery import fetch_models, _FALLBACK_MODELS
-    
+    from scrutics.ai.model_discovery import fetch_models_with_source
+    from scrutics.ai.model_rules import FALLBACK_LABEL
+
     try:
         base_url = "http://localhost:11434" if provider == "ollama" else ""
-        models = fetch_models(provider, api_key, base_url, timeout=10.0, max_results=50)
-        
-        if not models:
+        models, source, reason = fetch_models_with_source(provider, api_key, base_url, timeout=10.0, max_results=50)
+
+        if source != "live":
             print(f"  ✗ Failed to fetch models from {provider}.")
             if provider == "ollama":
                 print(f"  Is Ollama running? Try: ollama serve")
             elif not api_key:
                 print(f"  No API key found. Set {env_vars.get(provider, 'API_KEY')} or use --key")
             else:
-                print(f"  Possible causes:")
-                print(f"    • Invalid or expired API key")
-                print(f"    • Network connectivity issue")
-                print(f"    • Provider API is down")
-                print(f"    • Rate limit exceeded")
-            
+                print(f"  Reason: {reason}")
+
             # Show fallback list with warning
-            fallback = _FALLBACK_MODELS.get(provider, [])
+            fallback = models
             if fallback:
-                print(f"\n  Fallback list (may be outdated, {len(fallback)} models):\n")
+                print(f"\n  {FALLBACK_LABEL}, {len(fallback)} models:\n")
                 for i, model in enumerate(fallback, 1):
                     print(f"  {i:2d}. {model}")
             print()
@@ -1219,8 +1216,8 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
 
 _CLI_ONBOARDING_PROVIDERS = [
     ("gemini",    "Google Gemini  (free tier — recommended)", "gemini-3.8-flash",  "GEMINI_API_KEY",    "https://aistudio.google.com/app/apikey"),
-    ("openai",    "OpenAI                                   ", "gpt-4o-mini",       "OPENAI_API_KEY",    "https://platform.openai.com/api-keys"),
-    ("anthropic", "Anthropic                                ", "claude-haiku-4-5",  "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
+    ("openai",    "OpenAI                                   ", "gpt-6-luna",        "OPENAI_API_KEY",    "https://platform.openai.com/api-keys"),
+    ("anthropic", "Anthropic                                ", "claude-haiku-5-5",  "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
     ("ollama",    "Ollama (local, no key needed)            ", "qwen3.5:4b",        None,                None),
 ]
 
@@ -1287,26 +1284,29 @@ def _run_ai_onboarding_cli() -> dict | None:
 
     # Discover available models
     print("\n  Checking available models...", end="", flush=True)
-    try:
-        from scrutics.ai.model_discovery import fetch_models
-        base_url = "" if provider_id != "ollama" else "http://localhost:11434"
-        available = fetch_models(provider_id, api_key, base_url, timeout=6.0)
-    except Exception:
-        available = []
+    from scrutics.ai.model_discovery import fetch_models_with_source
+    from scrutics.ai.model_rules import FALLBACK_LABEL, default_index
+    base_url = "" if provider_id != "ollama" else "http://localhost:11434"
+    available, source, reason = fetch_models_with_source(provider_id, api_key, base_url, timeout=6.0)
 
     if available:
-        print(f" found {len(available)}")
+        if source == "live":
+            print(f" found {len(available)}")
+        else:
+            print(f" could not list models ({reason})")
+            print(f"  {FALLBACK_LABEL}:")
         print()
         for i, m in enumerate(available, 1):
             print(f"    {i}. {m}")
         print()
+        default_pos = default_index(available, model) + 1
         while True:
             try:
-                raw = input(f"  Select model (1-{len(available)}, default=1): ").strip()
+                raw = input(f"  Select model (1-{len(available)}, default={default_pos}): ").strip()
             except (EOFError, KeyboardInterrupt):
                 raw = ""
             if not raw:
-                model = available[0]
+                model = available[default_pos - 1]
                 break
             if raw.isdigit() and 1 <= int(raw) <= len(available):
                 model = available[int(raw) - 1]

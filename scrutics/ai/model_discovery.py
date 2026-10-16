@@ -10,26 +10,32 @@ from __future__ import annotations
 import re as _re
 from typing import Any
 
+from scrutics.ai.model_rules import (
+    DEFAULT_ANTHROPIC_MODEL,
+    DEFAULT_OPENAI_MODEL,
+    fallback_models,
+    order_models,
+)
+from scrutics.ai.redact import describe_error
 
-# Hardcoded fallback lists used when the discovery endpoint is unavailable.
-# Keep these updated with newest models as providers release them.
-# The fetch_models() function queries the live API first and only uses
-# these as a last resort when the API is unreachable.
+_ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models"
+_ANTHROPIC_VERSION = "2023-06-01"
+_ANTHROPIC_MAX_PAGES = 5
+
+# Lists used when a provider's model list cannot be fetched. OpenAI and Anthropic offer only the
+# models whose request rules are known (see model_rules); fetch_models_with_source labels them.
 _FALLBACK_MODELS: dict[str, list[str]] = {
     "gemini":    [
         "gemini-3.8-flash", "gemini-3.8-flash-lite",
         "gemini-2.5-flash", "gemini-2.5-flash-lite",
     ],
-    "openai":    [
-        "gpt-4o-mini", "gpt-4o", "gpt-4-turbo",
-        "gpt-3.5-turbo", "o1-mini", "o1-preview",
-    ],
-    "anthropic": [
-        "claude-haiku-4-5", "claude-sonnet-4", "claude-opus-4",
-        "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307",
-    ],
+    "openai":    fallback_models("openai"),
+    "anthropic": fallback_models("anthropic"),
     "ollama":    [],  # populated from local Ollama instance
 }
+
+# Providers whose offered list and order come from model_rules
+_DEFAULTS = {"openai": DEFAULT_OPENAI_MODEL, "anthropic": DEFAULT_ANTHROPIC_MODEL}
 
 # Model name substrings that always indicate a non-chat utility model
 _EXCLUDE_PATTERNS = {
@@ -44,9 +50,6 @@ _EXCLUDE_PATTERNS = {
 # Reject anything that doesn't match: gemini-robotics, gemma-*, lyria-*, etc.
 _GEMINI_CHAT_RE = _re.compile(r"^gemini-\d+\.\d+", _re.IGNORECASE)
 
-# OpenAI chat model prefixes
-_OPENAI_CHAT_PREFIXES = ("gpt-3", "gpt-4", "o1-", "o3-", "o4-")
-
 
 def _is_chat_model(name: str, provider_id: str = "") -> bool:
     """Return True if a model name is a generative chat model worth showing to users."""
@@ -58,10 +61,8 @@ def _is_chat_model(name: str, provider_id: str = "") -> bool:
     if provider_id == "gemini":
         return bool(_GEMINI_CHAT_RE.match(name))
 
-    if provider_id == "openai":
-        return any(lower.startswith(p) for p in _OPENAI_CHAT_PREFIXES)
-
-    # Ollama and Anthropic: accept anything not excluded
+    # OpenAI is limited to the offered models afterwards; Ollama and Anthropic accept anything
+    # not excluded
     return True
 
 
@@ -74,7 +75,8 @@ def fetch_models(
 ) -> list[str]:
     """
     Query a provider's models endpoint and return up to max_results chat-capable
-    model names, sorted newest-first by name.
+    model names. OpenAI and Anthropic come in the order Scrutics offers them, default
+    first (model_rules.order_models); Gemini and Ollama are sorted by name, newest first.
 
     Returns empty list on failure so callers can decide whether to proceed
     with fallback or show an error to the user.
@@ -84,16 +86,46 @@ def fetch_models(
     for convenience during setup.
     """
     try:
-        import requests
-        models = _query_models(provider_id, api_key, base_url, requests, timeout)
-        chat_models = [m for m in models if _is_chat_model(m, provider_id)]
-        # Sort newest-first: reverse-alphabetical is a reasonable heuristic
-        # (gemini-2.x sorts after gemini-1.x, gpt-4o sorts after gpt-3.5)
-        chat_models.sort(reverse=True)
-        return chat_models[:max_results]
+        return _listed(provider_id, api_key, base_url, timeout)[:max_results]
     except Exception:
         # Return empty list - let caller decide how to handle
         return []
+
+
+def fetch_models_with_source(
+    provider_id: str,
+    api_key: str = "",
+    base_url: str = "",
+    timeout: float = 8.0,
+    max_results: int = 20,
+) -> tuple[list[str], str, str]:
+    """
+    (models, source, reason): the provider's own list ("live"), or the fallback list
+    ("fallback") with the reason the list could not be fetched. The reason never holds the key.
+    """
+    reason = ""
+    if provider_id != "ollama" and not api_key:
+        reason = "no API key"
+    else:
+        try:
+            models = _listed(provider_id, api_key, base_url, timeout)[:max_results]
+            if models:
+                return models, "live", ""
+            reason = "the provider listed no usable models"
+        except Exception as e:
+            reason = describe_error(e, (api_key,))
+    return list(_FALLBACK_MODELS.get(provider_id, [])), "fallback", reason
+
+
+def _listed(provider_id: str, api_key: str, base_url: str, timeout: float) -> list[str]:
+    import requests
+    models = _query_models(provider_id, api_key, base_url, requests, timeout)
+    chat_models = [m for m in models if _is_chat_model(m, provider_id)]
+    if provider_id in _DEFAULTS:
+        return order_models(provider_id, chat_models, _DEFAULTS[provider_id])
+    # Newest first by name (gemini-2.x sorts after gemini-1.x)
+    chat_models.sort(reverse=True)
+    return chat_models
 
 
 def _query_models(
@@ -138,8 +170,26 @@ def _query_models(
         return [m["id"] for m in data.get("data", [])]
 
     if provider_id == "anthropic":
-        # Anthropic has no public model list endpoint; return hardcoded
-        return _FALLBACK_MODELS["anthropic"]
+        # Models API: newest first, paged by after_id; only models open to use are kept
+        names: list[str] = []
+        params: dict[str, Any] = {"limit": 1000}
+        for _page in range(_ANTHROPIC_MAX_PAGES):
+            resp = req.get(
+                _ANTHROPIC_MODELS_URL,
+                headers={"x-api-key": api_key, "anthropic-version": _ANTHROPIC_VERSION},
+                params=params,
+                timeout=timeout,
+            )
+            if resp.status_code != 200:
+                raise RuntimeError(f"Anthropic API returned {resp.status_code}")
+            data = resp.json()
+            for m in data.get("data", []):
+                if isinstance(m, dict) and m.get("id") and m.get("lifecycle", "active") == "active":
+                    names.append(str(m["id"]))
+            if not data.get("has_more") or not data.get("last_id"):
+                break
+            params = {"limit": 1000, "after_id": data["last_id"]}
+        return names
 
     if provider_id == "ollama":
         effective_base = (base_url or "http://localhost:11434").rstrip("/")

@@ -17,6 +17,7 @@ from scrutics.ai.provider import (
     LLMProviderError,
 )
 from scrutics.ai._openai_compat import OpenAICompatMixin
+from scrutics.ai.model_rules import DEFAULT_OPENAI_MODEL, openai_options
 
 
 class OpenAIProvider(OpenAICompatMixin, LLMProvider):
@@ -26,7 +27,7 @@ class OpenAIProvider(OpenAICompatMixin, LLMProvider):
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = DEFAULT_OPENAI_MODEL,
         api_key: str = "",
         base_url: str = DEFAULT_BASE_URL,
         temperature: float = 0.3,
@@ -61,8 +62,8 @@ class OpenAIProvider(OpenAICompatMixin, LLMProvider):
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
-            "temperature": self.temperature,
             "stream": stream,
+            **openai_options(self.model, self.temperature),
         }
         if tools:
             payload["tools"] = tools

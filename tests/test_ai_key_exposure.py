@@ -212,6 +212,23 @@ def test_model_discovery_never_carries_the_key(provider_name, label, behaviour, 
     _assert_urls_clean(recorder)
 
 
+@pytest.mark.parametrize("provider_name", ["gemini", "openai", "anthropic"])
+@pytest.mark.parametrize("label,behaviour", _BEHAVIOURS, ids=[b[0] for b in _BEHAVIOURS])
+def test_model_list_fallback_reason_and_list_models_never_print_the_key(
+        provider_name, label, behaviour, monkeypatch, debug_logs):
+    from scrutics import cli
+
+    monkeypatch.setenv(_KEY_VARS[provider_name], CANARY)
+    getter = _Recorder(behaviour)
+    out = io.StringIO()
+    with mock.patch("requests.get", getter), redirect_stdout(out), redirect_stderr(out):
+        models, source, reason = model_discovery.fetch_models_with_source(provider_name, CANARY, "", timeout=1.0)
+        cli.run_list_models(cli.build_parser().parse_args(["list-models", provider_name]))
+    assert source == "fallback"
+    _assert_clean(reason, out.getvalue(), *models, *debug_logs)
+    _assert_urls_clean(getter)
+
+
 def _run_diagnose(provider_name, get_behaviour, post_behaviour):
     buf = io.StringIO()
     getter, poster = _Recorder(get_behaviour), _Recorder(post_behaviour)

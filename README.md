@@ -144,6 +144,8 @@ python3 -m scrutics ask --session output/scrutics_20260914_120000
 
 **Supported providers** : Ollama (local, offline), Google Gemini, OpenAI, Anthropic. Configure via `scrutics/config/ai.yaml` or the built-in onboarding prompts.
 
+**Default models** : `gemini-3.8-flash`, `gpt-6-luna`, `claude-haiku-5-5`, `qwen3.5:4b` (Ollama). Setup lists the models your key can use. For OpenAI it offers only `gpt-6-luna` and `gpt-6-sol`, the models whose tool calls work on the Chat Completions API that Scrutics uses. If the list cannot be fetched, setup says why and shows a fallback list marked as such. A model you name in `ai.yaml` is used as given; Scrutics sends it a temperature only if it is documented to accept one.
+
 **Another provider for one run** : `scrutics ai --provider openai` (also with `--diagnose`) uses that provider's own key, read from its environment variable (`GEMINI_API_KEY`, `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`; Ollama needs none), and that provider's default model unless `--model` is given. The configured key, model and base URL are never passed to a different provider; of the other settings only `max_tokens` carries over, and timeout and temperature take that provider's defaults. If the variable is not set, Scrutics stops before sending anything and names the variable to set.
 
 **Keys on the command line** : `list-models PROVIDER --key KEY` puts the key on the command line, where other users of the machine can see it while the command runs (for example with `ps`) and where your shell history keeps it. Prefer setting the provider's environment variable, which `list-models` reads when `--key` is not given.

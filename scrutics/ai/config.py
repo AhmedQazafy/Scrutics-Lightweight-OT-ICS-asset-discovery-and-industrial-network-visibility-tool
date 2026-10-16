@@ -6,6 +6,7 @@ from typing import Any
 
 import yaml
 
+from scrutics.ai.model_rules import DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL
 from scrutics.ai.provider import LLMProvider, LLMProviderError
 
 _PKG_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -14,10 +15,8 @@ _DEFAULT_PKG_AI_CONFIG = os.path.join(_PKG_DIR, "config", "ai.yaml")
 # Pattern: ${VAR_NAME} resolves to the environment variable VAR_NAME
 _ENV_VAR_PATTERN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
-# Model used for each hosted provider when the configuration names none. The topology page's
-# browser chat uses the same models.
-DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5"
+# Model used for each provider when the configuration names none. The topology page's browser
+# chat uses the same models. The OpenAI and Anthropic defaults live with their request rules.
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 DEFAULT_OLLAMA_MODEL = "qwen3.5:4b"
 

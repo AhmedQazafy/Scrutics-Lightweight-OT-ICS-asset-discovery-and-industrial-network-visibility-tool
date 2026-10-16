@@ -35,7 +35,7 @@ if "%CHOICE%"=="2" (
     set "PROVIDER_LABEL=OpenAI"
     set "KEY_URL=https://platform.openai.com/api-keys"
     set "YAML_PROVIDER=openai"
-    set "YAML_MODEL=gpt-4o-mini"
+    set "YAML_MODEL=gpt-6-luna"
     goto :get_key
 )
 if "%CHOICE%"=="3" (
@@ -43,7 +43,7 @@ if "%CHOICE%"=="3" (
     set "PROVIDER_LABEL=Anthropic"
     set "KEY_URL=https://console.anthropic.com/settings/keys"
     set "YAML_PROVIDER=anthropic"
-    set "YAML_MODEL=claude-haiku-4-5"
+    set "YAML_MODEL=claude-haiku-5-5"
     goto :get_key
 )
 

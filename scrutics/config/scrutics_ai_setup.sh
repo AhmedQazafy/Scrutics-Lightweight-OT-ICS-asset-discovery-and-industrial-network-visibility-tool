@@ -43,14 +43,14 @@ case "$choice" in
         PROVIDER_LABEL="OpenAI"
         KEY_URL="https://platform.openai.com/api-keys"
         YAML_PROVIDER="openai"
-        YAML_MODEL="gpt-4o-mini"
+        YAML_MODEL="gpt-6-luna"
         ;;
     3)
         VAR_NAME="ANTHROPIC_API_KEY"
         PROVIDER_LABEL="Anthropic"
         KEY_URL="https://console.anthropic.com/settings/keys"
         YAML_PROVIDER="anthropic"
-        YAML_MODEL="claude-haiku-4-5"
+        YAML_MODEL="claude-haiku-5-5"
         ;;
     4)
         VAR_NAME=""

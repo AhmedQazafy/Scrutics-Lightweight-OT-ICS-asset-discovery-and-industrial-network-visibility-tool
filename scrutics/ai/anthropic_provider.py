@@ -6,6 +6,8 @@ Internally translates between Anthropic's native request/response shapes
 OpenAI-compatible contract expected by run_agent_loop():
   - Incoming tool_calls → normalized to {id, type, function: {name, arguments: str}}
   - Outgoing tool messages (role=tool) → translated to Anthropic tool_result blocks
+  - An assistant turn that called tools keeps the response's content blocks, so thinking blocks
+    go back exactly as received with the tool results, as the Messages API requires
 """
 
 import json
@@ -20,10 +22,15 @@ from scrutics.ai.provider import (
     LLMResponseError,
     LLMProviderError,
 )
-from scrutics.ai.redact import describe_error
+from scrutics.ai.model_rules import DEFAULT_ANTHROPIC_MODEL, anthropic_options
+from scrutics.ai.redact import describe_error, redact
 
 _ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_VERSION = "2023-06-01"
+
+# Key under which a tool-call message keeps the response's original content blocks
+_RAW_CONTENT = "_anthropic_content"
+_ERROR_DETAIL_LIMIT = 300
 
 
 def _openai_tools_to_anthropic(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -78,7 +85,11 @@ def _translate_messages_to_anthropic(
 
         if role == "assistant":
             tool_calls = msg.get("tool_calls")
-            if tool_calls:
+            raw_content = msg.get(_RAW_CONTENT)
+            if tool_calls and isinstance(raw_content, list):
+                # Replayed unmodified: thinking blocks must match the original response exactly
+                out.append({"role": "assistant", "content": raw_content})
+            elif tool_calls:
                 # Translate to tool_use content blocks
                 content_blocks = []
                 text = msg.get("content", "")
@@ -158,9 +169,26 @@ def _normalize_anthropic_response(response_body: dict[str, Any]) -> str | dict[s
             "role": "assistant",
             "content": text_content,
             "tool_calls": tool_calls,
+            _RAW_CONTENT: content_blocks,
         }
 
     return text_content
+
+
+def _anthropic_error_detail(resp: requests.Response, secrets: tuple[str, ...]) -> str:
+    """"<type>: <message>" from an Anthropic error body, redacted; empty when the body has none."""
+    try:
+        body = resp.json()
+    except Exception:
+        return ""
+    err = body.get("error") if isinstance(body, dict) else None
+    if not isinstance(err, dict):
+        return ""
+    err_type = str(err.get("type") or "").strip()
+    message = redact(str(err.get("message") or ""), secrets).strip()
+    if len(message) > _ERROR_DETAIL_LIMIT:
+        message = message[:_ERROR_DETAIL_LIMIT] + "..."
+    return ": ".join(part for part in (err_type, message) if part)
 
 
 class AnthropicProvider(LLMProvider):
@@ -168,7 +196,7 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(
         self,
-        model: str = "claude-haiku-4-5",
+        model: str = DEFAULT_ANTHROPIC_MODEL,
         api_key: str = "",
         temperature: float = 0.3,
         max_tokens: int = 1024,
@@ -207,7 +235,7 @@ class AnthropicProvider(LLMProvider):
             "model": self.model,
             "max_tokens": self.max_tokens,
             "messages": anthropic_messages,
-            "temperature": self.temperature,
+            **anthropic_options(self.model, self.temperature),
         }
         if system_prompt:
             payload["system"] = system_prompt
@@ -244,17 +272,15 @@ class AnthropicProvider(LLMProvider):
                 f"HTTP request to Anthropic failed: {describe_error(e, (self._api_key,))}"
             ) from None
 
-        if resp.status_code in (401, 403):
-            raise LLMResponseError(
-                "Authentication failed for Anthropic. "
-                "Check that your API key is valid and correctly set."
-            )
         if resp.status_code != 200:
-            # Never echo response body; it may contain auth-related detail
-            raise LLMResponseError(
-                f"Anthropic returned HTTP {resp.status_code}. "
-                "Check the model name and account limits."
-            )
+            detail = _anthropic_error_detail(resp, (self._api_key,))
+            if resp.status_code in (401, 403):
+                message = ("Authentication failed for Anthropic. "
+                           "Check that your API key is valid and correctly set.")
+                raise LLMResponseError(f"{message} ({detail})" if detail else message)
+            message = f"Anthropic returned HTTP {resp.status_code}"
+            raise LLMResponseError(f"{message} ({detail})." if detail
+                                   else f"{message}. Check the model name and account limits.")
 
         try:
             data = resp.json()
@@ -266,4 +292,12 @@ class AnthropicProvider(LLMProvider):
                 f"Unexpected top-level response type from Anthropic: {type(data).__name__}"
             )
 
-        return _normalize_anthropic_response(data)
+        result = _normalize_anthropic_response(data)
+        if data.get("stop_reason") == "max_tokens" and not (isinstance(result, str) and result.strip()):
+            # Thinking counts toward max_tokens, so a model can spend the whole limit before answering
+            raise LLMResponseError(
+                f"Anthropic stopped at the token limit (max_tokens {self.max_tokens}) before writing an "
+                "answer; the model most likely used it on reasoning. Raise max_tokens in "
+                f"~/.scrutics/ai.yaml or choose a model with thinking off, such as {DEFAULT_ANTHROPIC_MODEL}."
+            )
+        return result

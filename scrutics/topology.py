@@ -1369,6 +1369,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // ── State ─────────────────────────────────────────────────────────────────
   var AI_MODELS = __AI_MODELS_JSON__;
+  // Request fields each default model accepts, from the same rules as the Python providers
+  var AI_REQUEST_OPTIONS = __AI_REQUEST_OPTIONS_JSON__;
   var aiHistory = [];
   var aiKey = "";
   var aiProvider = "";
@@ -1472,26 +1474,50 @@ document.addEventListener("DOMContentLoaded", function() {
     return Promise.reject(new Error("Unknown provider: " + provider));
   }
 
+  var TOKEN_LIMIT_MESSAGE = "The model used its token limit before answering, most likely on reasoning. " +
+    "Try a shorter or more specific question.";
+
+  // Rejects with the provider's own error type and message, so a refused request can be fixed
+  function providerError(name, r) {
+    return r.json().catch(function () { return null; }).then(function (body) {
+      var err = body && body.error;
+      var detail = "";
+      if (err && typeof err === "object") {
+        detail = [err.type || err.status, err.message].filter(function (p) { return p; }).join(": ");
+      } else if (typeof err === "string") {
+        detail = err;
+      }
+      if (detail.length > 300) detail = detail.slice(0, 300) + "...";
+      var msg = (r.status === 401 || r.status === 403)
+        ? "Auth failed: check your " + name + " key"
+        : name + " error HTTP " + r.status;
+      throw new Error(detail ? msg + " (" + detail + ")." : msg + ".");
+    });
+  }
+
   function callOpenAI(key, history) {
+    var payload = Object.assign({ model: AI_MODELS.openai, messages: history }, AI_REQUEST_OPTIONS.openai);
     return fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: AI_MODELS.openai, messages: history, temperature: 0.3, max_tokens: 1024 }),
+      body: JSON.stringify(payload),
     })
     .then(function (r) {
-      if (r.status === 401 || r.status === 403) throw new Error("Auth failed — check your OpenAI key.");
-      if (!r.ok) throw new Error("OpenAI error HTTP " + r.status);
+      if (!r.ok) return providerError("OpenAI", r);
       return r.json();
     })
     .then(function (d) {
-      return (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || "(empty response)";
+      var choice = d.choices && d.choices[0];
+      var text = choice && choice.message && choice.message.content;
+      if (!text && choice && choice.finish_reason === "length") throw new Error(TOKEN_LIMIT_MESSAGE);
+      return text || "(empty response)";
     });
   }
 
   function callAnthropic(key, history) {
     var sys = history.find(function (m) { return m.role === "system"; });
     var msgs = history.filter(function (m) { return m.role !== "system"; });
-    var payload = { model: AI_MODELS.anthropic, max_tokens: 1024, messages: msgs, temperature: 0.3 };
+    var payload = Object.assign({ model: AI_MODELS.anthropic, messages: msgs }, AI_REQUEST_OPTIONS.anthropic);
     if (sys) payload.system = sys.content;
     return fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -1499,12 +1525,12 @@ document.addEventListener("DOMContentLoaded", function() {
       body: JSON.stringify(payload),
     })
     .then(function (r) {
-      if (r.status === 401 || r.status === 403) throw new Error("Auth failed — check your Anthropic key.");
-      if (!r.ok) throw new Error("Anthropic error HTTP " + r.status);
+      if (!r.ok) return providerError("Anthropic", r);
       return r.json();
     })
     .then(function (d) {
       var b = (d.content || []).find(function (x) { return x.type === "text"; });
+      if (!(b && b.text) && d.stop_reason === "max_tokens") throw new Error(TOKEN_LIMIT_MESSAGE);
       return (b && b.text) || "(empty response)";
     });
   }
@@ -1522,8 +1548,7 @@ document.addEventListener("DOMContentLoaded", function() {
       body: JSON.stringify(payload),
     })
     .then(function (r) {
-      if (r.status === 400 || r.status === 401 || r.status === 403) throw new Error("Auth or request error — check your Gemini key.");
-      if (!r.ok) throw new Error("Gemini error HTTP " + r.status);
+      if (!r.ok) return providerError("Gemini", r);
       return r.json();
     })
     .then(function (d) {
@@ -1551,11 +1576,27 @@ def _browser_chat_models() -> dict:
     }
 
 
+def _browser_chat_request_options() -> dict:
+    """Optional request fields for the browser chat's default models, from the providers' rules.
+    The answer length is the same 1024 tokens the chat always asked for."""
+    from scrutics.ai.model_rules import (
+        DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL, anthropic_options, openai_options,
+    )
+    return {
+        # max_completion_tokens: max_tokens is deprecated on Chat Completions and rejected by
+        # reasoning models
+        "openai": {"max_completion_tokens": 1024, **openai_options(DEFAULT_OPENAI_MODEL, 0.3)},
+        "anthropic": {"max_tokens": 1024, **anthropic_options(DEFAULT_ANTHROPIC_MODEL, 0.3)},
+    }
+
+
 def generate_topology_html(graph: dict) -> str:
     graph_json = json.dumps(graph, separators=(",", ":"), ensure_ascii=False)
     models = _browser_chat_models()
     # Graph data is substituted last so text inside it is never taken for a placeholder
     page = HTML_TEMPLATE.replace("__AI_MODELS_JSON__", json.dumps(models).replace("</", "<\\/"))
+    page = page.replace("__AI_REQUEST_OPTIONS_JSON__",
+                        json.dumps(_browser_chat_request_options()).replace("</", "<\\/"))
     for provider, model in models.items():
         page = page.replace(f"__{provider.upper()}_MODEL_HTML__", html.escape(model))
     return page.replace("__GRAPH_JSON__", graph_json.replace("</", "<\\/"))

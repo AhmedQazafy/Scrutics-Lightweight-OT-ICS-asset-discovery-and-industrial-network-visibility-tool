@@ -1115,8 +1115,8 @@ class FileAnalysisModal(SetupModalMixin, ModalScreen):
 
 _ONBOARDING_PROVIDERS = [
     ("gemini",    "Google Gemini",  "gemini-3.8-flash",  "GEMINI_API_KEY",    "https://aistudio.google.com/app/apikey  (free tier)"),
-    ("openai",    "OpenAI",         "gpt-4o-mini",       "OPENAI_API_KEY",    "https://platform.openai.com/api-keys"),
-    ("anthropic", "Anthropic",      "claude-haiku-4-5",  "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
+    ("openai",    "OpenAI",         "gpt-6-luna",        "OPENAI_API_KEY",    "https://platform.openai.com/api-keys"),
+    ("anthropic", "Anthropic",      "claude-haiku-5-5",  "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys"),
     ("ollama",    "Ollama (local)", "qwen3.5:4b",        None,                "No key needed -- install from https://ollama.com"),
 ]
 
@@ -1257,44 +1257,23 @@ class AIOnboardingModal(SetupModalMixin, ModalScreen):
         
         # Fetch models in background
         import threading
-        from scrutics.ai.model_discovery import fetch_models
-        
+        from scrutics.ai.model_discovery import fetch_models_with_source
+
         def _fetch():
+            source = "fallback"
             try:
                 base_url = "http://localhost:11434" if provider_id == "ollama" else ""
-                models = fetch_models(provider_id, api_key, base_url, timeout=10.0, max_results=20)
-                
-                if not models:
-                    # Fetch failed - show error and offer fallback
-                    from scrutics.ai.model_discovery import _FALLBACK_MODELS
-                    fallback = _FALLBACK_MODELS.get(provider_id, [])
-                    
-                    error_msg = f"Failed to fetch models from {label}. "
+                models, source, reason = fetch_models_with_source(
+                    provider_id, api_key, base_url, timeout=10.0, max_results=20)
+
+                if source != "live":
+                    error_msg = f"Could not list models from {label}"
                     if provider_id == "ollama":
-                        error_msg += "Is Ollama running?"
-                    elif not api_key:
-                        error_msg += "Check your API key."
+                        error_msg += ". Is Ollama running?"
                     else:
-                        error_msg += "Network issue or invalid key?"
-                    
-                    self.app.call_from_thread(
-                        self.notify,
-                        error_msg,
-                        severity="error",
-                        timeout=8,
-                    )
-                    
-                    if fallback:
-                        # Offer fallback but make it clear it's a guess
-                        models = fallback
-                        self.app.call_from_thread(
-                            self.notify,
-                            f"Using fallback list ({len(fallback)} common models). Your model may not be listed.",
-                            severity="warning",
-                            timeout=8,
-                        )
-                    else:
-                        # No fallback available - use default only
+                        error_msg += f" ({reason})."
+                    self.app.call_from_thread(self.notify, error_msg, severity="error", timeout=8)
+                    if not models:
                         models = [default_model]
                         self.app.call_from_thread(
                             self.notify,
@@ -1302,11 +1281,11 @@ class AIOnboardingModal(SetupModalMixin, ModalScreen):
                             severity="warning",
                             timeout=8,
                         )
-                
+
                 # Ensure default is in the list
                 if default_model not in models:
                     models.insert(0, default_model)
-                    
+
             except Exception as e:
                 models = [default_model]
                 self.app.call_from_thread(
@@ -1315,7 +1294,7 @@ class AIOnboardingModal(SetupModalMixin, ModalScreen):
                     severity="error",
                     timeout=8,
                 )
-            
+
             # Dismiss step 1 and open step 2 with fetched models
             step1_data = {
                 "action": "fetch_and_select_model",
@@ -1325,6 +1304,7 @@ class AIOnboardingModal(SetupModalMixin, ModalScreen):
                 "var_name": var_name,
                 "api_key": api_key,
                 "models": models,  # Pass models directly
+                "model_source": source,
             }
             self.app.call_from_thread(self.dismiss, step1_data)
         
@@ -1356,7 +1336,12 @@ class AIModelSelectionModal(SetupModalMixin, ModalScreen):
         with Container(id="setup-dialog"):
             yield Label("AI Assistant Setup - Step 2 of 2", id="setup-title")
             yield Label("Select Model", classes="field-label")
-            yield ChoiceField(self._models, self._models[0], id="model-choice")
+            default_model = self._step1_data.get("default_model")
+            initial = default_model if default_model in self._models else self._models[0]
+            yield ChoiceField(self._models, initial, id="model-choice")
+            if self._step1_data.get("model_source") == "fallback":
+                from scrutics.ai.model_rules import FALLBACK_LABEL
+                yield Label(FALLBACK_LABEL, classes="hint", id="fallback-model-hint")
             yield Label(
                 "Don't see your model? Edit ~/.scrutics/ai.yaml after setup.",
                 classes="hint",
