@@ -102,6 +102,7 @@ All notable changes to Scrutics are documented here.
 
 ### Fixed — AI Key Safety
 - **API keys stay out of URLs, messages and error details**: the Gemini key is sent in the `x-goog-api-key` header instead of the URL, by the assistant, `scrutics ai diagnose`, model listing and the topology page's chat. Every `scrutics ai diagnose` failure message, and the error text that OpenAI and Gemini send back, is cleaned of the key and of anything shaped like a credential before it is shown. A failed request no longer keeps the underlying network error, which described the request, attached to the error Scrutics raises; the message names that error's type and its cleaned reason instead (for example `ConnectionError: ... Connection refused`).
+- **`--provider` no longer sends the configured key to another provider**: `scrutics ai --provider X` and `scrutics ai --diagnose --provider X` used the configured provider's key and model with provider X, so for example a Gemini key and a Gemini model name were sent to OpenAI. A different provider now gets only its own key, from its environment variable, and its own default model or `--model`; the configured base URL is not carried over either. Of the other settings only `max_tokens` carries over; timeout and temperature take that provider's defaults. Without that variable, Scrutics stops before sending anything and names the variable to set. `--diagnose` now also applies `--model`.
 
 ## [0.6.1] — 2026-09-19
 

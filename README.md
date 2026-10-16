@@ -144,6 +144,10 @@ python3 -m scrutics ask --session output/scrutics_20260914_120000
 
 **Supported providers** : Ollama (local, offline), Google Gemini, OpenAI, Anthropic. Configure via `scrutics/config/ai.yaml` or the built-in onboarding prompts.
 
+**Another provider for one run** : `scrutics ai --provider openai` (also with `--diagnose`) uses that provider's own key, read from its environment variable (`GEMINI_API_KEY`, `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`; Ollama needs none), and that provider's default model unless `--model` is given. The configured key, model and base URL are never passed to a different provider; of the other settings only `max_tokens` carries over, and timeout and temperature take that provider's defaults. If the variable is not set, Scrutics stops before sending anything and names the variable to set.
+
+**Keys on the command line** : `list-models PROVIDER --key KEY` puts the key on the command line, where other users of the machine can see it while the command runs (for example with `ps`) and where your shell history keeps it. Prefer setting the provider's environment variable, which `list-models` reads when `--key` is not given.
+
 The AI assistant only reads session data, it never modifies assets, injects packets, or writes to the network.
 
 Note: AI assistant can be configured to run from a different server on the network. it works completely separately from Scrutics either way.

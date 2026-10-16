@@ -26,7 +26,7 @@ from scrutics.ai.provider import (
     LLMTimeoutError,
     LLMResponseError,
 )
-from scrutics.ai.config import load_ai_config, build_provider
+from scrutics.ai.config import PROVIDER_KEY_VARS, build_provider, load_ai_config, override_provider
 from scrutics.ai.tools import SessionContext, get_tool_definitions
 from scrutics.ai.agent import run_agent_loop
 from scrutics.ai.redact import redact
@@ -48,6 +48,7 @@ def run_ai_diagnostics(
     provider_name: str | None = None,
     cfg_override: dict[str, Any] | None = None,
     stream: Any = None,
+    model_name: str | None = None,
 ) -> int:
     """Execute the 14-stage progressive AI diagnostic suite.
 
@@ -87,12 +88,15 @@ def run_ai_diagnostics(
     step("Configuration loading")
     try:
         cfg = cfg_override if cfg_override is not None else load_ai_config()
+        if provider_name or model_name:
+            # A different provider gets its own key variable and default model, checked in Stage 2
+            cfg = override_provider(cfg, provider_name, model_name, require_key=False)
         if not cfg:
             return fail_step(
                 "No active AI configuration found.",
                 "Run 'scrutics ai --reconfigure' or check ~/.scrutics/ai.yaml."
             )
-        p_name = str(provider_name or cfg.get("provider", "gemini")).strip().lower()
+        p_name = str(cfg.get("provider", "gemini")).strip().lower()
         model_name = str(cfg.get("model", "gemini-3.8-flash")).strip()
         pass_step(f"provider={p_name}, model={model_name}")
     except Exception as e:
@@ -105,7 +109,7 @@ def run_ai_diagnostics(
         if not raw_key:
             return fail_step(
                 f"Missing API key for provider '{p_name}'.",
-                f"Set api_key in ai.yaml or export GEMINI_API_KEY / OPENAI_API_KEY."
+                f"Set api_key in ai.yaml or export {PROVIDER_KEY_VARS.get(p_name, 'the provider API key variable')}."
             )
         if str(raw_key).startswith("${") and str(raw_key).endswith("}"):
             var_name = str(raw_key)[2:-1].strip()

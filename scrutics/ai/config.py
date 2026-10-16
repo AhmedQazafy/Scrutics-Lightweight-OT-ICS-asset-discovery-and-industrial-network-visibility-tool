@@ -19,6 +19,81 @@ _ENV_VAR_PATTERN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5"
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_OLLAMA_MODEL = "qwen3.5:4b"
+
+_DEFAULT_MODELS = {
+    "gemini": DEFAULT_GEMINI_MODEL,
+    "openai": DEFAULT_OPENAI_MODEL,
+    "anthropic": DEFAULT_ANTHROPIC_MODEL,
+    "ollama": DEFAULT_OLLAMA_MODEL,
+}
+
+# The environment variable that holds each hosted provider's key. Ollama needs none.
+PROVIDER_KEY_VARS = {
+    "gemini": "GEMINI_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+}
+
+# The only setting that carries over to another provider: the answer length the user chose.
+# Timeout and temperature are tuned per provider and model, so that provider's defaults apply.
+_PORTABLE_SETTINGS = ("max_tokens",)
+
+
+class ProviderOverrideError(LLMProviderError):
+    """Raised when a provider chosen on the command line has no key of its own."""
+
+
+def override_provider(
+    cfg: dict[str, Any] | None,
+    provider: str | None = None,
+    model: str | None = None,
+    require_key: bool = True,
+) -> dict[str, Any]:
+    """Return the configuration to use when the command line names a provider or a model.
+
+    A provider other than the configured one never inherits the configured api_key, model or
+    base_url: its key comes from that provider's own environment variable and its model from
+    `model` or that provider's default. With require_key, a missing key raises
+    ProviderOverrideError before anything is sent. The given configuration is not modified.
+    """
+    base = dict(cfg or {})
+    if not provider:
+        if model:
+            base["model"] = model
+        return base
+
+    chosen = str(provider).strip().lower()
+    configured = str(base.get("provider", "")).strip().lower()
+    if chosen == configured:
+        if model:
+            base["model"] = model
+        return base
+
+    if chosen not in _DEFAULT_MODELS:
+        raise LLMProviderError(
+            f"Unsupported LLM provider: '{chosen}'. "
+            "Supported providers: 'ollama', 'openai', 'anthropic', 'gemini'."
+        )
+
+    result: dict[str, Any] = {
+        "enabled": True,
+        "provider": chosen,
+        "model": model or _DEFAULT_MODELS[chosen],
+    }
+    for name in _PORTABLE_SETTINGS:
+        if name in base:
+            result[name] = base[name]
+
+    var_name = PROVIDER_KEY_VARS.get(chosen)
+    if var_name:
+        if require_key and not os.environ.get(var_name):
+            message = f"No API key for {chosen}. Set {var_name}."
+            if configured:
+                message += f" The configured {configured} key is never sent to another provider."
+            raise ProviderOverrideError(message)
+        result["api_key"] = f"${{{var_name}}}"
+    return result
 
 
 def _resolve_env_var(value: str) -> str:

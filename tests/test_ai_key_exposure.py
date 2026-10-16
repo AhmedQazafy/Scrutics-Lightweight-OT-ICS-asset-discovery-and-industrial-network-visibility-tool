@@ -51,10 +51,12 @@ class _Recorder:
     def __init__(self, behaviour):
         self.behaviour = behaviour
         self.calls = []
+        self.bodies = []
 
     def __call__(self, url, *args, **kwargs):
         headers = kwargs.get("headers") or {}
         self.calls.append((url, dict(headers), kwargs.get("params")))
+        self.bodies.append(kwargs.get("json"))
         return self.behaviour(url, headers)
 
 
@@ -293,6 +295,104 @@ def test_cli_ai_question_failure_never_prints_the_key(tmp_path, monkeypatch):
              mock.patch("requests.post", _Recorder(behaviour)), redirect_stdout(out), redirect_stderr(err):
             cli.run_ai(args)
         _assert_clean(out.getvalue(), err.getvalue())
+
+
+_KEY_VARS = {"gemini": "GEMINI_API_KEY", "openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+_OVERRIDES = [(configured, chosen) for configured in _KEY_VARS
+              for chosen in ("gemini", "openai", "anthropic", "ollama") if chosen != configured]
+_OTHER_KEY = "other-provider-key-0000"
+
+
+def _echoing_status(code):
+    # The provider can only repeat what it was sent, so the body echoes this request's URL and headers
+    def behaviour(url, headers):
+        resp = mock.Mock()
+        resp.status_code = code
+        body = {"error": {"message": f"failed for {url} with {json.dumps(headers)}", "status": "UNAVAILABLE"}}
+        resp.json.return_value = body
+        resp.text = json.dumps(body)
+        resp.headers = {}
+        return resp
+    return behaviour
+
+
+_OVERRIDE_BEHAVIOURS = ([(e.__name__, _raising(e)) for e in _REQUEST_ERRORS]
+                        + [(f"HTTP {code}", _echoing_status(code)) for code in _STATUSES])
+
+
+def _overriding_cfg(configured):
+    return {"enabled": True, "provider": configured, "model": "configured-model",
+            "api_key": f"${{{_KEY_VARS[configured]}}}", "base_url": "https://configured.example"}
+
+
+def _assert_requests_clean(*recorders):
+    for recorder in recorders:
+        _assert_urls_clean(recorder)
+        for (_url, headers, _params), body in zip(recorder.calls, recorder.bodies):
+            _assert_clean(json.dumps(headers), json.dumps(body, default=str))
+
+
+@pytest.mark.parametrize("configured,chosen", _OVERRIDES, ids=[f"{c}-to-{o}" for c, o in _OVERRIDES])
+def test_cli_provider_override_never_sends_or_prints_the_configured_key(tmp_path, monkeypatch, configured, chosen):
+    from scrutics import cli
+
+    session = tmp_path / "session"
+    session.mkdir()
+    stats = {k: 0 for k in ("asset_count", "ot_count", "it_count", "unknown_count",
+                            "connection_count", "anomaly_count")}
+    (session / "manifest.json").write_text(json.dumps({
+        "format": "scrutics-evidence", "version": 1, "scrutics_version": "0.7",
+        "created_at": "2026-10-16T00:00:00Z", "capture_started": "2026-10-16T00:00:00Z",
+        "capture_ended": "2026-10-16T00:01:00Z", "sensor_id": "s", "scope": {},
+        "files": {}, "stats": stats,
+    }))
+    for var in _KEY_VARS.values():
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv(_KEY_VARS[configured], CANARY)
+    args = cli.build_parser().parse_args(["ai", "--session", str(session), "--provider", chosen, "hi"])
+    if chosen in _KEY_VARS:
+        # first without the chosen provider's key (refused), then with it
+        cases = [(None, "no key", _echoing_status(401))] + [(_OTHER_KEY, label, b) for label, b in _OVERRIDE_BEHAVIOURS]
+    else:
+        cases = [(None, label, b) for label, b in _OVERRIDE_BEHAVIOURS]
+    for chosen_key, _label, behaviour in cases:
+        if chosen in _KEY_VARS:
+            if chosen_key:
+                monkeypatch.setenv(_KEY_VARS[chosen], chosen_key)
+            else:
+                monkeypatch.delenv(_KEY_VARS[chosen], raising=False)
+        out, err = io.StringIO(), io.StringIO()
+        poster, getter = _Recorder(behaviour), _Recorder(behaviour)
+        with mock.patch("scrutics.ai.config.load_ai_config", return_value=_overriding_cfg(configured)), \
+             mock.patch("requests.post", poster), mock.patch("requests.get", getter), \
+             redirect_stdout(out), redirect_stderr(err):
+            cli.run_ai(args)
+        _assert_clean(out.getvalue(), err.getvalue())
+        _assert_requests_clean(poster, getter)
+        if chosen in _KEY_VARS and not chosen_key:
+            assert poster.calls == [] and getter.calls == []
+
+
+@pytest.mark.parametrize("configured,chosen", _OVERRIDES, ids=[f"{c}-to-{o}" for c, o in _OVERRIDES])
+@pytest.mark.parametrize("label,behaviour", _OVERRIDE_BEHAVIOURS, ids=[b[0] for b in _OVERRIDE_BEHAVIOURS])
+def test_diagnose_provider_override_never_sends_or_prints_the_configured_key(
+        monkeypatch, configured, chosen, label, behaviour):
+    for var in _KEY_VARS.values():
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv(_KEY_VARS[configured], CANARY)
+    if chosen in _KEY_VARS:
+        monkeypatch.setenv(_KEY_VARS[chosen], _OTHER_KEY)
+    buf = io.StringIO()
+    getter, poster = _Recorder(behaviour), _Recorder(behaviour)
+    with mock.patch("scrutics.ai.diagnostics.load_ai_config", return_value=_overriding_cfg(configured)), \
+         mock.patch.object(diagnostics.socket, "gethostbyname", return_value="0.0.0.0"), \
+         mock.patch.object(diagnostics.socket, "create_connection"), \
+         mock.patch.object(diagnostics.ssl, "create_default_context"), \
+         mock.patch("requests.get", getter), mock.patch("requests.post", poster), redirect_stderr(buf):
+        rc = diagnostics.run_ai_diagnostics(provider_name=chosen, stream=buf)
+    assert rc == 1
+    _assert_clean(buf.getvalue())
+    _assert_requests_clean(getter, poster)
 
 
 def test_malformed_config_with_a_literal_key_is_redacted(tmp_path, monkeypatch):

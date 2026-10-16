@@ -1366,8 +1366,10 @@ def run_ai(args) -> int:
     is_diagnose = getattr(args, "diagnose", False) or (q_tokens and str(q_tokens[0]).strip().lower() == "diagnose")
     if is_diagnose:
         from scrutics.ai.diagnostics import run_ai_diagnostics
-        provider_override = getattr(args, "provider", None)
-        return run_ai_diagnostics(provider_name=provider_override)
+        return run_ai_diagnostics(
+            provider_name=getattr(args, "provider", None),
+            model_name=getattr(args, "model", None),
+        )
 
     session_arg = getattr(args, "session", None)
     output_base = getattr(args, "output", "output")
@@ -1390,7 +1392,7 @@ def run_ai(args) -> int:
         return 1
 
     # ── Build LLM provider ────────────────────────────────────────────────────
-    from scrutics.ai.config import load_ai_config, build_provider
+    from scrutics.ai.config import load_ai_config, build_provider, override_provider
     from scrutics.ai.provider import LLMProviderError
 
     try:
@@ -1446,12 +1448,8 @@ def run_ai(args) -> int:
         if not cfg:
             return 1
 
-    if provider_override:
-        cfg["provider"] = provider_override
-    if model_override:
-        cfg["model"] = model_override
-
     try:
+        cfg = override_provider(cfg, provider_override, model_override)
         provider = build_provider(cfg)
     except LLMProviderError as e:
         sys.stderr.write(f"Error: {e}\n")
