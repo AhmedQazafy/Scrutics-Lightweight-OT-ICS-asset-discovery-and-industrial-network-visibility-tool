@@ -563,3 +563,85 @@ def test_topology_chat_sends_the_gemini_key_only_in_a_header(tmp_path):
     assert len(calls) == 1
     assert CANARY not in calls[0]["url"]
     assert calls[0]["headers"]["x-goog-api-key"] == CANARY
+
+
+# ── onboarding and setup scripts ──────────────────────────────────────────────
+
+def _files_holding_the_canary(home):
+    """Files under home, other than the private keys file, that contain the canary."""
+    found = []
+    for directory, _dirs, files in os.walk(home):
+        for name in files:
+            path = os.path.join(directory, name)
+            if path == os.path.join(home, ".scrutics", "ai_keys.sh"):
+                continue
+            with open(path, "rb") as f:
+                if CANARY.encode() in f.read():
+                    found.append(os.path.relpath(path, home))
+    return found
+
+
+_ONBOARDING = [("1", "gemini", "GEMINI_API_KEY"), ("2", "openai", "OPENAI_API_KEY"),
+               ("3", "anthropic", "ANTHROPIC_API_KEY")]
+
+
+@pytest.mark.parametrize("choice,provider_name,var", _ONBOARDING, ids=[o[1] for o in _ONBOARDING])
+@pytest.mark.parametrize("label,behaviour", _BEHAVIOURS[:3] + _BEHAVIOURS[-3:],
+                         ids=[b[0] for b in _BEHAVIOURS[:3] + _BEHAVIOURS[-3:]])
+def test_cli_onboarding_keeps_the_key_in_the_private_file_only(
+        tmp_path, monkeypatch, choice, provider_name, var, label, behaviour, debug_logs):
+    from scrutics import cli
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(var, raising=False)
+    (tmp_path / ".bashrc").write_text(f"export {var}=old\n")
+    replies = iter([choice, ""])
+    getter = _Recorder(behaviour)
+    out, err = io.StringIO(), io.StringIO()
+    with mock.patch("builtins.input", lambda prompt="": next(replies)), \
+         mock.patch("getpass.getpass", return_value=CANARY), mock.patch("requests.get", getter), \
+         redirect_stdout(out), redirect_stderr(err):
+        cli._run_ai_onboarding_cli()
+    _assert_clean(out.getvalue(), err.getvalue(), *debug_logs)
+    _assert_urls_clean(getter)
+    assert _files_holding_the_canary(str(tmp_path)) == []
+    assert oct(os.stat(tmp_path / ".scrutics" / "ai_keys.sh").st_mode & 0o777) == "0o600"
+
+
+def test_tui_onboarding_keeps_the_key_in_the_private_file_only(tmp_path, monkeypatch, debug_logs):
+    import asyncio
+    from scrutics.ui.tui import AIModelSelectionModal, ScruticsApp
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    (tmp_path / ".bashrc").write_text("export GEMINI_API_KEY=old\n")
+    notes = []
+
+    async def run():
+        app = ScruticsApp()
+        async with app.run_test() as pilot:
+            step1 = {"provider_id": "gemini", "var_name": "GEMINI_API_KEY", "api_key": CANARY,
+                     "default_model": "gemini-3.8-flash", "model_source": "fallback"}
+            screen = AIModelSelectionModal(step1, ["gemini-3.8-flash"])
+            await app.push_screen(screen)
+            await pilot.pause()
+            with mock.patch.object(screen, "notify", lambda message, **kw: notes.append(message)):
+                screen.confirm()
+            await pilot.pause()
+
+    asyncio.run(run())
+    assert notes
+    _assert_clean(*notes, *debug_logs)
+    assert _files_holding_the_canary(str(tmp_path)) == []
+
+
+@pytest.mark.skipif(os.name == "nt" or shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.parametrize("choice", ["1", "2", "3"])
+def test_the_sh_setup_keeps_the_key_off_command_lines_output_and_other_files(tmp_path, choice):
+    from tests.test_ai_setup_scripts import run_setup_sh
+
+    result, argv = run_setup_sh(str(tmp_path), f"{choice}\n{CANARY}\n\n")
+    assert result.returncode == 0, result.stderr
+    assert argv
+    _assert_clean(result.stdout, result.stderr, argv)
+    assert _files_holding_the_canary(str(tmp_path)) == []

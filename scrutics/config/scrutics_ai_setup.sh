@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Scrutics AI Setup — run once to configure the AI assistant.
-# Saves your API key as an environment variable and writes ai.yaml automatically.
+# Saves your API key in ~/.scrutics/ai_keys.sh (readable only by you), makes new terminals load it,
+# and writes ai.yaml. The key is passed to Python on standard input or in the environment, never on
+# a command line or inside code.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The directory that contains the scrutics package, for running its modules from a checkout
+PACKAGE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+export PYTHONPATH="$PACKAGE_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 # Write user config to ~/.scrutics/ai.yaml — never overwrite the packaged template
 YAML_PATH="$HOME/.scrutics/ai.yaml"
 mkdir -p "$HOME/.scrutics"
@@ -124,56 +129,74 @@ fi
 echo ""
 echo " Setting up Scrutics AI..."
 
-# Save to ~/.bashrc permanently (skip for Ollama)
+# Store the key (skip for Ollama). printf is a shell builtin, so the key is never on a command
+# line; Python reads it from standard input.
 if [[ -n "$VAR_NAME" ]]; then
-    BASHRC="$HOME/.bashrc"
-    if grep -q "^export ${VAR_NAME}=" "$BASHRC" 2>/dev/null; then
-        sed -i "/^export ${VAR_NAME}=/d" "$BASHRC"
+    if ! printf '%s\n' "$USER_KEY" | python3 -m scrutics.ai.key_store set "$VAR_NAME"; then
+        echo " The key was not saved. Nothing else was changed."
+        exit 1
     fi
-    echo "export ${VAR_NAME}=\"${USER_KEY}\"" >> "$BASHRC"
-    # Apply to current session
+    # For the model check below and this session; export is a builtin too
     export "${VAR_NAME}=${USER_KEY}"
 fi
 
-# Fetch available models using Python
+# Fetch available models. The provider, default model and key variable name are passed as
+# arguments; the key itself is read from the environment.
 echo ""
 echo " Checking available models with your key..."
-FETCH_RESULT=$(python3 -c "
+FETCH_RESULT=$(python3 - "$YAML_PROVIDER" "$YAML_MODEL" "$VAR_NAME" <<'PY' 2>/dev/null
+import os
 import sys
-sys.path.insert(0, '$SCRIPT_DIR/..')
-try:
-    from scrutics.ai.model_discovery import fetch_models
-    base_url = 'http://localhost:11434' if '$YAML_PROVIDER' == 'ollama' else ''
-    models = fetch_models('$YAML_PROVIDER', '$USER_KEY', base_url, timeout=6.0, max_results=10)
-    if models:
-        print('SUCCESS')
-        for m in models:
-            print(m)
-    else:
-        print('FALLBACK')
-        print('$YAML_MODEL')
-except Exception as e:
-    print('FALLBACK')
-    print('$YAML_MODEL')
-" 2>/dev/null)
 
-# Parse the result
-if echo "$FETCH_RESULT" | head -1 | grep -q "SUCCESS"; then
-    mapfile -t MODELS < <(echo "$FETCH_RESULT" | tail -n +2)
-    echo " Found ${#MODELS[@]} models available with your key:"
+provider, default, var_name = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    from scrutics.ai.model_discovery import fetch_models_with_source
+    from scrutics.ai.model_rules import FALLBACK_LABEL, default_index
+    base_url = "http://localhost:11434" if provider == "ollama" else ""
+    key = os.environ.get(var_name, "") if var_name else ""
+    models, source, reason = fetch_models_with_source(provider, key, base_url, timeout=6.0, max_results=10)
+    if source == "live":
+        print("LIVE")
+        print("")
+    else:
+        print("FALLBACK")
+        print(f"Could not list models ({reason}). {FALLBACK_LABEL}:")
+    print(default_index(models, default) + 1 if models else 0)
+    for m in models:
+        print(m)
+except Exception as e:
+    print("FALLBACK")
+    print(f"Could not list models ({type(e).__name__}).")
+    print(0)
+PY
+)
+
+# Parse the result: status, message, default position, then one model per line
+FETCH_STATUS="$(echo "$FETCH_RESULT" | sed -n 1p)"
+FETCH_MESSAGE="$(echo "$FETCH_RESULT" | sed -n 2p)"
+DEFAULT_POS="$(echo "$FETCH_RESULT" | sed -n 3p)"
+mapfile -t MODELS < <(echo "$FETCH_RESULT" | tail -n +4 | sed '/^$/d')
+if [[ ${#MODELS[@]} -gt 0 ]]; then
+    if [[ "$FETCH_STATUS" == "LIVE" ]]; then
+        echo " Found ${#MODELS[@]} models available with your key:"
+    else
+        echo " $FETCH_MESSAGE"
+    fi
     echo ""
     for i in "${!MODELS[@]}"; do
         echo "   $((i+1)). ${MODELS[$i]}"
     done
     echo ""
-    read -rp " Select model (1-${#MODELS[@]}, default=1): " model_choice
+    [[ "$DEFAULT_POS" =~ ^[0-9]+$ ]] && [ "$DEFAULT_POS" -ge 1 ] || DEFAULT_POS=1
+    read -rp " Select model (1-${#MODELS[@]}, default=$DEFAULT_POS): " model_choice
     if [[ "$model_choice" =~ ^[0-9]+$ ]] && [ "$model_choice" -ge 1 ] && [ "$model_choice" -le "${#MODELS[@]}" ]; then
         YAML_MODEL="${MODELS[$((model_choice-1))]}"
     else
-        YAML_MODEL="${MODELS[0]}"
+        YAML_MODEL="${MODELS[$((DEFAULT_POS-1))]}"
     fi
     echo " Selected: $YAML_MODEL"
 else
+    [[ -n "$FETCH_MESSAGE" ]] && echo " $FETCH_MESSAGE"
     echo " Using default model: $YAML_MODEL"
 fi
 
@@ -223,7 +246,9 @@ echo " Start Scrutics and press A to open the AI assistant."
 echo " Or from the terminal:"
 echo "   scrutics ai \"What is on this network?\""
 echo ""
-echo " The key was added to ~/.bashrc. To apply it in this"
-echo " terminal without reopening it, run:"
-echo "   source ~/.bashrc"
-echo ""
+if [[ -n "$VAR_NAME" ]]; then
+    echo " New terminals load the key from ~/.scrutics/ai_keys.sh. To load it"
+    echo " in this terminal without reopening it, run:"
+    echo "   . ~/.scrutics/ai_keys.sh"
+    echo ""
+fi

@@ -14,7 +14,7 @@ recursive-include docs *.md
 # ── Package data (mirrors pyproject.toml [tool.setuptools.package-data]) ──
 include scrutics/classifier/ics_oui.txt
 include scrutics/classifier/curated_oui.yaml
-recursive-include scrutics/config *.yaml *.sh *.bat
+recursive-include scrutics/config *.yaml *.sh *.bat *.ps1
 include scrutics/web/*.js
 
 # ── Explicit excludes for runtime-generated files ───────────────

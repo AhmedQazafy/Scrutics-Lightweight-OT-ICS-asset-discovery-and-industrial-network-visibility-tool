@@ -1226,11 +1226,10 @@ _CLI_ONBOARDING_PROVIDERS = [
 def _run_ai_onboarding_cli() -> dict | None:
     """
     Interactive first-time setup wizard for the CLI.
-    Prompts for provider and API key, writes ~/.bashrc and ai.yaml.
+    Prompts for provider and API key, stores the key (see scrutics.ai.key_store) and writes ai.yaml.
     Returns a config dict ready for build_provider(), or None if the user skipped.
     """
     import getpass
-    import re as _re
 
     print("\n✦ Scrutics AI — First-Time Setup")
     print("─" * 50)
@@ -1270,18 +1269,16 @@ def _run_ai_onboarding_cli() -> dict | None:
             print("\nNo key entered. Skipped.")
             return None
 
-        # Save to ~/.bashrc
-        bashrc = os.path.join(os.path.expanduser("~"), ".bashrc")
+        # A Scrutics-owned file (mode 0600) and one marked ~/.bashrc line; other lines are only reported
+        from scrutics.ai.key_store import KeyStoreError, store_for_setup
         try:
-            content = open(bashrc, encoding="utf-8").read() if os.path.exists(bashrc) else ""
-            content = _re.sub(rf"^export {var_name}=.*\n?", "", content, flags=_re.MULTILINE)
-            with open(bashrc, "a", encoding="utf-8") as f:
-                if content and not content.endswith("\n"):
-                    f.write("\n")
-                f.write(f'export {var_name}="{api_key}"\n')
-            os.environ[var_name] = api_key
-        except Exception:
-            pass
+            saved = store_for_setup(var_name, api_key)
+        except KeyStoreError as e:
+            print(f"\n  Key not saved: {e}")
+            return None
+        print()
+        for line in saved:
+            print(f"  {line}")
 
     # Discover available models
     print("\n  Checking available models...", end="", flush=True)

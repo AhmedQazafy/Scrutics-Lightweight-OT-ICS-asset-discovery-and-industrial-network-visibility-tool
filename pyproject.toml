@@ -50,6 +50,7 @@ scrutics = [
     "config/*.yaml",
     "config/*.sh",
     "config/*.bat",
+    "config/*.ps1",
     "classifier/ics_oui.txt",
     "classifier/curated_oui.yaml",
     "web/*.js",

@@ -1380,26 +1380,22 @@ class AIModelSelectionModal(SetupModalMixin, ModalScreen):
     @on(Button.Pressed, "#model-confirm-btn")
     def confirm(self):
         """Final step: save config and dismiss."""
-        import re as _re
-        
         model = self.query_one("#model-choice", ChoiceField).value
         provider_id = self._step1_data["provider_id"]
         var_name = self._step1_data["var_name"]
         api_key = self._step1_data["api_key"]
-        
-        # Save key to ~/.bashrc and environment
+
+        # A Scrutics-owned file (mode 0600) and one marked ~/.bashrc line; other lines are only reported
         if var_name and api_key:
-            bashrc = os.path.join(os.path.expanduser("~"), ".bashrc")
+            from scrutics.ai.key_store import KeyStoreError, store_for_setup
             try:
-                content = open(bashrc, encoding="utf-8").read() if os.path.exists(bashrc) else ""
-                content = _re.sub(rf"^export {var_name}=.*\n?", "", content, flags=_re.MULTILINE)
-                with open(bashrc, "a", encoding="utf-8") as f:
-                    if content and not content.endswith("\n"):
-                        f.write("\n")
-                    f.write(f'export {var_name}="{api_key}"\n')
-                os.environ[var_name] = api_key
-            except Exception:
-                pass
+                saved = store_for_setup(var_name, api_key)
+            except KeyStoreError as e:
+                self.notify(f"Key not saved: {e}", severity="error", timeout=12)
+                return
+            for line in saved:
+                severity = "warning" if "Scrutics did not change it" in line else "information"
+                self.notify(line, severity=severity, timeout=12)
         
         # Write ~/.scrutics/ai.yaml
         try:

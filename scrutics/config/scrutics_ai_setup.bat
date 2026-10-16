@@ -55,31 +55,36 @@ echo.
 echo  Get your !PROVIDER_LABEL! API key from:
 echo    !KEY_URL!
 echo.
-echo  Paste the key below and press Enter.
-echo  (It will be visible on screen - close this window after.)
+echo  Paste the key and press Enter. It is not shown while you type.
 echo.
-set /p USER_KEY="  API key: "
 
-if "!USER_KEY!"=="" (
-    echo.
-    echo  No key entered. Nothing was changed.
-    goto :done
-)
+:: The key is read and stored by PowerShell as a per-user environment variable. It never passes
+:: through this script, so it is never on screen, on a command line or in another program's arguments.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scrutics_ai_key.ps1" -Name "!VAR_NAME!"
+:: Matched exactly: PowerShell exits with a negative code when it cannot run the helper at all, which
+:: "if errorlevel 1" would take for success
+set "KEY_RESULT=!errorlevel!"
+if "!KEY_RESULT!"=="0" goto :key_ready
+if "!KEY_RESULT!"=="3" goto :key_kept
+if "!KEY_RESULT!"=="2" goto :done
+goto :key_not_saved
 
+:key_not_saved
+:: Outside a parenthesised block, so the text may hold brackets; ^> keeps > from redirecting
+echo.
+echo  ERROR: The key was not saved. Nothing else was changed.
+echo  A Windows policy on this computer may block PowerShell scripts.
+echo  To set the key yourself, open System Properties ^> Environment Variables
+echo  and add !VAR_NAME! under "User variables for %USERNAME%" (not System variables),
+echo  or ask your administrator. Then run this script again.
+goto :done
+
+:key_kept
+echo  Using the value already set for your account.
+
+:key_ready
 echo.
 echo  Setting up Scrutics AI...
-
-:: Save key as a permanent Windows user environment variable
-powershell -NoProfile -Command "[System.Environment]::SetEnvironmentVariable('!VAR_NAME!', '!USER_KEY!', 'User')" >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo  ERROR: Could not save the environment variable.
-    echo  Try right-clicking this script and choosing "Run as administrator".
-    goto :done
-)
-
-:: Also set it in the current process so the YAML write below can verify it
-set "!VAR_NAME!=!USER_KEY!"
 
 :: Write user config to %USERPROFILE%\.scrutics\ai.yaml — never overwrite the packaged template
 set "YAML_PATH=%USERPROFILE%\.scrutics\ai.yaml"
@@ -106,17 +111,12 @@ echo.
 echo  Start Scrutics and press A to open the AI assistant.
 echo  Or from the terminal: scrutics ai "What is on this network?"
 echo.
+echo  The key is saved for your Windows account. Open a new terminal
+echo  so that Scrutics sees it.
+echo.
 echo  NOTE FOR WSL2 USERS:
-echo  The key was saved for Windows. To use it in your Linux
-echo  terminal (WSL2), run this command once:
-echo.
-echo    export !VAR_NAME!=!USER_KEY!
-echo.
-echo  To make it permanent in Linux, add that line to ~/.bashrc
-echo.
-echo  ------------------------------------------------------------
-echo  Close this window now - your key is visible above.
-echo  ------------------------------------------------------------
+echo  Linux in WSL2 does not see Windows variables. To use Scrutics
+echo  there, run scrutics/config/scrutics_ai_setup.sh inside WSL.
 echo.
 goto :done
 
