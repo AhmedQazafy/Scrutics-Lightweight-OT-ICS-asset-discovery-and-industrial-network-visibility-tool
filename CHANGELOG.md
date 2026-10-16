@@ -133,6 +133,11 @@ All notable changes to Scrutics are documented here.
 - **The setup script labels a fallback model list** the same way as `scrutics ai` setup, with the reason the list could not be fetched.
 - `scrutics ai` setup on Windows keeps the key for that session only and points to `scrutics_ai_setup.bat` to store it.
 
+### Known Gaps — AI
+- If Python's low-level HTTP debug output is turned on (`http.client.HTTPConnection.debuglevel`), Python prints request headers, including the API key. Scrutics never turns it on; DEBUG logging shows no key.
+- `list-models PROVIDER --key KEY` still takes the key on the command line; the provider's environment variable is the recommended form.
+- Empty answers other than the token-limit case are not yet reported (see "AI Models and Request Parameters").
+
 ## [0.6.1] — 2026-09-19
 
 ### Fixed — AI Reliability & Tool-Calling Protocol

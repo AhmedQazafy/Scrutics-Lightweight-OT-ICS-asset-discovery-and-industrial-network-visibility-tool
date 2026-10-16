@@ -142,7 +142,7 @@ python3 -m scrutics ask --session output/scrutics_20260914_120000
 
 **TUI** : press the AI Assistant button in the toolbar.
 
-**Supported providers** : Ollama (local, offline), Google Gemini, OpenAI, Anthropic. Configure via `scrutics/config/ai.yaml` or the built-in onboarding prompts.
+**Supported providers** : Ollama (local, offline), Google Gemini, OpenAI, Anthropic. Configure with the built-in setup (`scrutics ai --reconfigure`, the TUI, or the setup scripts in `scrutics/config/`), or edit `~/.scrutics/ai.yaml` by hand; `scrutics/config/ai.yaml` is the packaged template.
 
 **Default models** : `gemini-3.8-flash`, `gpt-6-luna`, `claude-haiku-5-5`, `qwen3.5:4b` (Ollama). Setup lists the models your key can use. For OpenAI it offers only `gpt-6-luna` and `gpt-6-sol`, the models whose tool calls work on the Chat Completions API that Scrutics uses. If the list cannot be fetched, setup says why and shows a fallback list marked as such. A model you name in `ai.yaml` is used as given; Scrutics sends it a temperature only if it is documented to accept one.
 
@@ -157,12 +157,16 @@ python3 -m scrutics ask --session output/scrutics_20260914_120000
 
 **Keys on the command line** : `list-models PROVIDER --key KEY` puts the key on the command line, where other users of the machine can see it while the command runs (for example with `ps`) and where your shell history keeps it. Prefer setting the provider's environment variable, which `list-models` reads when `--key` is not given.
 
-The AI assistant only reads session data, it never modifies assets, injects packets, or writes to the network.
+**Keys in output and logs** : Scrutics sends each key only to its own provider, in a request header, and removes keys from every message it prints or raises, including Python logging at DEBUG level. One limit remains: if you turn on Python's low-level HTTP debug output yourself (`http.client.HTTPConnection.debuglevel`), Python prints every request header, including the key. Scrutics never turns it on.
 
-Note: AI assistant can be configured to run from a different server on the network. it works completely separately from Scrutics either way.
+**Incomplete sessions** : if part of a session cannot be read (for example a damaged `evidence.json` or a file that is not UTF-8), `scrutics ai` and the TUI assistant say which file and why, and the assistant is told that its answers cover only the part that was loaded.
 
-![Scrutics AI assitant](docs/screenshots/Scrutics_Assistant.png)
-*AI Assitant in can be Run in both CLI and TUI, Topology HTML assitant is currently broken but will be fixed soon*
+The AI assistant only reads session data; it never modifies assets or injects packets. Your questions, and the session data the assistant looks up to answer them, are sent only to the provider you configured (for Ollama, your own server). The topology page's chat sends the key from your browser straight to the provider you pick and never stores it.
+
+Note: an Ollama server can run on another machine on the network; set its address as `base_url` in `~/.scrutics/ai.yaml`.
+
+![Scrutics AI assistant](docs/screenshots/Scrutics_Assistant.png)
+*The AI assistant runs in both the CLI and the TUI; `topology.html` has its own chat panel.*
 
 ---
 
