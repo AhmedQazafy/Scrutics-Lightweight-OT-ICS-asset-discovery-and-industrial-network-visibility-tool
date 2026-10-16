@@ -29,6 +29,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from scrutics.classifier.oui import VENDOR_CLASS_UNKNOWN, classify_vendor  # noqa: E402
+from scrutics.csv_input import allow_large_fields  # noqa: E402
 
 ATTRIBUTION = "Vendor assignments from the IEEE Registration Authority registry"
 REGISTRATION_AUTHORITY = "IEEE Registration Authority"
@@ -50,6 +51,7 @@ def read_registry(path, registry):
     """(assignment, organisation) rows of one registry CSV file, validated."""
     digits = REGISTRIES[registry]
     rows = []
+    allow_large_fields()
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         missing = [c for c in COLUMNS if c not in (reader.fieldnames or [])]

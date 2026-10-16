@@ -44,6 +44,7 @@ from scrutics.diagnostics import VERSION
 from scrutics.topology import export_topology
 from scrutics.db.session_export import export_summary_line
 from scrutics.seconds_input import MIN_BASELINE, MIN_DURATION, parse_whole_seconds
+from scrutics.csv_input import allow_large_fields
 from scrutics.vendor_display import display_vendor_name, vendor_note
 from scrutics.protocol_display import (
     PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text, split_display_column,
@@ -1827,6 +1828,8 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
         try:
             provider = build_provider(cfg)
             ctx = SessionContext(self._session_dir)
+            if ctx.load_issues:
+                self.app.call_from_thread(self._show_load_issues, ctx.load_issues)
 
             if self._conversation_history:
                 prior = "\n".join(
@@ -1877,6 +1880,20 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
 
     def _update_worker_status(self, msg: str):
         self._thinking_text = msg
+
+    def _show_load_issues(self, issues: list) -> None:
+        """Tell the user which session files were not fully loaded; each message is shown once."""
+        from scrutics.ai.tools import describe_load_issue
+
+        shown = getattr(self, "_shown_load_issues", None)
+        if shown is None:
+            shown = self._shown_load_issues = set()
+        history = self.query_one("#ai-history", PanelLog)
+        for entry in issues:
+            line = describe_load_issue(entry)
+            if line not in shown:
+                shown.add(line)
+                history.write_line(f"[yellow]Not loaded:[/yellow] {escape(line)}")
 
     def _on_query_complete(self, answer: str | None, error: str | None):
         self._is_processing = False
@@ -3035,6 +3052,7 @@ class ScruticsApp(App):
 
         # Rebuild inventory
         self.inventory = AssetInventory()
+        allow_large_fields()
         assets_csv = os.path.join(session, "assets.csv")
         if os.path.exists(assets_csv):
             with open(assets_csv, newline="") as f:

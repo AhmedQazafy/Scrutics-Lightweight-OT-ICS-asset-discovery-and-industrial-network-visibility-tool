@@ -14,6 +14,13 @@ from scrutics.db.inventory import split_conflicts
 from scrutics.protocol_display import split_display_column
 from scrutics.vendor_display import display_vendor_name, ot_service_observed, vendor_note_for
 from scrutics.topology import read_manifest
+from scrutics.csv_input import allow_large_fields
+
+# Load status of one session file
+LOAD_OK = "ok"
+LOAD_PARTIAL = "partial"          # reading stopped part way; later rows were not loaded
+LOAD_UNREADABLE = "unreadable"    # nothing could be read
+LOAD_MISSING = "missing"          # named by the manifest but absent
 
 
 def _saved_ports(text) -> list:
@@ -30,6 +37,8 @@ class SessionContext:
 
     def __init__(self, session_dir: str):
         self.session_dir = session_dir
+        # One entry per session file read: what was loaded and what was not, and why
+        self.load_report: list[dict[str, Any]] = []
         try:
             self.manifest = read_manifest(session_dir)
         except FileNotFoundError as e:
@@ -51,122 +60,179 @@ class SessionContext:
         connections_filename = files_map.get("connections", "connections.csv")
         anomalies_filename = files_map.get("anomalies", "anomalies.csv")
 
+        self._named_files = {name for name in files_map.values() if isinstance(name, str)}
+
         self.assets = self._load_assets(os.path.join(session_dir, assets_filename))
         self.evidence = self._load_evidence(os.path.join(session_dir, evidence_filename))
         self.connections = self._load_connections(os.path.join(session_dir, connections_filename))
         self.anomalies = self._load_anomalies(os.path.join(session_dir, anomalies_filename))
 
-    def _load_assets(self, filepath: str) -> list[dict[str, Any]]:
-        """Load assets.csv into standardized asset dictionaries."""
-        if not os.path.exists(filepath):
+    @property
+    def load_issues(self) -> list[dict[str, Any]]:
+        """Report entries for files that were not loaded completely."""
+        return [entry for entry in getattr(self, "load_report", [])
+                if entry["status"] != LOAD_OK or entry["rows_not_loaded"]]
+
+    def _record(self, filepath: str, status: str, rows_loaded: int, rows_not_loaded: int | None,
+                reason: str = "") -> None:
+        # A context whose loaders are called without __init__ starts its report here
+        self.__dict__.setdefault("load_report", []).append({
+            "file": os.path.basename(filepath),
+            "status": status,
+            "rows_loaded": rows_loaded,
+            # None: reading stopped, so the number of rows after that point is unknown
+            "rows_not_loaded": rows_not_loaded,
+            "reason": reason,
+        })
+
+    def _file_present(self, filepath: str) -> bool:
+        """True if the file exists. A file the manifest names but that is absent is recorded as missing;
+        older sessions leave out files the manifest does not name, so those stay silent."""
+        if os.path.exists(filepath):
+            return True
+        if os.path.basename(filepath) in getattr(self, "_named_files", ()):
+            self._record(filepath, LOAD_MISSING, 0, None, "listed in manifest.json but not found")
+        return False
+
+    def _read_csv(self, filepath: str, convert) -> list[dict[str, Any]]:
+        """Read a session CSV row by row. A row that cannot be converted is counted and skipped; a
+        malformed or undecodable file stops at that point and the rows read so far are kept."""
+        if not self._file_present(filepath):
             return []
-        assets = []
+        rows: list[dict[str, Any]] = []
+        skipped = 0
+        first_skip = ""
+        allow_large_fields()
         try:
             with open(filepath, "r", encoding="utf-8", newline="") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    protocols_raw = row.get("protocol", "")
-                    protocols = [p.strip() for p in protocols_raw.split(",") if p.strip()] if protocols_raw else []
-                    # Sessions written before the protocol_display column show served protocols
-                    if "protocol_display" in row:
-                        protocol_display = split_display_column(row.get("protocol_display"))
-                    else:
-                        protocol_display = [p for p in protocols if p != "Unknown"]
-
-                    # Parse confidence percentage
+                for row in csv.DictReader(f):
                     try:
-                        conf_pct = int(row.get("confidence_pct", 0))
-                    except (ValueError, TypeError):
-                        conf_pct = 0
+                        rows.append(convert(row))
+                    except Exception as e:
+                        skipped += 1
+                        if not first_skip:
+                            first_skip = f"row {len(rows) + skipped}: {type(e).__name__}: {e}"
+        except (csv.Error, UnicodeDecodeError) as e:
+            row_number = len(rows) + skipped + 1
+            reason = f"reading stopped at row {row_number}: {type(e).__name__}: {e}"
+            status = LOAD_PARTIAL if rows or skipped else LOAD_UNREADABLE
+            self._record(filepath, status, len(rows), None, reason)
+            return rows
+        except OSError as e:
+            self._record(filepath, LOAD_UNREADABLE, 0, None, f"{type(e).__name__}: {e}")
+            return []
+        self._record(filepath, LOAD_OK, len(rows), skipped,
+                     f"{skipped} row(s) could not be read, first at {first_skip}" if skipped else "")
+        return rows
 
-                    asset_type = row.get("type", "Unknown")
-                    if asset_type not in ("OT", "IT"):
-                        asset_type = "Unknown"
+    def _load_assets(self, filepath: str) -> list[dict[str, Any]]:
+        """Load assets.csv into standardized asset dictionaries."""
+        def convert(row: dict[str, Any]) -> dict[str, Any]:
+            protocols_raw = row.get("protocol", "")
+            protocols = [p.strip() for p in protocols_raw.split(",") if p.strip()] if protocols_raw else []
+            # Sessions written before the protocol_display column show served protocols
+            if "protocol_display" in row:
+                protocol_display = split_display_column(row.get("protocol_display"))
+            else:
+                protocol_display = [p for p in protocols if p != "Unknown"]
 
-                    assets.append({
-                        "ip": row.get("ip", ""),
-                        "mac": row.get("mac", ""),
-                        "vendor": row.get("vendor", "Unknown"),
-                        "role": row.get("role", "Unclassified"),
-                        "type": asset_type,
-                        "confidence_pct": conf_pct,
-                        "protocols": protocols,
-                        "protocol_display": protocol_display,
-                        # Sessions written before the vendor_note column: derived from the stored values
-                        "vendor_note": (row.get("vendor_note") or "") if "vendor_note" in row else
-                                       vendor_note_for(row.get("vendor_class"), row.get("classification_type"),
-                                                       ot_service_observed(_saved_ports(row.get("ports_seen")))),
-                        "classification_reason": row.get("classification_reason", "") or "",
-                        "classification_conflicts": split_conflicts(row.get("classification_conflicts", "")),
-                        "_raw": row,
-                    })
-        except Exception:
-            pass
-        return assets
+            # Parse confidence percentage
+            try:
+                conf_pct = int(row.get("confidence_pct", 0))
+            except (ValueError, TypeError):
+                conf_pct = 0
+
+            asset_type = row.get("type", "Unknown")
+            if asset_type not in ("OT", "IT"):
+                asset_type = "Unknown"
+
+            return {
+                "ip": row.get("ip", ""),
+                "mac": row.get("mac", ""),
+                "vendor": row.get("vendor", "Unknown"),
+                "role": row.get("role", "Unclassified"),
+                "type": asset_type,
+                "confidence_pct": conf_pct,
+                "protocols": protocols,
+                "protocol_display": protocol_display,
+                # Sessions written before the vendor_note column: derived from the stored values
+                "vendor_note": (row.get("vendor_note") or "") if "vendor_note" in row else
+                               vendor_note_for(row.get("vendor_class"), row.get("classification_type"),
+                                               ot_service_observed(_saved_ports(row.get("ports_seen")))),
+                "classification_reason": row.get("classification_reason", "") or "",
+                "classification_conflicts": split_conflicts(row.get("classification_conflicts", "")),
+                "_raw": row,
+            }
+
+        return self._read_csv(filepath, convert)
 
     def _load_evidence(self, filepath: str) -> dict[str, list[dict[str, Any]]]:
         """Load evidence.json mapped by asset IP."""
-        if not os.path.exists(filepath):
+        if not self._file_present(filepath):
             return {}
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except Exception:
-            pass
-        return {}
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
+            self._record(filepath, LOAD_UNREADABLE, 0, None, f"{type(e).__name__}: {e}")
+            return {}
+        if not isinstance(data, dict):
+            self._record(filepath, LOAD_UNREADABLE, 0, None,
+                         f"expected a JSON object, found {type(data).__name__}")
+            return {}
+        self._record(filepath, LOAD_OK, len(data), 0)
+        return data
 
     def _load_connections(self, filepath: str) -> list[dict[str, Any]]:
         """Load connections.csv into connection dictionaries."""
-        if not os.path.exists(filepath):
-            return []
-        connections = []
-        try:
-            with open(filepath, "r", encoding="utf-8", newline="") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    try:
-                        count = int(row.get("count", 1))
-                    except (ValueError, TypeError):
-                        count = 1
-                    connections.append({
-                        "source": row.get("source", ""),
-                        "destination": row.get("destination", ""),
-                        "protocol": row.get("protocol", "Unknown"),
-                        "count": count,
-                    })
-        except Exception:
-            pass
-        return connections
+        def convert(row: dict[str, Any]) -> dict[str, Any]:
+            try:
+                count = int(row.get("count", 1))
+            except (ValueError, TypeError):
+                count = 1
+            return {
+                "source": row.get("source", ""),
+                "destination": row.get("destination", ""),
+                "protocol": row.get("protocol", "Unknown"),
+                "count": count,
+            }
+
+        return self._read_csv(filepath, convert)
 
     def _load_anomalies(self, filepath: str) -> list[dict[str, Any]]:
         """Load anomalies.csv into anomaly dictionaries."""
-        if not os.path.exists(filepath):
-            return []
-        anomalies = []
-        try:
-            with open(filepath, "r", encoding="utf-8", newline="") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    anomalies.append({
-                        "timestamp": row.get("timestamp", ""),
-                        "ip": row.get("ip", ""),
-                        "severity": row.get("severity", "LOW").upper(),
-                        "type": row.get("type", "UNKNOWN"),
-                        "detail": row.get("detail", ""),
-                    })
-        except Exception:
-            pass
-        return anomalies
+        def convert(row: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "timestamp": row.get("timestamp", ""),
+                "ip": row.get("ip", ""),
+                "severity": row.get("severity", "LOW").upper(),
+                "type": row.get("type", "UNKNOWN"),
+                "detail": row.get("detail", ""),
+            }
+
+        return self._read_csv(filepath, convert)
+
+
+def describe_load_issue(entry: dict[str, Any]) -> str:
+    """One line for the user about a session file that was not loaded completely."""
+    name, status, reason = entry["file"], entry["status"], entry["reason"]
+    if status == LOAD_MISSING:
+        return f"{name}: {reason}"
+    if status == LOAD_UNREADABLE:
+        return f"{name}: not loaded ({reason})"
+    if status == LOAD_PARTIAL:
+        return f"{name}: {entry['rows_loaded']} row(s) loaded, the rest not loaded ({reason})"
+    return f"{name}: {entry['rows_not_loaded']} row(s) not loaded ({reason})"
 
 
 # ── The 5 Semantic Tools ───────────────────────────────────────────────────────
 
-def get_statistics(ctx: SessionContext) -> dict[str, int]:
+def get_statistics(ctx: SessionContext) -> dict[str, Any]:
     """
     Return aggregate session statistics.
     Uses manifest stats if present and non-zero; otherwise computes fresh from loaded data.
+    When a session file was not loaded completely, or a count loaded differs from the manifest,
+    the result also gives the loaded counts and the files that were not fully loaded.
     """
     manifest_stats = ctx.manifest.get("stats", {})
 
@@ -181,7 +247,7 @@ def get_statistics(ctx: SessionContext) -> dict[str, int]:
     connection_count = int(manifest_stats.get("connection_count", 0)) or len(ctx.connections)
     anomaly_count = int(manifest_stats.get("anomaly_count", 0)) or len(ctx.anomalies)
 
-    return {
+    stats: dict[str, Any] = {
         "asset_count": asset_count,
         "ot_count": ot_count,
         "it_count": it_count,
@@ -189,6 +255,20 @@ def get_statistics(ctx: SessionContext) -> dict[str, int]:
         "connection_count": connection_count,
         "anomaly_count": anomaly_count,
     }
+
+    loaded = {
+        "asset_count": len(ctx.assets),
+        "connection_count": len(ctx.connections),
+        "anomaly_count": len(ctx.anomalies),
+    }
+    issues = ctx.load_issues
+    if issues or any(stats[name] != count for name, count in loaded.items()):
+        stats["loaded"] = loaded
+        stats["load_issues"] = [
+            {key: entry[key] for key in ("file", "status", "rows_loaded", "rows_not_loaded", "reason")}
+            for entry in issues
+        ]
+    return stats
 
 
 def get_assets(
@@ -308,7 +388,10 @@ def get_tool_definitions() -> list[dict[str, Any]]:
                 "name": "get_statistics",
                 "description": (
                     "Retrieve high-level asset, connection, and anomaly count statistics "
-                    "for the captured OT/ICS network session."
+                    "for the captured OT/ICS network session. If some session data could not be "
+                    "loaded, the result also has 'loaded' (the counts actually available to the "
+                    "other tools) and 'load_issues' (each file not fully loaded and why); the other "
+                    "tools then see only the loaded part, so say so in the answer."
                 ),
                 "parameters": {
                     "type": "object",

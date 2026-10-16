@@ -935,6 +935,9 @@ def _print_session_context(session_dir: str, ctx: object) -> None:
         f"{dim}({asset_count} assets · {conn_count} connections · {anomaly_count} anomalies){reset}\n"
         f"{dim}Path    :{reset} {session_dir}"
     )
+    from scrutics.ai.tools import describe_load_issue
+    for entry in getattr(ctx, "load_issues", []):
+        print(f"Not loaded : {describe_load_issue(entry)}")
     print()
 
 
