@@ -7,7 +7,9 @@
 
 ![Scrutics TUI](docs/screenshots/Scrutics_TUI.png)
 
-Scrutics discovers and classifies industrial assets (PLCs, RTUs, HMIs, field devices) by observing network traffic passively. It never transmits packets or actively interacts with monitored devices.
+Scrutics discovers the devices on an industrial network by observing its traffic passively, and classifies each one as OT, IT or Unknown from the evidence it observed. It never transmits packets to, or interacts with, the monitored devices.
+
+What Scrutics does and does not do, in full: [docs/SCRUTICS.md](docs/SCRUTICS.md).
 
 ---
 
@@ -17,7 +19,7 @@ Active scanning can disrupt sensitive or legacy OT devices, particularly in envi
 
 No probes. No injected packets. No active interaction with monitored devices.
 
-Passive operation is enforced at runtime by patching Scapy’s transmit functions before capture starts. Any accidental transmit attempt raises a `PermissionError` and is logged.
+Before a capture starts, Scrutics replaces Scapy's send functions with a guard: a call to one raises a `PermissionError` and is logged to `output/scrutics_passive_audit.log`. The guard covers those Scapy functions only; Scrutics' capture code has no other way to send. The only network connections Scrutics opens are ones you configure or start: SIEM sinks, the AI assistant and its setup, `scrutics oui update`, and the topology page's chat.
 
 ---
 
@@ -25,15 +27,15 @@ Passive operation is enforced at runtime by patching Scapy’s transmit function
 
 - **Passive live discovery** : captures traffic from a network interface
 - **PCAP / PCAPNG analysis** : works offline with existing packet captures
-- **OT/ICS protocol classification** : identifies supported industrial protocols including Modbus TCP, S7comm, EtherNet/IP, DNP3, BACnet/IP, and others
+- **OT/ICS protocol identification** : recognises industrial services by port (33 OT ports, including Modbus TCP, S7comm, EtherNet/IP, DNP3, IEC 60870-5-104 and BACnet/IP); Modbus TCP is also validated by parsing its messages
 - **Vendor identification** : MAC OUI lookup using the bundled OUI database
 - **Behavioral baselining** : learns per-device communication patterns and detects anomalies (`NEW_PEER`, `DIRECTIONALITY_CHANGE`, `INTERVAL_ANOMALY`)
 - **Custom behavioral rules** : constraints such as `never_initiates`, `allowed_peers`, `allowed_ports`, `max_new_peers_per_hour`
 - **Interactive topology HTML** : force-directed graph with isolated-node side panel, drag, and zoom
 - **Excel export (`.xlsx`)** : client-side export from the topology HTML (Assets, Connections, Summary)
-- **SIEM forwarding** : syslog (JSON, CEF, LEEF, plain) and Splunk HEC
+- **SIEM forwarding** : anomalies to syslog (JSON, CEF, LEEF, plain) and Splunk HEC, best effort
 - **Zeek & Suricata log ingestion** : discover assets from existing Zeek and Suricata logs
-- **Crash-safe checkpointing** : session data checkpointed every 15 seconds using atomic file replacement
+- **Periodic checkpoints** : session files rewritten every 15 seconds; events and anomalies appended as they happen
 - **AI assistant** : ask questions about captured sessions using natural language. Supports Gemini, OpenAI, Anthropic, and Ollama (local/offline)
 - **MAC-based asset identity** : persistent device tracking by MAC address with IP history
 - **Passive DHCP enrichment** : extracts hostname and vendor class from observed DHCPv4 traffic
@@ -94,7 +96,7 @@ sudo python3 -m scrutics --live <interface> --headless
 python3 -m scrutics --file capture.pcap --headless
 ```
 
-**Fast inventory from a large PCAP** (skip anomaly detection)
+**Fast inventory from a large PCAP** (skip the learned baseline)
 
 ```bash
 python3 -m scrutics --file big.pcap --headless --no-baseline
@@ -110,7 +112,7 @@ python3 -m scrutics --file big.pcap --headless --no-baseline
 Scrutics generates an interactive HTML topology map:
 
 - Force-directed layout
-- Isolated unknown assets grouped in a side panel
+- Devices with no drawn connection listed in a side panel
 - Labels hide when zoomed out to avoid clutter
 - Drag nodes to adjust layout; scroll to zoom
 
@@ -132,7 +134,7 @@ The export is 100% client-side : no data is sent to any server. The SheetJS libr
 
 ## AI assistant
 
-Scrutics includes an optional AI assistant that can answer questions about captured sessions using natural language.
+Scrutics includes an optional AI assistant that can answer questions about captured sessions using natural language. It needs the optional `requests` package, which `requirements.txt` does not install: `pip install -e ".[ai]"`.
 
 **CLI**
 
@@ -178,7 +180,9 @@ All output is saved under `output/scrutics_TIMESTAMP/`.
 
 | File              | When written             | Contents                                              |
 |-------------------|--------------------------|-------------------------------------------------------|
-| `assets.csv`      | Every 15s / session end  | IP, MAC, vendor, protocols, role, confidence, anomaly count |
+| `assets.csv`      | Every 15s / session end  | IP, MAC, vendor, protocols, role, class, confidence, classification reason, per-device limit counts |
+| `evidence.json`   | Every 15s / session end  | Evidence records, keyed by IP address                 |
+| `manifest.json`   | Every 15s / session end  | What was observed, exported and dropped               |
 | `events.csv`      | As each event happens    | Classification events (`timestamp,message`)           |
 | `anomalies.csv`   | As each anomaly happens  | Behavioral anomalies (`timestamp,ip,type,severity,detail`) |
 | `connections.csv` | Every 15s / session end  | Source, destination, protocol, packet count           |
@@ -186,7 +190,9 @@ All output is saved under `output/scrutics_TIMESTAMP/`.
 | `topology.html`   | Every 15s / session end  | Interactive topology map                              |
 
 `events.csv` and `anomalies.csv` are appended record by record and never rewritten, so they hold
-every event and anomaly of the session. `manifest.json` states, for events, anomalies, evidence,
+every event and anomaly of the session. The other files are rewritten in place at each checkpoint;
+only `manifest.json` is replaced atomically, so a process killed while a file is being written can
+leave that file incomplete. `manifest.json` states, for events, anomalies, evidence,
 connections and topology edges, how many were observed, exported and dropped (with the reason),
 lists any write error, and sets `export_complete` to true only when nothing is missing from the
 final files. `topology.json` and the topology page show the 2,000 busiest connections;
@@ -319,15 +325,16 @@ sudo python3 -m scrutics --live <interface> --duration 0 --headless
 | `--baseline SECONDS` | 60         | Observation window before anomaly detection      |
 | `--output DIR`       | `./output` | Output directory for session folders             |
 | `--headless`         | off        | Run without the TUI                              |
-| `--no-baseline`      | off        | Skip anomaly detection : inventory only          |
+| `--no-baseline`      | off        | Skip the learned baseline; rule, identity and Suricata alerts still run |
 | `doctor`             | :          | Print diagnostic information                     |
-| `ask`                | :          | Interactive AI assistant (alias: `ai`)           |
+| `ai`                 | :          | AI assistant (alias: `ask`)                      |
 | `oui status`         | :          | Show OUI database status and freshness           |
+| `oui validate FILE`  | :          | Check an OUI database file                       |
 | `oui update`         | :          | Download latest OUI database from IEEE            |
 | `oui import FILE`    | :          | Import an offline OUI database file               |
 | `list-models PROVIDER`| :         | List available models for a provider              |
 
-**TUI shortcuts:** `1` Start · `2` File Options · `3` Toggle Panels · `R` Reload Rules · `P` Pause · `Q` Quit · `←→` Switch Panels · `Enter` Scroll Mode
+**TUI shortcuts:** `1` Start · `2` File Options · `3` Toggle Panels · `R` Reload Rules · `P` Pause · `A` AI Assistant · `Q` Quit · `←→` Switch Panels · `Enter` Scroll Mode
 
 ---
 
@@ -349,7 +356,11 @@ Run `python3 -m scrutics doctor` first : it identifies most issues.
 
 - Large PCAPs may require more processing time and memory. Use `--no-baseline` when behavioral anomaly detection is not required.
 - Memory grows with the number of distinct devices seen; there is no limit on the number of devices. Spoofed traffic that invents many MAC or IP addresses therefore grows memory without bound. Measured with the behavioral baseline on: about 9 KB per device that talks to one other host (about 880 MB per 100,000 invented devices), plus about 1 KB for each further host a device talks to (19 KB per device with ten); the connections between devices are kept without a limit. With `--no-baseline` a device talking to one host takes about 7 KB. The history kept per device is bounded (see "Per-device limits"), but the behavioral baseline is kept per IP address, so one device that moves through many addresses still adds one baseline per address.
-- No MAC addresses in Zeek/Suricata logs : OUI vendor matching unavailable; confidence scores are lower
+- Live capture loses packets it cannot keep up with, and does not count them; the loss rate was not measured in v0.7
+- Hosts behind a router are recorded against the router's MAC address
+- Confidence is the accumulated weight of a device's evidence, capped at 100: it measures how much evidence there is (an OT vendor alone gives 30), not how likely the class is to be right
+- Protocols other than Modbus TCP are identified by port number only; no device is classified Infrastructure
+- No MAC addresses in Zeek/Suricata logs : OUI vendor matching unavailable, and devices are identified by IP address. Their application-layer logs (`modbus.log`, `dnp3.log`, Suricata `modbus` events) are used only as observations of the protocol's port
 - No IPv6 support
 - No Linux cooked (SLL/SLL2, `tcpdump -i any`) or raw-IP captures: see "Supported capture types"
 - Topology layout does not avoid crossing connections or overlapping labels; drag nodes apart to read a dense group
@@ -386,7 +397,7 @@ Scrutics/
 │   ├── db/             – asset inventory and rolling CSV writer
 │   ├── diagnostics.py  – health checks (scrutics doctor)
 │   ├── integrations/   – SIEM sink manager (syslog, Splunk HEC)
-│   ├── parsers/        – Zeek, Suricata, PCAP parsers
+│   ├── parsers/        – Zeek, Suricata and Modbus TCP parsers, file type detection
 │   ├── signals.py      – file-watch reload and SIGHUP handler
 │   ├── ui/             – Textual TUI
 │   └── passive.py      – passive enforcement layer

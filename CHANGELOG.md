@@ -76,7 +76,7 @@ All notable changes to Scrutics are documented here.
 - **Clearer `scrutics oui update` errors**: when the download is refused (for example HTTP 418, which the IEEE server returns to some client user agents), fails on the network, or arrives incomplete, the message says what happened, that the installed database was not changed, and how to install the file offline with `scrutics oui import`. A response that is not 200, or shorter than its stated length, is no longer passed on. Requests now identify Scrutics with its installed version. The developer script `scripts/download_oui.py` uses the same download, validates the file before replacing the existing one, and keeps the existing file on failure.
 
 ### Fixed — Topology Assistant
-- **The assistant panel in `topology.html` works again**: a page-template escaping error broke its script, so the AI button, the panel and the chat did nothing. The assistant is now also given the devices, protocols and connections of the graph; before, its context described an empty network.
+- **The assistant panel in `topology.html` works again**: a page-template escaping error broke its script, so the AI button, the panel and the chat did nothing. The assistant is now also given a summary of the graph (see "Known Gaps — AI" for what it contains); before, its context described an empty network.
 - The topology chat uses the same default models as the AI configuration for OpenAI, Anthropic and Gemini, instead of its own model names (it named the retired `gemini-2.0-flash`). The API key stays in page memory only and is never stored.
 
 ### Fixed — TUI Crashes and Input Validation
@@ -152,6 +152,12 @@ All notable changes to Scrutics are documented here.
 - **Constraints of a port rule reach its clients**: a device that only contacts a port receives the behavioral constraints of a user rule for that port, so a rule with `port` alone and constraints such as `never_initiates` or `allowed_peers` raises alerts for every client polling the port. Scope constraint rules with `mac_prefix`; the README example now does.
 - **Topology layout**: the layout separates nodes but does not avoid crossing connections or overlapping labels, so a dense group can be hard to read until its nodes are dragged apart.
 - Linux cooked captures (SLL and SLL2, as written by `tcpdump -i any`) and raw-IP captures are not supported; their frames are counted by kind (see "Frames That Cannot Produce a Device").
+- **Live capture loss is not counted**: live capture restarts Scapy's capture every second and processes each packet before reading the next, so packets the host cannot keep up with, or that arrive during a restart, are lost without being counted. The loss rate was not measured in v0.7.
+- **Hosts behind a router** arrive with the router's MAC address and are recorded against it; Scrutics does not infer routers.
+- **Confidence measures the amount of evidence**: the confidence shown everywhere is the accumulated weight of a device's evidence, capped at 100, including evidence that never decides the class (an OT vendor alone gives 30, each distinct mDNS name 15, and port evidence is recorded for both ports of each packet a device sends). It is not a probability that the class is right.
+- **Port-only protocol identification**: apart from Modbus TCP, protocols are identified by port number only. Zeek `modbus.log`, `dnp3.log` and `bacnet.log` records and Suricata `modbus` and `dnp3` events are used as observations of the protocol's port; their application-layer fields are not used. No device is classified Infrastructure.
+- **Session snapshot files are not written atomically**: `assets.csv`, `evidence.json`, `connections.csv` and the topology files are rewritten in place at each checkpoint, and only `manifest.json` is replaced atomically, so a process killed during a write can leave that file incomplete. Earlier release notes described session persistence as atomic.
+- **SIEM delivery is best effort**: anomalies are queued (up to 1,000) for the sinks; an anomaly that does not fit in the queue, or that a sink fails to send, is not delivered and not counted.
 
 ## [0.6.1] — 2026-09-19
 
@@ -182,7 +188,7 @@ All notable changes to Scrutics are documented here.
   - TUI `AIAssistantModal` status label displays real-time retry progress across worker thread boundaries.
 
 ### Known Limitations
-- **Text-part signatures are now load-bearing**: With `gemini-3.8-flash` as default (GA Flash model; `gemini-2.0-flash` EOL June 2026), Gemini emits a `thoughtSignature` on the final text part of most responses. The C2 preservation path is exercised on every turn, not only tool-calling turns.
+- **Text-part signatures are now load-bearing**: With `gemini-3.8-flash` as default (GA Flash model; `gemini-2.0-flash` EOL June 2026), Gemini emits a `thoughtSignature` on the final text part of most responses. The signature preservation path is exercised on every turn, not only tool-calling turns.
 - **Live rate-limit behavior unverified against real API**: Retry logic was built against documented status codes and documented `RetryInfo` schemas. Confirmation of live 429 `RetryInfo.retryDelay` wire population requires active testing (see post-release verification list: `docs/post-release-verification-v0.6.1.md`).
 - **Multi-turn REPL text-part signature loss**: Multi-turn CLI/TUI REPL sessions concatenate prior turns into a contextual prompt string; signatures attached to text parts in earlier turns are not replayed. This does not affect the agent loop's internal tool-calling rounds, which preserve signatures verbatim.
 - **Default model chosen on EOL/GA status, not full cost comparison**: `gemini-3.8-flash` was selected because `gemini-2.0-flash` reached EOL. A full cost/latency comparison across the GA model tier was not performed in v0.6.1.

@@ -1,5 +1,7 @@
 # Post-Release Verification — v0.6.1
 
+> **Historical:** the v0.6.1 release checklist; it does not describe v0.7 (see [SCRUTICS.md](SCRUTICS.md)).
+
 The following items cannot be verified by static analysis, mocks, or protocol
 traces. Run them against a real Gemini API key as the first action after
 tagging v0.6.1.
