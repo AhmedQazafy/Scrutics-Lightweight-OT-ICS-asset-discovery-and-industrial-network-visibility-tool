@@ -533,7 +533,7 @@ def _print_table(inventory: AssetInventory):
         proto  = protocol_display_text(a, w)
         type_s = "OT" if a.is_ot is True else "IT" if a.is_ot is False else "?"
         print(f"{a.ip:<18} {a.mac:<20} {display_vendor_name(a.vendor)[:22]:<22} {proto:<{w}} "
-              f"{a.role[:28]:<28} {a.confidence_pct:<7}% {type_s}")
+              f"{a.role[:28]:<28} {a.classification_confidence_pct:<7}% {type_s}")
     print(f"{'─'*(92 + w)}")
     print(f"Total: {inventory.count()} assets\n")
 

@@ -2958,7 +2958,7 @@ class ScruticsApp(App):
                     table.update_cell_at((i, 2), vendor_cell(asset, 20))
                     table.update_cell_at((i, 3), protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH))
                     table.update_cell_at((i, 4), asset.role[:26])
-                    table.update_cell_at((i, 5), f"{asset.confidence_pct}%")
+                    table.update_cell_at((i, 5), f"{asset.classification_confidence_pct}%")
                     table.update_cell_at((i, 6), _baseline_display(asset.baseline_status))
                     table.update_cell_at((i, 7), str(anomaly_counts.get(asset.ip, 0)))
                     table.update_cell_at((i, 8), _type_label(asset.is_ot))
@@ -2971,7 +2971,7 @@ class ScruticsApp(App):
                 table.add_row(
                     asset.ip, mac, vendor_cell(asset, 20),
                     protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
-                    asset.role[:26], f"{asset.confidence_pct}%",
+                    asset.role[:26], f"{asset.classification_confidence_pct}%",
                     _baseline_display(asset.baseline_status),
                     str(anomaly_counts.get(asset.ip, 0)),
                     _type_label(asset.is_ot),

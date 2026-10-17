@@ -136,9 +136,11 @@ class SessionContext:
             else:
                 protocol_display = [p for p in protocols if p != "Unknown"]
 
-            # Parse confidence percentage
+            # Evidence-based classification confidence, the value the screens show. Sessions
+            # written before the classification_confidence column have only confidence_pct.
+            column = "classification_confidence" if "classification_confidence" in row else "confidence_pct"
             try:
-                conf_pct = int(row.get("confidence_pct", 0))
+                conf_pct = int(row.get(column, 0))
             except (ValueError, TypeError):
                 conf_pct = 0
 
@@ -152,7 +154,7 @@ class SessionContext:
                 "vendor": row.get("vendor", "Unknown"),
                 "role": row.get("role", "Unclassified"),
                 "type": asset_type,
-                "confidence_pct": conf_pct,
+                "classification_confidence_pct": conf_pct,
                 "protocols": protocols,
                 "protocol_display": protocol_display,
                 # Sessions written before the vendor_note column: derived from the stored values
@@ -287,7 +289,7 @@ def get_assets(
     for a in ctx.assets:
         if target_type and a.get("type", "").upper() != target_type:
             continue
-        if min_confidence is not None and a.get("confidence_pct", 0) < min_confidence:
+        if min_confidence is not None and a.get("classification_confidence_pct", 0) < min_confidence:
             continue
 
         results.append({
@@ -297,7 +299,7 @@ def get_assets(
             "vendor_note": a.get("vendor_note", ""),
             "role": a["role"],
             "type": a["type"],
-            "confidence_pct": a["confidence_pct"],
+            "classification_confidence_pct": a["classification_confidence_pct"],
             "protocols": a["protocols"],
             "protocol_display": a.get("protocol_display", a["protocols"]),
         })
@@ -406,7 +408,8 @@ def get_tool_definitions() -> list[dict[str, Any]]:
                 "name": "get_assets",
                 "description": (
                     "List discovered network assets with summary details. "
-                    "Can filter by asset type ('OT', 'IT', 'Unknown') and minimum confidence percentage."
+                    "Can filter by asset type ('OT', 'IT', 'Unknown') and minimum classification confidence "
+                    "(classification_confidence_pct: accumulated evidence weight, 0-100)."
                 ),
                 "parameters": {
                     "type": "object",
@@ -420,7 +423,7 @@ def get_tool_definitions() -> list[dict[str, Any]]:
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100,
-                            "description": "Only return assets with confidence percentage >= min_confidence.",
+                            "description": "Only return assets with classification_confidence_pct >= min_confidence.",
                         },
                     },
                     "required": [],

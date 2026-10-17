@@ -101,7 +101,7 @@ python3 -m scrutics --file big.pcap --headless --no-baseline
 ```
 ![Scrutics headless mode](docs/screenshots/Scrutics_Headless.png)
 
-*Headless live capture | periodic asset snapshots with confidence scores climbing as the baseline locks, then a clean save on Ctrl+C*
+*Headless live capture | periodic asset snapshots with confidence scores climbing as evidence accumulates, then a clean save on Ctrl+C*
 
 ---
 

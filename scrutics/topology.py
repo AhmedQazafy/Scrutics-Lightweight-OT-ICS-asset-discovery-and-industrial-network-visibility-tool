@@ -102,7 +102,8 @@ def build_graph_data(inventory: Any, edges: dict | None = None, max_edges: int =
     for asset in assets:
         pk = asset.primary_key
         ntype = _asset_type(asset)
-        confidence = int(getattr(asset, "confidence_pct", 0) or 0)
+        # Evidence-based classification confidence, the value every other screen shows
+        confidence = int(getattr(asset, "classification_confidence_pct", 0) or 0)
         node_data = {
             "id": pk,                   # Persistent identity (Asset.primary_key)
             "label": str(asset.ip),     # Human-friendly IP label for display
@@ -1347,7 +1348,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (ot.length > 0) {
       lines.push("\nOT devices:");
       ot.slice(0, 20).forEach(function (n) {
-        lines.push("  " + (n.label||n.id||"?") + " | " + (n.vendor_display||"Unknown") + " | " + (n.protocol||"no protocol") + " | conf: " + (n.confidence||"?") + "%");
+        lines.push("  " + (n.label||n.id||"?") + " | " + (n.vendor_display||"Unknown") + " | " + (n.protocol||"no protocol") + " | conf: " + (n.confidence||0) + "%");
       });
       if (ot.length > 20) lines.push("  ...and " + (ot.length - 20) + " more");
     }
