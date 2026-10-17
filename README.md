@@ -163,10 +163,12 @@ python3 -m scrutics ask --session output/scrutics_20260914_120000
 
 The AI assistant only reads session data; it never modifies assets or injects packets. Your questions, and the session data the assistant looks up to answer them, are sent only to the provider you configured (for Ollama, your own server). The topology page's chat sends the key from your browser straight to the provider you pick and never stores it.
 
+**What the topology chat sees**: a summary of the page, not the session. It has the asset counts by type, and the address, vendor, protocol and confidence of up to 20 OT devices. IT devices are listed by address only (just counted when there are more than 10), unknown devices are only counted, and connections are listed only when there are 15 or fewer. It is given no device roles and no vendors of IT or unknown devices, so it cannot answer questions about them; use `scrutics ai` or the TUI assistant, which look up the whole session.
+
 Note: an Ollama server can run on another machine on the network; set its address as `base_url` in `~/.scrutics/ai.yaml`.
 
 ![Scrutics AI assistant](docs/screenshots/Scrutics_Assistant.png)
-*The AI assistant runs in both the CLI and the TUI; `topology.html` has its own chat panel.*
+*The AI assistant runs in both the CLI and the TUI; `topology.html` has its own chat panel, which sees only a summary of the page.*
 
 ---
 
@@ -222,14 +224,23 @@ The built-in ICS rules are in `scrutics/config/builtin_rules.yaml` : do not edit
 rules:
   - name: "Modbus PLC Fleet"
     port: 502
+    mac_prefix: "00:80:F4"      # the PLCs' vendor prefix
     classify_as: "Modbus TCP"
     role: "PLC / RTU"
     is_ot: true
     never_initiates: true
-    allowed_peers:
+    allowed_peers:              # every host that talks to these PLCs (SCADA server, HMI)
       - "192.168.1.100"
+      - "192.168.1.50"
     max_new_peers_per_hour: 2
 ```
+
+A rule's fields must all match: this rule applies to devices that serve port 502 and whose MAC
+starts with `00:80:F4`. Put behavioral constraints only in rules that also set `mac_prefix`. A
+device that contacts a port (for example an HMI or SCADA server polling port 502) also receives
+the constraints of a rule for that port unless the rule's `mac_prefix` excludes it, so a constraint
+rule with `port` alone raises alerts for every client that polls the PLCs. List in `allowed_peers`
+every host that talks to the devices; any other peer raises an alert.
 
 **SIEM sink**
 
@@ -264,6 +275,19 @@ sudo tcpdump -i <interface> -c 10
 ```
 
 If `tcpdump` shows no packets, the interface is wrong or the SPAN/mirror port is not configured.
+
+**Supported capture types**
+
+Devices are built from Ethernet frames carrying IPv4 or ARP, so capture on a named Ethernet
+interface (`--live eth0`, or `tcpdump -i eth0 -w capture.pcap` for a file). These are not
+supported and produce no devices:
+
+- Linux cooked captures (SLL and SLL2), which `tcpdump -i any` writes; do not capture on the `any`
+  pseudo-interface
+- raw-IP captures with no link layer
+- IPv6 traffic
+
+The run summary counts such frames by kind, and a capture that produces no devices says why.
 
 **Windows users**
 
@@ -324,9 +348,11 @@ Run `python3 -m scrutics doctor` first : it identifies most issues.
 ## Known limitations
 
 - Large PCAPs may require more processing time and memory. Use `--no-baseline` when behavioral anomaly detection is not required.
-- Memory grows with the number of distinct devices seen; there is no limit on the number of devices. Spoofed traffic that invents many MAC or IP addresses therefore grows memory without bound (about 8.8 KB per device, so about 880 MB per 100,000 invented devices). The history kept per device is bounded (see "Per-device limits"), but the behavioral baseline is kept per IP address, so one device that moves through many addresses still adds one baseline per address.
+- Memory grows with the number of distinct devices seen; there is no limit on the number of devices. Spoofed traffic that invents many MAC or IP addresses therefore grows memory without bound. Measured with the behavioral baseline on: about 9 KB per device that talks to one other host (about 880 MB per 100,000 invented devices), plus about 1 KB for each further host a device talks to (19 KB per device with ten); the connections between devices are kept without a limit. With `--no-baseline` a device talking to one host takes about 7 KB. The history kept per device is bounded (see "Per-device limits"), but the behavioral baseline is kept per IP address, so one device that moves through many addresses still adds one baseline per address.
 - No MAC addresses in Zeek/Suricata logs : OUI vendor matching unavailable; confidence scores are lower
 - No IPv6 support
+- No Linux cooked (SLL/SLL2, `tcpdump -i any`) or raw-IP captures: see "Supported capture types"
+- Topology layout does not avoid crossing connections or overlapping labels; drag nodes apart to read a dense group
 - WSL2 file performance : keep Scrutics on the Linux filesystem, not `/mnt/c/...`
 - Very large topology graphs may become slower to render
 

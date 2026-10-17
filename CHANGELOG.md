@@ -145,6 +145,13 @@ All notable changes to Scrutics are documented here.
 - If Python's low-level HTTP debug output is turned on (`http.client.HTTPConnection.debuglevel`), Python prints request headers, including the API key. Scrutics never turns it on; DEBUG logging shows no key.
 - `list-models PROVIDER --key KEY` still takes the key on the command line; the provider's environment variable is the recommended form.
 - Empty answers other than the token-limit case are not yet reported (see "AI Models and Request Parameters").
+- The topology page's chat sees only a summary of the page: asset counts by type, vendor, protocol and confidence for up to 20 OT devices, IT devices by address only (or a count above 10), unknown devices as a count, and connections only when there are 15 or fewer. It is given no device roles and no vendors of IT or unknown devices, so it cannot answer questions about them; `scrutics ai` and the TUI assistant look up the whole session.
+
+### Known Gaps — Capture, Rules and Topology
+- **pcapng read differs by Scapy version**: a pcapng packet block that names an interface the file never described is skipped by Scapy 2.8, which reads on and shows only Scapy's own warning ("invalid interface id"); Scrutics does not report it. With Scapy 2.7 the read stops at that block and Scrutics reports the file as damaged there.
+- **Constraints of a port rule reach its clients**: a device that only contacts a port receives the behavioral constraints of a user rule for that port, so a rule with `port` alone and constraints such as `never_initiates` or `allowed_peers` raises alerts for every client polling the port. Scope constraint rules with `mac_prefix`; the README example now does.
+- **Topology layout**: the layout separates nodes but does not avoid crossing connections or overlapping labels, so a dense group can be hard to read until its nodes are dragged apart.
+- Linux cooked captures (SLL and SLL2, as written by `tcpdump -i any`) and raw-IP captures are not supported; their frames are counted by kind (see "Frames That Cannot Produce a Device").
 
 ## [0.6.1] — 2026-09-19
 
