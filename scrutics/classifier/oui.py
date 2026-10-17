@@ -654,10 +654,12 @@ def get_oui_freshness(now: datetime.datetime | None = None) -> dict:
     if age_days is None:
         if db_type == "bundled":
             try:
+                # The header dates the data: "# Retrieved YYYY-MM-DD from ..." (written by
+                # scripts/build_bundled_oui.py) or the older "# Last updated: YYYY[-MM-DD]"
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     for _ in range(10):
-                        line = f.readline()
-                        if "last updated:" in line.lower():
+                        line = f.readline().lower()
+                        if "last updated:" in line or line.startswith("# retrieved "):
                             m = re.search(r"(\d{4}(?:-\d{2}-\d{2})?)", line)
                             if m:
                                 d_str = m.group(1)

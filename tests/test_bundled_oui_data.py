@@ -6,6 +6,7 @@ blocks held by the IEEE Registration Authority are never attributed to one vendo
 organisation has a vendor class, and curated family hints carry a cited source.
 """
 
+import datetime
 import re
 
 import pytest
@@ -61,6 +62,38 @@ def test_header_names_the_registry_its_retrieval_date_and_hashes():
     assert any("Retrieved 2026-10-10" in line for line in header)
     for registry in ("MA-L", "MA-M", "MA-S", "IAB"):
         assert any(re.match(rf"#   {registry}: \S+\.csv SHA-256 [0-9a-f]{{64}}$", line) for line in header)
+
+
+def _use_bundled_file(monkeypatch, tmp_path, bundled_path):
+    # The bundled file is the active database only when no user or local database exists
+    monkeypatch.setattr(oui, "OUI_USER_PATH", str(tmp_path / "absent_user_oui.txt"))
+    monkeypatch.setattr(oui, "OUI_FULL_PATH", str(tmp_path / "absent_local_oui.txt"))
+    monkeypatch.setattr(oui, "OUI_BUNDLED_PATH", bundled_path)
+
+
+def test_bundled_file_reports_its_retrieval_date(monkeypatch, tmp_path):
+    _use_bundled_file(monkeypatch, tmp_path, oui.OUI_BUNDLED_PATH)
+    info = oui.get_oui_freshness(now=datetime.datetime(2026, 10, 17, tzinfo=datetime.timezone.utc))
+    assert info["db_type"] == "bundled"
+    assert info["source_date"] == "2026-10-10"
+    assert info["age_days"] == 7
+    assert info["freshness"] == oui.FRESHNESS_CURRENT
+
+
+@pytest.mark.parametrize("header_line, date", [
+    ("# Retrieved 2026-03-04 from https://standards-oui.ieee.org/:", "2026-03-04"),
+    ("# Last updated: 2025-06-01", "2025-06-01"),
+    ("# Last updated: 2025", "2025-01-01"),
+])
+def test_bundled_header_date_forms(monkeypatch, tmp_path, header_line, date):
+    bundled = tmp_path / "ics_oui.txt"
+    bundled.write_text(f"# Vendor assignments\n{header_line}\n\n"
+                       "00-80-F4   (hex)\t\t\t\tTELEMECANIQUE ELECTRIQUE\n", encoding="utf-8")
+    _use_bundled_file(monkeypatch, tmp_path, str(bundled))
+    now = datetime.datetime(2026, 10, 17, tzinfo=datetime.timezone.utc)
+    info = oui.get_oui_freshness(now=now)
+    assert info["source_date"] == date
+    assert info["age_days"] == (now - datetime.datetime.fromisoformat(date + "T00:00:00+00:00")).days
 
 
 def test_bundled_family_hints_cite_a_source():
