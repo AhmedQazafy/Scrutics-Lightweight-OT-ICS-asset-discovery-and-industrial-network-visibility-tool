@@ -543,11 +543,6 @@ def _sanitize_mac(mac: str) -> str:
     return "".join(c for c in mac if c.isprintable() and ord(c) < 128)
 
 
-def _type_label(is_ot) -> str:
-    if is_ot is True:  return "OT"
-    if is_ot is False: return "IT"
-    return "?"
-
 def _baseline_display(status: str) -> str:
     if status == "active":            return "active"
     if status.startswith("building"): return status
@@ -2008,6 +2003,30 @@ def vendor_cell(asset, width: int) -> str:
     return display_vendor_name(asset.vendor)[:width]
 
 
+def asset_row_cells(asset, anomaly_count: int) -> tuple:
+    """The asset table's nine cells, the same for a live capture and a loaded session."""
+    return (
+        asset.ip,
+        _sanitize_mac(asset.mac),
+        vendor_cell(asset, 20),
+        protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
+        asset.role[:26],
+        f"{asset.classification_confidence_pct}%",
+        _baseline_display(asset.baseline_status),
+        str(anomaly_count),
+        asset.classification_type,
+    )
+
+
+def anomaly_counts_by_ip(anomalies) -> dict[str, int]:
+    """Anomalies per IP address, from anomaly records or anomalies.csv rows (both have "ip")."""
+    counts: dict[str, int] = {}
+    for anomaly in anomalies:
+        ip = anomaly.get("ip", "")
+        counts[ip] = counts.get(ip, 0) + 1
+    return counts
+
+
 def asset_identity_lines(asset) -> list:
     """Detail-panel lines naming the device: MAC and vendor, then the vendor note when it applies."""
     lines = [f"MAC: {asset.mac}    Vendor: {display_vendor_name(asset.vendor)}"]
@@ -3037,10 +3056,7 @@ class ScruticsApp(App):
     def _refresh_table(self):
         table = self.query_one("#asset-table", DataTable)
         assets = sorted(self.inventory.get_all(), key=lambda x: x.ip)
-        anomaly_counts = {}
-        for a in self.engine.baseline.get_anomalies():
-            ip = a.get("ip", "")
-            anomaly_counts[ip] = anomaly_counts.get(ip, 0) + 1
+        anomaly_counts = anomaly_counts_by_ip(self.engine.baseline.get_anomalies())
 
         # Rows are keyed by primary key: two assets can share an IP (a device replaced on the
         # same address keeps its own asset). Cells are updated in place only while the rows
@@ -3049,27 +3065,15 @@ class ScruticsApp(App):
         if keys == [row_key.value for row_key in table.rows]:
             for i, asset in enumerate(assets):
                 try:
-                    table.update_cell_at((i, 0), asset.ip)
-                    table.update_cell_at((i, 2), vendor_cell(asset, 20))
-                    table.update_cell_at((i, 3), protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH))
-                    table.update_cell_at((i, 4), asset.role[:26])
-                    table.update_cell_at((i, 5), f"{asset.classification_confidence_pct}%")
-                    table.update_cell_at((i, 6), _baseline_display(asset.baseline_status))
-                    table.update_cell_at((i, 7), str(anomaly_counts.get(asset.ip, 0)))
-                    table.update_cell_at((i, 8), _type_label(asset.is_ot))
+                    for column, cell in enumerate(asset_row_cells(asset, anomaly_counts.get(asset.ip, 0))):
+                        table.update_cell_at((i, column), cell)
                 except Exception:
                     pass
         else:
             table.clear()
             for asset in assets:
-                mac = _sanitize_mac(asset.mac)
                 table.add_row(
-                    asset.ip, mac, vendor_cell(asset, 20),
-                    protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
-                    asset.role[:26], f"{asset.classification_confidence_pct}%",
-                    _baseline_display(asset.baseline_status),
-                    str(anomaly_counts.get(asset.ip, 0)),
-                    _type_label(asset.is_ot),
+                    *asset_row_cells(asset, anomaly_counts.get(asset.ip, 0)),
                     key=asset.primary_key,
                 )
 
@@ -3157,20 +3161,19 @@ class ScruticsApp(App):
                             )
                             asset.load_evidence(ev)
 
-            # Populate table -- exactly 9 cells
-            for asset in sorted(self.inventory.get_all(), key=lambda x: x.ip):
-                table.add_row(
-                    asset.ip,
-                    asset.mac[:17],
-                    vendor_cell(asset, 16),
-                    protocol_display_text(asset, PROTOCOL_COLUMN_WIDTH),
-                    asset.role[:16],
-                    f"{asset.classification_confidence_pct}%",
-                    _baseline_display(asset.baseline_status),
-                    str(len(asset.evidence)),
-                    asset.classification_type[:8],
-                    key=asset.primary_key,
-                )
+        # Every anomaly the session recorded (the live table counts the newest 100 only)
+        anomalies_csv = os.path.join(session, "anomalies.csv")
+        anomaly_rows = []
+        if os.path.exists(anomalies_csv):
+            with open(anomalies_csv, newline="") as f:
+                anomaly_rows = list(csv.DictReader(f))
+        anomaly_counts = anomaly_counts_by_ip(anomaly_rows)
+
+        for asset in sorted(self.inventory.get_all(), key=lambda x: x.ip):
+            table.add_row(
+                *asset_row_cells(asset, anomaly_counts.get(asset.ip, 0)),
+                key=asset.primary_key,
+            )
 
         elog = self.query_one("#event-log", Log)
         elog.clear()
@@ -3182,15 +3185,13 @@ class ScruticsApp(App):
 
         alog = self.query_one("#anomaly-log", Log)
         alog.clear()
-        anomalies_csv = os.path.join(session, "anomalies.csv")
         if os.path.exists(anomalies_csv):
             self.query_one("#anomaly-panel").add_class("has-anomalies")
-            with open(anomalies_csv, newline="") as f:
-                for row in csv.DictReader(f):
-                    alog.write_line(
-                        f"{row.get('timestamp','')}  [{row.get('severity','?')}]  "
-                        f"{row.get('ip','')}  {row.get('type','')} -- {row.get('detail','')}"
-                    )
+            for row in anomaly_rows:
+                alog.write_line(
+                    f"{row.get('timestamp','')}  [{row.get('severity','?')}]  "
+                    f"{row.get('ip','')}  {row.get('type','')} -- {row.get('detail','')}"
+                )
 
         self._set_status(
             f"Loaded: {os.path.basename(session)}  |  "

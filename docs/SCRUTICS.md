@@ -265,7 +265,9 @@ have not been validated against production SIEMs.
 | `oui status`, `oui validate FILE`, `oui update`, `oui import FILE` | vendor database |
 
 **TUI:** `1` start, `2` file options, `3` panels, `R` reload rules, `P` pause, `A` AI assistant,
-`Q` quit; it can also load a saved session (read-only). The TUI redraws its asset table every
+`Q` quit; it can also load a saved session (read-only). The asset table's Anomalies column counts
+anomalies per IP address: during a capture among the newest 100 kept on screen, for a loaded session
+every row of `anomalies.csv`. The TUI redraws its asset table every
 0.5 s, work that headless mode does not do; how much this costs on large inventories was not
 measured for this release.
 
