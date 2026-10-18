@@ -14,6 +14,7 @@ from typing import Any, Iterator
 import requests
 
 from scrutics.ai.provider import (
+    ChatResult,
     LLMConnectionError,
     LLMTimeoutError,
     LLMResponseError,
@@ -143,8 +144,15 @@ class OpenAICompatMixin:
                     "(the default sends reasoning_effort \"none\")."
                 )
 
+            cut_off = data["choices"][0].get("finish_reason") == "length"
             tool_calls = message.get("tool_calls")
             if tool_calls:
+                if cut_off:
+                    # The call's arguments may be incomplete
+                    raise LLMResponseError(
+                        f"{provider_name} stopped at the model's output token limit while calling a tool; "
+                        "ask a shorter or more specific question."
+                    )
                 return {
                     "role": "assistant",
                     "content": message.get("content") or "",
@@ -161,7 +169,8 @@ class OpenAICompatMixin:
                     )
                 return content if content is not None else ""
 
-            return content
+            # Scrutics sends no limit here, so the model's own limit applies
+            return ChatResult(str(content), truncated=cut_off)
 
         # ── Streaming ──────────────────────────────────────────────────────────
         try:

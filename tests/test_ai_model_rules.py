@@ -454,7 +454,7 @@ def test_topology_chat_anthropic_request_follows_the_rules(tmp_path):
     out = _run_chat(tmp_path, "callAnthropic", 200, {"content": [{"type": "text", "text": "ok"}]})
     body = out["calls"][0]["body"]
     assert body["model"] == "claude-haiku-5-5" and body["thinking"] == {"type": "disabled"}
-    assert "temperature" not in body and body["max_tokens"] == 1024
+    assert "temperature" not in body and body["max_tokens"] == 4096
     assert out["reply"] == "ok"
 
 

@@ -324,8 +324,12 @@ prints headers including the key; `list-models --key KEY` puts the key on the co
 
 **Models and requests.** Model lists come from the provider (OpenAI limited to `gpt-6-luna` and
 `gpt-6-sol`); a fallback list is labelled with its 2026-10-16 check date. Temperature is sent only
-to models documented to accept it. An answer cut off by the token limit before any text is
-reported; other empty answers (Gemini safety or malformed calls, Anthropic refusals) are not.
+to models documented to accept it. Output limits: Gemini 8192 tokens with a low thinking level on
+`gemini-3.8-flash`, Anthropic 4096, none sent to OpenAI or Ollama; setup writes no `max_tokens`, and
+an `ai.yaml` holding exactly 1024 (written by earlier setups) gets the default. The model is told
+the answer length that fits its limit. An answer cut off at the limit is shown with a notice saying
+so (CLI, TUI, topology chat); one cut off before any text is reported; other empty answers (Gemini
+safety or malformed calls, Anthropic refusals) are not.
 
 **Retries.** HTTP 429, 502, 503, 529 and connections that could not be opened: up to 4 attempts,
 at most 30 s per wait and 60 s in total, honouring `Retry-After` within those limits. Read

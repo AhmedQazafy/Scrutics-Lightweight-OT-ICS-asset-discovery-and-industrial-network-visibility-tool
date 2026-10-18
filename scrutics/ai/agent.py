@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from scrutics.ai.model_rules import answer_length_instruction
 from scrutics.ai.provider import LLMProvider
 from scrutics.ai.tools import (
     SessionContext,
@@ -87,6 +88,10 @@ def run_agent_loop(
     reaches max_tool_iterations.
     """
     effective_system_prompt = system_prompt or OT_SYSTEM_PROMPT
+    # Tell the model how long an answer can be, so it fits the output limit sent with each request
+    length = answer_length_instruction(getattr(provider, "output_limit", None))
+    if length:
+        effective_system_prompt = f"{effective_system_prompt}\n\n{length}"
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": effective_system_prompt},
         {"role": "user", "content": user_message},

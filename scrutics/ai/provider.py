@@ -6,12 +6,31 @@ from typing import Any, Iterator
 
 
 class ChatResult(str):
-    """Plain text response from an LLM provider, preserving optional thought signature."""
+    """Plain text response from an LLM provider, preserving optional thought signature.
 
-    def __new__(cls, content: str, thought_signature: str | None = None):
+    `truncated` is True when the provider stopped because the answer reached the output token
+    limit, so the text is cut off; `limit` is the limit that was sent, or None when Scrutics sent
+    none and the model's own limit applied.
+    """
+
+    def __new__(cls, content: str, thought_signature: str | None = None,
+                truncated: bool = False, limit: int | None = None):
         obj = super().__new__(cls, content)
         obj.thought_signature = thought_signature
+        obj.truncated = truncated
+        obj.limit = limit
         return obj
+
+
+def truncation_notice(answer: Any) -> str | None:
+    """The line to show after an answer that stopped at the output limit, or None."""
+    if not getattr(answer, "truncated", False):
+        return None
+    limit = getattr(answer, "limit", None)
+    if limit:
+        return (f"Answer cut off: the model reached its output limit (max_tokens {limit}). "
+                "Ask for a shorter answer, or raise max_tokens in ~/.scrutics/ai.yaml.")
+    return "Answer cut off: the model reached its output limit. Ask for a shorter answer."
 
 
 @dataclass
@@ -62,6 +81,9 @@ class LLMProvider(ABC):
 
     # Called as (attempt, total, delay_seconds[, reason]) while a request is retried
     retry_callback: Any = None
+
+    # Output token limit sent with each request, or None when the model's own limit applies
+    output_limit: int | None = None
 
     def set_retry_callback(self, cb: Any) -> None:
         """Register or clear the retry status callback."""

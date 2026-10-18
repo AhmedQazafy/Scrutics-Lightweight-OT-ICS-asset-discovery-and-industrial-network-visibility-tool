@@ -28,6 +28,7 @@ from scrutics.ai.provider import (
     LLMResponseError,
     LLMProviderError,
 )
+from scrutics.ai.model_rules import DEFAULT_MAX_TOKENS, gemini_options
 from scrutics.ai.redact import describe_error, redact
 from scrutics.ai.retry import send_with_retry
 
@@ -248,13 +249,15 @@ def _translate_messages_to_gemini(
     return system_instruction, contents
 
 
-def _normalize_gemini_response(response_body: dict[str, Any]) -> str | dict[str, Any]:
+def _normalize_gemini_response(response_body: dict[str, Any], max_tokens: int | None = None) -> str | dict[str, Any]:
     """Translate Gemini's generateContent response to the internal OpenAI-compatible contract.
 
     Returns:
-      ChatResult (str subclass): if the model produced a final text answer
+      ChatResult (str subclass): if the model produced a final text answer, marked truncated when
+             finishReason is MAX_TOKENS (the answer reached maxOutputTokens)
       dict: with 'role', 'content', 'tool_calls' (OpenAI-style) if the model called functions
              'tool_calls' entries include 'thought_signature' when present per Gemini 3 requirement.
+    Raises LLMResponseError when the limit was reached before any text or function call.
     """
     candidates = response_body.get("candidates", [])
     if not candidates:
@@ -269,6 +272,14 @@ def _normalize_gemini_response(response_body: dict[str, Any]) -> str | dict[str,
     fn_call_parts = [p for p in parts if "functionCall" in p]
     text_parts = [p for p in parts if "text" in p]
     text_content = " ".join(p["text"] for p in text_parts).strip()
+    truncated = candidates[0].get("finishReason") == "MAX_TOKENS"
+    if truncated and not fn_call_parts and not text_content:
+        # Thinking tokens count toward maxOutputTokens, so the limit can be spent before answering
+        limit = f" (maxOutputTokens {max_tokens})" if max_tokens else ""
+        raise LLMResponseError(
+            f"Gemini stopped at the token limit{limit} before writing an answer; the model most "
+            "likely used it on thinking. Raise max_tokens in ~/.scrutics/ai.yaml or ask a shorter question."
+        )
 
     if fn_call_parts:
         tool_calls = []
@@ -310,7 +321,7 @@ def _normalize_gemini_response(response_body: dict[str, Any]) -> str | dict[str,
     # Text-only response: capture thoughtSignature from last part if present
     last_part = parts[-1] if parts else {}
     sig = last_part.get("thoughtSignature") or last_part.get("thought_signature")
-    return ChatResult(text_content, thought_signature=sig)
+    return ChatResult(text_content, thought_signature=sig, truncated=truncated, limit=max_tokens)
 
 
 class GeminiProvider(LLMProvider):
@@ -321,7 +332,7 @@ class GeminiProvider(LLMProvider):
         model: str = "gemini-3.8-flash",
         api_key: str = "",
         temperature: float = 0.3,
-        max_tokens: int = 1024,
+        max_tokens: int = DEFAULT_MAX_TOKENS["gemini"],
         timeout: float = 60.0,
         retry_callback: Callable[[int, int, float], None] | None = None,
     ):
@@ -334,6 +345,7 @@ class GeminiProvider(LLMProvider):
         self._api_key = api_key          # stored privately, never logged
         self.temperature = float(temperature)
         self.max_tokens = int(max_tokens)
+        self.output_limit = self.max_tokens
         self.timeout = float(timeout)
         self.retry_callback = retry_callback
 
@@ -371,6 +383,7 @@ class GeminiProvider(LLMProvider):
             "generationConfig": {
                 "temperature": self.temperature,
                 "maxOutputTokens": self.max_tokens,
+                **gemini_options(self.model),
             },
         }
         if system_instruction:
@@ -421,4 +434,4 @@ class GeminiProvider(LLMProvider):
                 f"Unexpected top-level response type from Gemini: {type(data).__name__}"
             )
 
-        return _normalize_gemini_response(data)
+        return _normalize_gemini_response(data, self.max_tokens)

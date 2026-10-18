@@ -222,7 +222,6 @@ fi
 
 cat >> "$YAML_PATH" <<EOF
 temperature: 0.3
-max_tokens: 1024
 timeout: $TIMEOUT
 EOF
 

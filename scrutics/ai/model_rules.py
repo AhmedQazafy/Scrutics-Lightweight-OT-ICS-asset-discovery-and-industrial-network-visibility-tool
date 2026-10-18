@@ -4,7 +4,9 @@ A parameter is sent only where it is stated here; an unknown model gets no optio
 Anthropic: temperature, top_p and top_k return HTTP 400 at non-default values on Claude 4.7 and
 later models; Claude Haiku 5.5 accepts thinking {"type": "disabled"}. OpenAI: GPT-6 Luna and Sol
 support function calling on Chat Completions only with reasoning_effort "none"; GPT-6 Astra and
-GPT-6.1 Sol need the Responses API for tools, which Scrutics does not use.
+GPT-6.1 Sol need the Responses API for tools, which Scrutics does not use. Gemini: a thinking level
+only for the models listed below. Output token limits and the answer length told to the model are
+also set here.
 """
 
 from __future__ import annotations
@@ -35,6 +37,26 @@ _ACCEPTS_TEMPERATURE = {
 }
 _ANTHROPIC_THINKING_DISABLED = ("claude-haiku-5-5",)
 _OPENAI_REASONING_NONE = ("gpt-6-luna", "gpt-6-sol")
+
+# Gemini thinking level sent as generationConfig.thinkingConfig.thinkingLevel (generateContent API
+# reference: MINIMAL, LOW, MEDIUM, HIGH, for Gemini 3 and later). Per-model levels from the
+# thinking guide, checked 2026-10-18: gemini-3.8-flash accepts low, medium and high (default
+# medium). Thinking tokens count toward maxOutputTokens, so a low level leaves the answer more room.
+_GEMINI_THINKING_LEVEL = {"gemini-3.8-flash": "LOW"}
+
+# Output token limit sent when the configuration sets none. Gemini counts thinking tokens toward
+# maxOutputTokens. OpenAI and Ollama requests carry no limit, so the model's own limit applies.
+DEFAULT_MAX_TOKENS = {"gemini": 8192, "anthropic": 4096}
+
+# The max_tokens value every setup flow wrote before v0.7; a configuration holding exactly this
+# value gets the provider's default instead
+LEGACY_SETUP_MAX_TOKENS = 1024
+
+# Answer length asked of the model: about 3 characters per token (addresses, tables and markdown
+# tokenize worse than prose at about 4), on three quarters of the limit (the rest left for thinking
+# and formatting)
+_CHARS_PER_TOKEN = 3
+_ANSWER_SHARE = 0.75
 
 
 def _is(model: str, names: tuple[str, ...]) -> bool:
@@ -70,6 +92,42 @@ def openai_options(model: str, temperature: float | None) -> dict[str, Any]:
     if _is(model, _OPENAI_REASONING_NONE):
         options["reasoning_effort"] = "none"
     return options
+
+
+def gemini_options(model: str) -> dict[str, Any]:
+    """Optional generationConfig fields for this Gemini model."""
+    level = next((lvl for name, lvl in _GEMINI_THINKING_LEVEL.items() if _is(model, (name,))), None)
+    return {"thinkingConfig": {"thinkingLevel": level}} if level else {}
+
+
+def max_tokens_for(provider: str, configured: Any) -> int | None:
+    """
+    The output token limit to send: the configured value, except that a missing value or the old
+    setup value 1024 gives the provider's default (None for providers that send no limit).
+    """
+    default = DEFAULT_MAX_TOKENS.get(provider)
+    if configured is None or str(configured).strip() == "":
+        return default
+    value = int(configured)
+    if value == LEGACY_SETUP_MAX_TOKENS and default is not None:
+        return default
+    return value
+
+
+def answer_char_budget(limit: int | None) -> int | None:
+    """Characters an answer should stay under for an output limit of `limit` tokens."""
+    if not limit:
+        return None
+    return int(limit * _ANSWER_SHARE * _CHARS_PER_TOKEN) // 100 * 100
+
+
+def answer_length_instruction(limit: int | None) -> str:
+    """System prompt sentence telling the model its answer length, or "" when no limit is sent."""
+    chars = answer_char_budget(limit)
+    if not chars:
+        return ""
+    return (f"Your output is limited to {limit} tokens. Keep each answer under about {chars:,} "
+            "characters; when there is more, summarise and offer to go into detail.")
 
 
 def order_models(provider: str, ids: list[str], default: str | None = None) -> list[str]:

@@ -6,6 +6,7 @@ from typing import Any, Iterator
 import requests
 
 from scrutics.ai.provider import (
+    ChatResult,
     LLMProvider,
     LLMConnectionError,
     LLMTimeoutError,
@@ -109,9 +110,20 @@ class OllamaProvider(LLMProvider):
             if not isinstance(message, dict):
                 raise LLMResponseError(f"Missing message in Ollama choice: {data['choices'][0]}")
 
+            # Ollama's OpenAI-compatible endpoint reports a stop at the output limit as
+            # finish_reason "length" (done_reason in its native API)
+            choice = data["choices"][0]
+            cut_off = choice.get("finish_reason") == "length" or data.get("done_reason") == "length"
+
             # If the model emitted tool calls, return structured message dict
             tool_calls = message.get("tool_calls")
             if tool_calls:
+                if cut_off:
+                    # The call's arguments may be incomplete
+                    raise LLMResponseError(
+                        "Ollama stopped at the model's output token limit while calling a tool; "
+                        "ask a shorter or more specific question."
+                    )
                 return {
                     "role": "assistant",
                     "content": message.get("content") or "",
@@ -120,7 +132,7 @@ class OllamaProvider(LLMProvider):
 
             content = message.get("content")
             if content and str(content).strip():
-                return content
+                return ChatResult(str(content), truncated=cut_off)
 
             # Defensive check: did the model return only reasoning without a final answer?
             reasoning = message.get("reasoning") or message.get("reasoning_content")

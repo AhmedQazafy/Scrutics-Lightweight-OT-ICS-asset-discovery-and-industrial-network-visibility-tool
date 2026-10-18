@@ -2168,6 +2168,8 @@ document.addEventListener("DOMContentLoaded", function() {
   var AI_MODELS = __AI_MODELS_JSON__;
   // Request fields each default model accepts, from the same rules as the Python providers
   var AI_REQUEST_OPTIONS = __AI_REQUEST_OPTIONS_JSON__;
+  // Sentence telling each provider's model how long an answer can be for its output limit
+  var AI_ANSWER_LENGTH = __AI_ANSWER_LENGTH_JSON__;
   // The retry policy of the Python providers (scrutics/ai/retry.py)
   var RETRY_POLICY = __AI_RETRY_POLICY_JSON__;
   var aiHistory = [];
@@ -2193,7 +2195,8 @@ document.addEventListener("DOMContentLoaded", function() {
       role: "system",
       content: "You are a network analysis assistant for Scrutics OT/ICS topology data. " +
         "Answer questions about this network. Be concise and accurate. " +
-        "Do not invent devices or connections not in the data.\n\n" + summary
+        "Do not invent devices or connections not in the data." +
+        (AI_ANSWER_LENGTH[provider] ? " " + AI_ANSWER_LENGTH[provider] : "") + "\n\n" + summary
     }];
 
     var labels = { openai: "OpenAI " + AI_MODELS.openai, anthropic: "Anthropic " + AI_MODELS.anthropic, gemini: "Gemini " + AI_MODELS.gemini };
@@ -2273,8 +2276,10 @@ document.addEventListener("DOMContentLoaded", function() {
     return Promise.reject(new Error("Unknown provider: " + provider));
   }
 
+  // CUT_OFF_NOTICE follows an answer that stopped at the output token limit
   var TOKEN_LIMIT_MESSAGE = "The model used its token limit before answering, most likely on reasoning. " +
-    "Try a shorter or more specific question.";
+    "Try a shorter or more specific question.",
+    CUT_OFF_NOTICE = "[Answer cut off: the model reached its output limit. Ask for a shorter answer.]";
 
   // Rejects with the provider's own error type and message, so a refused request can be fixed
   function errorDetail(r) {
@@ -2377,8 +2382,9 @@ document.addEventListener("DOMContentLoaded", function() {
     .then(function (d) {
       var choice = d.choices && d.choices[0];
       var text = choice && choice.message && choice.message.content;
-      if (!text && choice && choice.finish_reason === "length") throw new Error(TOKEN_LIMIT_MESSAGE);
-      return text || "(empty response)";
+      var cutOff = !!(choice && choice.finish_reason === "length");
+      if (!text && cutOff) throw new Error(TOKEN_LIMIT_MESSAGE);
+      return text ? (cutOff ? text + "\n\n" + CUT_OFF_NOTICE : text) : "(empty response)";
     });
   }
 
@@ -2398,8 +2404,9 @@ document.addEventListener("DOMContentLoaded", function() {
     })
     .then(function (d) {
       var b = (d.content || []).find(function (x) { return x.type === "text"; });
-      if (!(b && b.text) && d.stop_reason === "max_tokens") throw new Error(TOKEN_LIMIT_MESSAGE);
-      return (b && b.text) || "(empty response)";
+      var cutOff = d.stop_reason === "max_tokens";
+      if (!(b && b.text) && cutOff) throw new Error(TOKEN_LIMIT_MESSAGE);
+      return (b && b.text) ? (cutOff ? b.text + "\n\n" + CUT_OFF_NOTICE : b.text) : "(empty response)";
     });
   }
 
@@ -2408,7 +2415,8 @@ document.addEventListener("DOMContentLoaded", function() {
     var contents = history
       .filter(function (m) { return m.role !== "system"; })
       .map(function (m) { return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }; });
-    var payload = { contents: contents, generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } };
+    // Generation settings from the providers' rules, written in when the page is generated
+    var payload = { contents: contents, generationConfig: __GEMINI_GENERATION_CONFIG_JSON__ };
     if (sys) payload.systemInstruction = { parts: [{ text: sys.content }] };
     return withRetry("Gemini", function () { return fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(AI_MODELS.gemini) + ":generateContent", {
       method: "POST",
@@ -2420,8 +2428,13 @@ document.addEventListener("DOMContentLoaded", function() {
       return r.json();
     })
     .then(function (d) {
-      try { return d.candidates[0].content.parts[0].text || "(empty response)"; }
-      catch (e) { return "(empty response)"; }
+      var candidate = d.candidates && d.candidates[0];
+      var parts = (candidate && candidate.content && candidate.content.parts) || [];
+      var text = parts.filter(function (p) { return typeof p.text === "string"; })
+        .map(function (p) { return p.text; }).join("");
+      var cutOff = !!(candidate && candidate.finishReason === "MAX_TOKENS");
+      if (!text && cutOff) throw new Error(TOKEN_LIMIT_MESSAGE);
+      return text ? (cutOff ? text + "\n\n" + CUT_OFF_NOTICE : text) : "(empty response)";
     });
   }
 })();
@@ -2444,18 +2457,44 @@ def _browser_chat_models() -> dict:
     }
 
 
+# Output token limit of the browser chat's OpenAI requests (unchanged; the assistant sends none)
+_BROWSER_OPENAI_MAX_TOKENS = 1024
+
+
+def _browser_chat_limits() -> dict:
+    """Output token limit the browser chat sends to each provider."""
+    from scrutics.ai.model_rules import DEFAULT_MAX_TOKENS
+    return {"openai": _BROWSER_OPENAI_MAX_TOKENS, **DEFAULT_MAX_TOKENS}
+
+
 def _browser_chat_request_options() -> dict:
-    """Optional request fields for the browser chat's default models, from the providers' rules.
-    The answer length is the same 1024 tokens the chat always asked for."""
+    """Optional request fields for the browser chat's OpenAI and Anthropic models, from the
+    providers' rules, with the same output limits as the assistant's defaults (OpenAI: the chat's
+    own 1024)."""
     from scrutics.ai.model_rules import (
         DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL, anthropic_options, openai_options,
     )
+    limits = _browser_chat_limits()
     return {
         # max_completion_tokens: max_tokens is deprecated on Chat Completions and rejected by
         # reasoning models
-        "openai": {"max_completion_tokens": 1024, **openai_options(DEFAULT_OPENAI_MODEL, 0.3)},
-        "anthropic": {"max_tokens": 1024, **anthropic_options(DEFAULT_ANTHROPIC_MODEL, 0.3)},
+        "openai": {"max_completion_tokens": limits["openai"], **openai_options(DEFAULT_OPENAI_MODEL, 0.3)},
+        "anthropic": {"max_tokens": limits["anthropic"], **anthropic_options(DEFAULT_ANTHROPIC_MODEL, 0.3)},
     }
+
+
+def _browser_chat_gemini_generation_config() -> dict:
+    """generationConfig of the browser chat's Gemini requests."""
+    from scrutics.ai.config import DEFAULT_GEMINI_MODEL
+    from scrutics.ai.model_rules import gemini_options
+    return {"temperature": 0.3, "maxOutputTokens": _browser_chat_limits()["gemini"],
+            **gemini_options(DEFAULT_GEMINI_MODEL)}
+
+
+def _browser_chat_answer_length() -> dict:
+    """The system prompt sentence on answer length for each provider's output limit."""
+    from scrutics.ai.model_rules import answer_length_instruction
+    return {provider: answer_length_instruction(limit) for provider, limit in _browser_chat_limits().items()}
 
 
 def generate_topology_html(graph: dict) -> str:
@@ -2467,6 +2506,10 @@ def generate_topology_html(graph: dict) -> str:
     page = page.replace("__AI_RETRY_POLICY_JSON__", json.dumps(policy_for_browser()).replace("</", "<\\/"))
     page = page.replace("__AI_REQUEST_OPTIONS_JSON__",
                         json.dumps(_browser_chat_request_options()).replace("</", "<\\/"))
+    page = page.replace("__GEMINI_GENERATION_CONFIG_JSON__",
+                        json.dumps(_browser_chat_gemini_generation_config()).replace("</", "<\\/"))
+    page = page.replace("__AI_ANSWER_LENGTH_JSON__",
+                        json.dumps(_browser_chat_answer_length()).replace("</", "<\\/"))
     for provider, model in models.items():
         page = page.replace(f"__{provider.upper()}_MODEL_HTML__", html.escape(model))
     return page.replace("__GRAPH_JSON__", graph_json.replace("</", "<\\/"))

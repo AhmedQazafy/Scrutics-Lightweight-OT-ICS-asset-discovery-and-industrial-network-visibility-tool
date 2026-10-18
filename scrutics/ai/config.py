@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 
-from scrutics.ai.model_rules import DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL
+from scrutics.ai.model_rules import DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL, max_tokens_for
 from scrutics.ai.provider import LLMProvider, LLMProviderError
 
 _PKG_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -214,7 +214,7 @@ def build_provider(config: dict[str, Any] | None = None) -> LLMProvider:
             model=str(cfg.get("model", DEFAULT_ANTHROPIC_MODEL)),
             api_key=api_key,
             temperature=float(cfg.get("temperature", 0.3)),
-            max_tokens=int(cfg.get("max_tokens", 1024)),
+            max_tokens=max_tokens_for("anthropic", cfg.get("max_tokens")),
             timeout=float(cfg.get("timeout", 60.0)),
         )
 
@@ -225,7 +225,7 @@ def build_provider(config: dict[str, Any] | None = None) -> LLMProvider:
             model=str(cfg.get("model", DEFAULT_GEMINI_MODEL)),
             api_key=api_key,
             temperature=float(cfg.get("temperature", 0.3)),
-            max_tokens=int(cfg.get("max_tokens", 1024)),
+            max_tokens=max_tokens_for("gemini", cfg.get("max_tokens")),
             timeout=float(cfg.get("timeout", 60.0)),
         )
 

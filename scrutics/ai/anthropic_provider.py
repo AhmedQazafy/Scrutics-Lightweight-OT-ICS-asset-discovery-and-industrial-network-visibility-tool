@@ -16,13 +16,14 @@ from typing import Any, Iterator
 import requests
 
 from scrutics.ai.provider import (
+    ChatResult,
     LLMProvider,
     LLMConnectionError,
     LLMTimeoutError,
     LLMResponseError,
     LLMProviderError,
 )
-from scrutics.ai.model_rules import DEFAULT_ANTHROPIC_MODEL, anthropic_options
+from scrutics.ai.model_rules import DEFAULT_ANTHROPIC_MODEL, DEFAULT_MAX_TOKENS, anthropic_options
 from scrutics.ai.redact import describe_error, redact
 from scrutics.ai.retry import send_with_retry
 
@@ -200,7 +201,7 @@ class AnthropicProvider(LLMProvider):
         model: str = DEFAULT_ANTHROPIC_MODEL,
         api_key: str = "",
         temperature: float = 0.3,
-        max_tokens: int = 1024,
+        max_tokens: int = DEFAULT_MAX_TOKENS["anthropic"],
         timeout: float = 60.0,
     ):
         if not api_key:
@@ -212,6 +213,7 @@ class AnthropicProvider(LLMProvider):
         self._api_key = api_key          # stored privately, never logged
         self.temperature = float(temperature)
         self.max_tokens = int(max_tokens)
+        self.output_limit = self.max_tokens
         self.timeout = float(timeout)
 
     def _auth_headers(self) -> dict[str, str]:
@@ -308,4 +310,6 @@ class AnthropicProvider(LLMProvider):
                 "answer; the model most likely used it on reasoning. Raise max_tokens in "
                 f"~/.scrutics/ai.yaml or choose a model with thinking off, such as {DEFAULT_ANTHROPIC_MODEL}."
             )
+        if isinstance(result, str):
+            return ChatResult(result, truncated=data.get("stop_reason") == "max_tokens", limit=self.max_tokens)
         return result

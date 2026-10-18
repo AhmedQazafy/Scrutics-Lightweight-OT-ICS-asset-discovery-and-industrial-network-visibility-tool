@@ -1412,7 +1412,7 @@ class AIModelSelectionModal(SetupModalMixin, ModalScreen):
             ]
             if var_name:
                 lines.append(f"api_key: ${{{var_name}}}\n")
-            lines += ["temperature: 0.3\n", "max_tokens: 1024\n", f"timeout: {timeout}\n"]
+            lines += ["temperature: 0.3\n", f"timeout: {timeout}\n"]
             if provider_id == "ollama":
                 lines += ["base_url: http://localhost:11434\n", "reasoning_effort: low\n"]
             with open(yaml_path, "w", encoding="utf-8") as f:
@@ -1426,7 +1426,6 @@ class AIModelSelectionModal(SetupModalMixin, ModalScreen):
             "provider": provider_id,
             "model": model,
             "temperature": 0.3,
-            "max_tokens": 1024,
             "timeout": timeout,
         }
         if var_name:
@@ -1893,6 +1892,10 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
                 history.write_line(f"[bold red]{error}[/bold red]\n")
             elif answer:
                 history.write_line(f"[bold green]Assistant:[/bold green] {answer}\n")
+                from scrutics.ai.provider import truncation_notice
+                notice = truncation_notice(answer)
+                if notice:
+                    history.write_line(f"[yellow]{escape(notice)}[/yellow]\n")
                 last_q = getattr(self, "_last_submitted_query", None)
                 self._conversation_history.append((last_q or "query", answer))
         except Exception:

@@ -92,7 +92,7 @@ if not exist "%USERPROFILE%\.scrutics" mkdir "%USERPROFILE%\.scrutics"
 )
 
 :: Write ai.yaml using Python (already required by Scrutics, handles encoding reliably)
-python -c "import sys; p,m,v = sys.argv[1],sys.argv[2],sys.argv[3]; open(sys.argv[4],'w',encoding='utf-8').write('# Scrutics AI Configuration\n# Configured automatically by scrutics_ai_setup.bat\n# To reconfigure, run scrutics_ai_setup.bat again.\nenabled: true\nprovider: '+p+'\nmodel: '+m+'\napi_key: ${'+v+'}\ntemperature: 0.3\nmax_tokens: 1024\ntimeout: 60\n')" "!YAML_PROVIDER!" "!YAML_MODEL!" "!VAR_NAME!" "!YAML_PATH!" 2>nul
+python -c "import sys; p,m,v = sys.argv[1],sys.argv[2],sys.argv[3]; open(sys.argv[4],'w',encoding='utf-8').write('# Scrutics AI Configuration\n# Configured automatically by scrutics_ai_setup.bat\n# To reconfigure, run scrutics_ai_setup.bat again.\nenabled: true\nprovider: '+p+'\nmodel: '+m+'\napi_key: ${'+v+'}\ntemperature: 0.3\ntimeout: 60\n')" "!YAML_PROVIDER!" "!YAML_MODEL!" "!VAR_NAME!" "!YAML_PATH!" 2>nul
 
 if errorlevel 1 (
     echo.
@@ -131,7 +131,6 @@ echo    provider: !YAML_PROVIDER!
 echo    model: !YAML_MODEL!
 echo    api_key: ${!VAR_NAME!}
 echo    temperature: 0.3
-echo    max_tokens: 1024
 echo    timeout: 60
 echo.
 

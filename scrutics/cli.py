@@ -1092,6 +1092,7 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
         LLMTimeoutError,
         LLMResponseError,
         LLMProviderError,
+        truncation_notice,
     )
 
     is_tty = sys.stdout.isatty()
@@ -1171,6 +1172,10 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
             return 1
 
         print(answer)
+        notice = truncation_notice(answer)
+        if notice:
+            yellow = "\033[33m" if is_tty else ""
+            print(f"{yellow}[{notice}]{reset}")
         print()
         conversation_history.append((question, answer))
         return None
@@ -1331,7 +1336,7 @@ def _run_ai_onboarding_cli() -> dict | None:
         ]
         if var_name:
             lines.append(f"api_key: ${{{var_name}}}\n")
-        lines += ["temperature: 0.3\n", "max_tokens: 1024\n", f"timeout: {timeout}\n"]
+        lines += ["temperature: 0.3\n", f"timeout: {timeout}\n"]
         if provider_id == "ollama":
             lines += ["base_url: http://localhost:11434\n", "reasoning_effort: low\n"]
         with open(yaml_path, "w", encoding="utf-8") as fh:
@@ -1346,7 +1351,6 @@ def _run_ai_onboarding_cli() -> dict | None:
         "provider": provider_id,
         "model": model,
         "temperature": 0.3,
-        "max_tokens": 1024,
         "timeout": timeout,
     }
     if var_name:
