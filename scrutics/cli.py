@@ -1055,26 +1055,14 @@ def _ask_one(
     on an LLM error (errors are printed to stderr by the caller).
     """
     from scrutics.ai.agent import run_agent_loop
+    from scrutics.ai.conversation import question_with_history
     # run_agent_loop builds its own message list from scratch each call,
-    # so we pass prior Q&A pairs as extra context injected into the question.
-    # This gives the model full conversation awareness without changing the
-    # agent API.
-    if conversation_history:
-        prior = "\n".join(
-            f"User: {q}\nAssistant: {a}"
-            for q, a in conversation_history
-        )
-        full_question = (
-            f"[Previous conversation]\n{prior}\n\n"
-            f"[New question]\n{question}"
-        )
-    else:
-        full_question = question
-
+    # so the earlier exchanges (capped, see scrutics.ai.conversation) are
+    # sent as text in front of the question.
     return run_agent_loop(
         provider=provider,
         ctx=ctx,
-        user_message=full_question,
+        user_message=question_with_history(conversation_history, question),
         status_callback=status_callback,
     )
 
@@ -1094,6 +1082,7 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
         LLMProviderError,
         truncation_notice,
     )
+    from scrutics.ai.conversation import remember_exchange
 
     is_tty = sys.stdout.isatty()
     dim    = "\033[2m"  if is_tty else ""
@@ -1177,7 +1166,7 @@ def _run_ai_repl(provider, ctx, session_dir: str, initial_question: str | None) 
             yellow = "\033[33m" if is_tty else ""
             print(f"{yellow}[{notice}]{reset}")
         print()
-        conversation_history.append((question, answer))
+        remember_exchange(conversation_history, question, answer)
         return None
 
     # If a question was supplied on the command line, answer it first

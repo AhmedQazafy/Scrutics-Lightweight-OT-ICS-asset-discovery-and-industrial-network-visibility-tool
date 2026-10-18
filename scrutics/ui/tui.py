@@ -20,7 +20,7 @@ import time
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
+from textual.containers import Container, Horizontal, Vertical, ScrollableContainer, VerticalScroll
 from textual.coordinate import Coordinate
 from textual.reactive import reactive
 from textual.screen import ModalScreen
@@ -52,6 +52,15 @@ from scrutics.protocol_display import (
 
 TAGLINE = "Passive OT/ICS Network Asset Discovery"
 SESSION_FLUSH_INTERVAL = 15.0
+# Lines kept in the assistant's transcript
+TRANSCRIPT_MAX_LINES = 1000
+
+
+def _session_key(session_dir: str | None) -> str | None:
+    """Comparable form of a session directory path, so the same session given twice matches."""
+    if not session_dir:
+        return None
+    return os.path.normcase(os.path.realpath(session_dir))
 
 CSS = """
 Screen {
@@ -307,7 +316,7 @@ AIAssistantModal {
     height: 90%;
     background: $surface;
     border: solid $accent-darken-2;
-    padding: 1 2;
+    padding: 0 1;
 }
 
 #ai-header-bar {
@@ -318,7 +327,6 @@ AIAssistantModal {
 
 #ai-subheader-bar {
     height: 1;
-    margin-bottom: 1;
     align: left middle;
 }
 
@@ -370,7 +378,7 @@ AIAssistantModal {
     text-style: italic;
 }
 
-#ai-btn-browse-session {
+#ai-btn-browse-session, #ai-close-btn {
     height: 1;
     min-width: 10;
     background: $accent-darken-2;
@@ -380,7 +388,12 @@ AIAssistantModal {
     margin: 0;
 }
 
-#ai-btn-browse-session:hover, #ai-btn-browse-session:focus {
+#ai-close-btn {
+    margin-left: 1;
+}
+
+#ai-btn-browse-session:hover, #ai-btn-browse-session:focus,
+#ai-close-btn:hover, #ai-close-btn:focus {
     background: $accent;
     color: $text;
 }
@@ -389,7 +402,6 @@ AIAssistantModal {
     height: 1fr;
     border: solid $accent-darken-3;
     background: $panel;
-    margin: 0 0 1 0;
     padding: 0 1;
 }
 
@@ -397,7 +409,6 @@ AIAssistantModal {
     height: 1;
     color: $text-muted;
     text-style: italic;
-    margin-bottom: 1;
 }
 
 #onboard-info {
@@ -421,7 +432,6 @@ AIAssistantModal {
 
 #ai-input-row {
     height: 1;
-    margin-bottom: 1;
     align: left middle;
 }
 
@@ -637,6 +647,48 @@ class PanelLog(Log):
         if selection is not None:
             self._render_line_cache[y] = line
         return line
+
+
+class TranscriptView(VerticalScroll, can_focus=False):
+    """Scrolling transcript whose entries wrap to the panel width.
+
+    `lines` holds the entries as written (Rich markup), one per write_line call; the newest
+    max_lines are kept. The view always scrolls to the newest entry.
+    """
+
+    DEFAULT_CSS = """
+    TranscriptView > Static {
+        width: 1fr;
+        height: auto;
+    }
+    """
+
+    def __init__(self, *, max_lines: int = 1000, id: str | None = None):
+        super().__init__(id=id)
+        self.max_lines = max_lines
+        self._entries: list[str] = []
+
+    @property
+    def lines(self) -> list[str]:
+        return list(self._entries)
+
+    def write_line(self, line: str) -> None:
+        try:
+            text = Text.from_markup(line)
+        except Exception:
+            text = Text(line)
+        self._entries.append(line)
+        self.mount(Static(text))
+        excess = len(self._entries) - self.max_lines
+        if excess > 0:
+            del self._entries[:excess]
+            for child in list(self.children)[:excess]:
+                child.remove()
+        self.call_after_refresh(self.scroll_end, animate=False)
+
+    def clear(self) -> None:
+        self._entries.clear()
+        self.remove_children()
 
 
 class FormInput(Input):
@@ -1465,7 +1517,8 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
         super().__init__()
         self._session_dir = session_dir
         self._is_live_active = is_live_active
-        self._conversation_history: list[tuple[str, str]] = []
+        # Shared with the app so the conversation survives closing and reopening the assistant
+        self._conversation: dict | None = None
         self._is_processing = False
         self._anim_timer = None
         self._anim_frame_idx = 0
@@ -1487,6 +1540,38 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
         # Fallback: any scrutics_ dir even without manifest
         return candidates[0] if candidates else None
 
+    @property
+    def _conversation_history(self) -> list[tuple[str, str]]:
+        return self._conversation["exchanges"] if self._conversation else []
+
+    def _attach_conversation(self) -> None:
+        """Use the app's conversation for this session, starting a new one for another session."""
+        session = _session_key(self._session_dir)
+        conv = getattr(self.app, "_ai_conversation", None)
+        if conv is None or conv["session"] != session:
+            conv = {"session": session, "exchanges": [], "transcript": []}
+            self.app._ai_conversation = conv
+        self._conversation = conv
+
+    def _write(self, line: str, conv: dict | None = None) -> None:
+        """Add a line to the conversation's transcript and show it if that conversation is open."""
+        conv = conv or self._conversation
+        if conv is not None:
+            conv["transcript"].append(line)
+            del conv["transcript"][:-TRANSCRIPT_MAX_LINES]
+        if conv is self._conversation:
+            self.query_one("#ai-history", TranscriptView).write_line(line)
+
+    def _on_session_changed(self) -> None:
+        """A different session clears the conversation; choosing the same one keeps it."""
+        self._update_session_display()
+        if self._conversation and self._conversation["session"] == _session_key(self._session_dir):
+            return
+        self._attach_conversation()
+        history = self.query_one("#ai-history", TranscriptView)
+        history.clear()
+        history.write_line("[dim]Session switched: conversation cleared.[/dim]\n")
+
     def _get_session_display_name(self) -> str:
         if self._session_dir:
             name = os.path.basename(os.path.normpath(self._session_dir))
@@ -1500,6 +1585,7 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
                 yield Label("✦ Scrutics AI Assistant", id="setup-title")
                 yield Label(self._get_session_display_name(), id="ai-session-badge")
                 yield FormButton("Switch Session", id="ai-btn-browse-session")
+                yield FormButton("Close (Esc)", id="ai-close-btn")
 
             with Horizontal(id="ai-subheader-bar"):
                 yield FormButton("Reconfigure (R)", id="ai-btn-reconfigure")
@@ -1515,18 +1601,15 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
 
             yield Label(freshness_msg, id="ai-status-label")
 
-            yield PanelLog(id="ai-history", auto_scroll=True, max_lines=1000)
+            yield TranscriptView(id="ai-history", max_lines=TRANSCRIPT_MAX_LINES)
 
             with Horizontal(id="ai-input-row"):
                 yield FormInput(placeholder="Ask a question about the network...", id="ai-query-input")
                 yield FormButton("Send", id="ai-send-btn", variant="primary")
 
-            with Horizontal(classes="dialog-actions"):
-                yield FormButton("Close (Esc)", id="ai-close-btn")
-
     def on_mount(self):
         super().on_mount()
-        history = self.query_one("#ai-history", PanelLog)
+        history = self.query_one("#ai-history", TranscriptView)
 
         # Auto-detect a session if none was passed in
         if not self._session_dir:
@@ -1550,6 +1633,10 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
             history.write_line("    or provide --provider in CLI.")
             self.query_one("#ai-query-input", FormInput).disabled = True
             self.query_one("#ai-send-btn", FormButton).disabled = True
+
+        self._attach_conversation()
+        for line in self._conversation["transcript"]:
+            history.write_line(line)
 
     def action_confirm_field(self):
         focused = self.app.focused
@@ -1664,7 +1751,7 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
                 # App's own session
                 self._session_dir = self.app._session_dir
                 self._is_live_active = self.app._capture_running.is_set()
-                self._update_session_display()
+                self._on_session_changed()
             elif choice == "Enter custom path...":
                 self._prompt_custom_session_path()
             else:
@@ -1676,7 +1763,7 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
                     return
                 self._session_dir = chosen_dir
                 self._is_live_active = False
-                self._update_session_display()
+                self._on_session_changed()
 
         self.app.push_screen(ChoiceListModal("Select Evidence Session", options), _on_session_chosen)
 
@@ -1715,7 +1802,7 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
                     return
                 self._session_dir = path
                 self._is_live_active = False
-                self._update_session_display()
+                self._on_session_changed()
 
         self.app.push_screen(PathInputModal(), _handle_path)
 
@@ -1771,11 +1858,10 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
 
         query_input.value = ""
         self._last_submitted_query = query
-        history = self.query_one("#ai-history", PanelLog)
-        history.write_line(f"[bold cyan]You:[/bold cyan] {query}")
+        self._write(f"[bold cyan]You:[/bold cyan] {escape(query)}")
 
         if self._is_live_active:
-            history.write_line(
+            self._write(
                 f"[italic dim white](Note: live session results reflect data up to the last 15s checkpoint)[/italic dim white]"
             )
 
@@ -1783,14 +1869,15 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
         self.query_one("#ai-send-btn", FormButton).disabled = True
         self._start_thinking_anim("Thinking...")
 
-        self._run_query_worker(query)
+        self._run_query_worker(query, self._conversation)
 
     @work(thread=True)
-    def _run_query_worker(self, query: str) -> None:
+    def _run_query_worker(self, query: str, conv: dict | None = None) -> None:
         from scrutics.ai.config import load_ai_config, build_provider
         from scrutics.ai.tools import SessionContext
         from scrutics.ai.agent import run_agent_loop
         from scrutics.ai.provider import LLMProviderError
+        from scrutics.ai.conversation import question_with_history
 
         cfg = load_ai_config()
         if not cfg or cfg.get("enabled") is False:
@@ -1811,17 +1898,8 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
             if ctx.load_issues:
                 self.app.call_from_thread(self._show_load_issues, ctx.load_issues)
 
-            if self._conversation_history:
-                prior = "\n".join(
-                    f"User: {q}\nAssistant: {a}"
-                    for q, a in self._conversation_history
-                )
-                full_question = (
-                    f"[Previous conversation]\n{prior}\n\n"
-                    f"[New question]\n{query}"
-                )
-            else:
-                full_question = query
+            exchanges = conv["exchanges"] if conv else self._conversation_history
+            full_question = question_with_history(list(exchanges), query)
 
             def status_cb(msg: str):
                 self.app.call_from_thread(self._update_worker_status, msg)
@@ -1847,14 +1925,14 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
                 user_message=full_question,
                 status_callback=status_cb,
             )
-            self.app.call_from_thread(self._on_query_complete, answer, None)
+            self.app.call_from_thread(self._on_query_complete, answer, None, conv, query)
 
         except LLMProviderError as e:
-            self.app.call_from_thread(self._on_query_complete, None, f"LLM error: {e}")
+            self.app.call_from_thread(self._on_query_complete, None, f"LLM error: {e}", conv)
         except FileNotFoundError as e:
-            self.app.call_from_thread(self._on_query_complete, None, f"Session error: {e}")
+            self.app.call_from_thread(self._on_query_complete, None, f"Session error: {e}", conv)
         except Exception as e:
-            self.app.call_from_thread(self._on_query_complete, None, f"Error: {e}")
+            self.app.call_from_thread(self._on_query_complete, None, f"Error: {e}", conv)
 
     def _update_worker_status(self, msg: str):
         self._thinking_text = msg
@@ -1866,16 +1944,33 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
         shown = getattr(self, "_shown_load_issues", None)
         if shown is None:
             shown = self._shown_load_issues = set()
-        history = self.query_one("#ai-history", PanelLog)
+        history = self.query_one("#ai-history", TranscriptView)
         for entry in issues:
             line = describe_load_issue(entry)
             if line not in shown:
                 shown.add(line)
                 history.write_line(f"[yellow]Not loaded:[/yellow] {escape(line)}")
 
-    def _on_query_complete(self, answer: str | None, error: str | None):
+    def _on_query_complete(self, answer: str | None, error: str | None,
+                           conv: dict | None = None, query: str | None = None):
+        """Record the outcome in the conversation it was asked in (kept even if the assistant was
+        closed meanwhile), then update the panel if it is still open."""
+        from scrutics.ai.conversation import remember_exchange
+        from scrutics.ai.provider import truncation_notice
+
         self._is_processing = False
         self._stop_thinking_anim()
+        conv = conv or self._conversation
+        if error:
+            self._write_safe(f"[bold red]{escape(error)}[/bold red]\n", conv)
+        elif answer:
+            self._write_safe(f"[bold green]Assistant:[/bold green] {escape(answer)}\n", conv)
+            notice = truncation_notice(answer)
+            if notice:
+                self._write_safe(f"[yellow]{escape(notice)}[/yellow]\n", conv)
+            if conv is not None:
+                last_q = query or getattr(self, "_last_submitted_query", None)
+                remember_exchange(conv["exchanges"], last_q or "query", answer)
         try:
             self.query_one("#ai-send-btn", FormButton).disabled = False
             self.query_one("#ai-query-input", FormInput).focus()
@@ -1886,18 +1981,13 @@ class AIAssistantModal(SetupModalMixin, ModalScreen):
                 )
             else:
                 status_label.update("Completed session evidence package")
+        except Exception:
+            pass
 
-            history = self.query_one("#ai-history", PanelLog)
-            if error:
-                history.write_line(f"[bold red]{error}[/bold red]\n")
-            elif answer:
-                history.write_line(f"[bold green]Assistant:[/bold green] {answer}\n")
-                from scrutics.ai.provider import truncation_notice
-                notice = truncation_notice(answer)
-                if notice:
-                    history.write_line(f"[yellow]{escape(notice)}[/yellow]\n")
-                last_q = getattr(self, "_last_submitted_query", None)
-                self._conversation_history.append((last_q or "query", answer))
+    def _write_safe(self, line: str, conv: dict | None) -> None:
+        """_write that never raises when the panel is closed; the transcript still keeps the line."""
+        try:
+            self._write(line, conv)
         except Exception:
             pass
 
@@ -2249,6 +2339,8 @@ class ScruticsApp(App):
         self._status_generation = 0
         self._checkpoint_lock = threading.Lock()
         self._is_loaded_session = False
+        # The assistant's conversation for one session, kept while the assistant is closed
+        self._ai_conversation: dict | None = None
 
     def action_view_detail(self):
         """Open detail screen for selected asset."""

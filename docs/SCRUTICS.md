@@ -315,6 +315,14 @@ the evidence may belong to the other device.
 **What it sends.** Your question and the session data the assistant looks up go to the provider
 you configured. The assistant only reads; it changes nothing.
 
+**Follow-up questions.** Each question carries the earlier exchanges as text: at most the 5 most
+recent and 8,000 characters of question and answer text (CLI and TUI alike). The newest exchange
+is always sent; an answer that alone exceeds the cap keeps its start and end around
+`[middle of this answer omitted]`. Older exchanges that no longer fit are dropped whole, oldest
+first. The TUI keeps the conversation, on screen and as context, across closing and reopening the
+assistant, and clears it on a session switch; nothing is kept after Scrutics exits. Answers,
+questions and errors are shown as plain text (no Markdown rendering), wrapped to the panel.
+
 **Keys.** Sent only to their own provider, in a request header (Gemini in `x-goog-api-key`).
 Removed from every message Scrutics prints or raises, including DEBUG logging. Setup stores keys
 in `~/.scrutics/ai_keys.sh` (mode 0600) with one marked loader line in `~/.bashrc` (Linux, macOS,
