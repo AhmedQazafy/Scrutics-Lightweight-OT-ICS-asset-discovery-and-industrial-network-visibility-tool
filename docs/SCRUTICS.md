@@ -198,6 +198,12 @@ window (`--baseline`, 60 s of capture time by default), then locks the baseline 
 | `DIRECTIONALITY_CHANGE` | a device that mostly responded starts initiating (at most once per 300 s) | HIGH |
 | `INTERVAL_ANOMALY` | a packet interval more than 4 standard deviations from the learned mean (at most once per 60 s) | LOW |
 
+The interval is the time between consecutive packets an address sends, to any peer: one rhythm per
+address, not per conversation, learned once in the baseline window and not updated afterwards. A
+new client that starts talking to a device therefore changes the device's rhythm, and the device
+raises `INTERVAL_ANOMALY` about once a minute for as long as that client stays, although its polling
+of each peer is unchanged.
+
 **User-rule constraints** (`BEHAVIORAL_VIOLATION`, HIGH): `never_initiates`, `allowed_peers`,
 `allowed_ports`, `alert_on_new_port` (`NEW_PORT`) and `max_new_peers_per_hour`
 (`PEER_RATE_EXCEEDED`), with cooldowns. A device that only contacts a port receives the
@@ -398,6 +404,8 @@ longer used. `oui status` and `doctor` report the active database and its age.
 - No Infrastructure classification (section 6).
 - No IPv6, Linux cooked (SLL/SLL2) or raw-IP captures (section 3).
 - A port rule's constraints reach the devices that contact the port (section 8).
+- Polling intervals are measured per address across all its peers, so a new client makes a device
+  raise `INTERVAL_ANOMALY` about once a minute while it lasts (section 8).
 - `evidence.json` and the assistant's single-asset lookup are keyed by IP address (sections 9, 12).
 - Write failures are reported at the end of the run, not when they happen (section 9).
 - SIEM delivery is best effort and losses are not counted (section 9).
