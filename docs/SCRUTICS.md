@@ -281,8 +281,17 @@ reload at once; an invalid edit keeps the rules in use. Built-in rules are in
 `topology.html` draws devices with connections as a force-directed graph (drag, zoom; labels hide
 when zoomed out), lists devices with no drawn connection in a side panel, and exports Assets,
 Connections and Summary sheets to `.xlsx` in the browser. Node size follows confidence. The layout
-separates nodes but does not avoid crossing connections or overlapping labels. It shows the 2,000
-busiest connections.
+starts each group as a radial tree around its most connected device and packs groups in rows; once
+it settles, devices in a group of up to 30 devices and 60 links swap places while that lowers the
+number of crossing connections and connections over a device (larger groups keep the force layout),
+devices linked only to a hub are spread evenly around it, and the view is fitted so that every
+device and label is in view. Addresses and ids do not decide the layout. Connections in both
+directions between two devices are two mirror-image arcs. Labels are placed so they touch no other
+label, device, label line, off-screen badge or page overlay, farther out with a thin line to the
+device when needed; a protocol label that does not fit clear of other connections is not shown.
+After settling, groups are packed closely by their actual size so that the fitted view is as large
+as the canvas allows.
+It shows the 2,000 busiest connections.
 
 The page's chat (section 12) is optional and sends data only after you enter a key.
 
@@ -378,8 +387,8 @@ longer used. `oui status` and `doctor` report the active database and its age.
 - `evidence.json` and the assistant's single-asset lookup are keyed by IP address (sections 9, 12).
 - Write failures are reported at the end of the run, not when they happen (section 9).
 - SIEM delivery is best effort and losses are not counted (section 9).
-- The topology layout does not avoid crossings or label overlap; the topology chat sees only a
-  summary (sections 11, 12).
+- Topology groups of more than 30 devices or 60 links keep the force layout and can show crossing
+  connections; the topology chat sees only a summary (sections 11, 12).
 - Empty AI answers other than the token-limit case are not reported; `list-models --key` takes the
   key on the command line (section 12).
 - pcapng undescribed-interface packets: behaviour differs between Scapy 2.7 and 2.8 (section 3).

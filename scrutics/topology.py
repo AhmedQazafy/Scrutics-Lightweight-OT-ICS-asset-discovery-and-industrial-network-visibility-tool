@@ -307,7 +307,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     <div id="offscreen-alert"></div>
   </div>
   <div id="isolated-panel">
-    <h3>Isolated Unknown Assets</h3>
+    <h3>Isolated Assets</h3>
     <ul id="isolated-list"></ul>
   </div>
 </div>
@@ -338,12 +338,13 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     });
   } else {
     const li = document.createElement("li");
-    li.textContent = "No isolated unknown assets.";
+    li.textContent = "No isolated assets.";
     li.style.color = "#687285";
     isolatedList.appendChild(li);
   }
 
   const byId = new Map(nodes.map((node) => [node.id, node]));
+  const nodeIndex = new Map(nodes.map((node, i) => [node.id, i]));
 
   // Adjacency graph for degrees and connected components
   const adj = new Map();
@@ -356,29 +357,72 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     n.degree = (adj.get(n.id) || []).length;
   });
 
-  // Identify connected components to separate disconnected groups
-  const visited = new Set();
+  // Connections drawn between two nodes on the page; a link in both directions counts once in
+  // `neighbours`
+  const drawnEdges = edges.filter(e => byId.has(e.from) && byId.has(e.to) && e.from !== e.to);
+  const neighbours = new Map(nodes.map(n => [n.id, new Set()]));
+  drawnEdges.forEach(e => {
+    neighbours.get(e.from).add(e.to);
+    neighbours.get(e.to).add(e.from);
+  });
+
+  // Group of every node, found in data order; only its size is used below
+  const groupSize = new Map();
+  (function () {
+    const seen = new Set();
+    nodes.forEach(n => {
+      if (seen.has(n.id)) return;
+      const members = [n.id];
+      seen.add(n.id);
+      for (let i = 0; i < members.length; i++) {
+        neighbours.get(members[i]).forEach(x => { if (!seen.has(x)) { seen.add(x); members.push(x); } });
+      }
+      members.forEach(id => groupSize.set(id, members.length));
+    });
+  })();
+
+  // Structural order. Layout decisions never depend on node ids or labels: nodes are ranked by the
+  // size of their group, their number of distinct neighbours, their drawn size and the neighbour
+  // counts of their neighbours; ties keep the order of the page data.
+  const neighbourWeight = new Map(nodes.map(n => {
+    let sum = 0;
+    neighbours.get(n.id).forEach(x => { sum += neighbours.get(x).size; });
+    return [n.id, sum];
+  }));
+  const nodesByRank = nodes.slice().sort((a, b) =>
+    (groupSize.get(b.id) - groupSize.get(a.id)) ||
+    (neighbours.get(b.id).size - neighbours.get(a.id).size) ||
+    ((b.size || 0) - (a.size || 0)) ||
+    (neighbourWeight.get(b.id) - neighbourWeight.get(a.id)) ||
+    (nodeIndex.get(a.id) - nodeIndex.get(b.id)));
+  const rank = new Map(nodesByRank.map((n, i) => [n.id, i]));
+  function byRank(a, b) {
+    return rank.get(a.id) - rank.get(b.id);
+  }
+  function edgeOrder(e, f) {
+    const ea = Math.min(rank.get(e.from), rank.get(e.to)), eb = Math.max(rank.get(e.from), rank.get(e.to));
+    const fa = Math.min(rank.get(f.from), rank.get(f.to)), fb = Math.max(rank.get(f.from), rank.get(f.to));
+    return (ea - fa) || (eb - fb) || (rank.get(e.from) - rank.get(f.from));
+  }
+  const edgesByRank = drawnEdges.slice().sort(edgeOrder);
+  function rankedNeighbours(node) {
+    return Array.from(neighbours.get(node.id)).map(id => byId.get(id)).sort(byRank);
+  }
+
+  // Groups, each listed breadth first from its highest-ranked node; largest group first
   const components = [];
-  nodes.forEach(n => {
-    if (!visited.has(n.id)) {
-      const comp = [];
-      const queue = [n.id];
-      visited.add(n.id);
-      while (queue.length > 0) {
-        const currId = queue.shift();
-        const currNode = byId.get(currId);
-        if (currNode) comp.push(currNode);
-        for (const neighborId of (adj.get(currId) || [])) {
-          if (!visited.has(neighborId)) {
-            visited.add(neighborId);
-            queue.push(neighborId);
-          }
-        }
+  (function () {
+    const seen = new Set();
+    nodesByRank.forEach(n => {
+      if (seen.has(n.id)) return;
+      const comp = [n];
+      seen.add(n.id);
+      for (let i = 0; i < comp.length; i++) {
+        rankedNeighbours(comp[i]).forEach(x => { if (!seen.has(x.id)) { seen.add(x.id); comp.push(x); } });
       }
       components.push(comp);
-    }
-  });
-  components.sort((a, b) => b.length - a.length);
+    });
+  })();
 
   let width = 0, height = 0, scale = 1, panX = 0, panY = 0;
   let dragNode = null, hoverNode = null, hoverBorderCluster = null;
@@ -396,6 +440,44 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
   const EDGE_ATTRACTION = 0.032;
   const CENTER_FORCE = 0.012;
 
+  // Seed layout: each group as a radial tree around its highest-ranked node
+  const LEVEL_DISTANCE = 200;
+  const GROUP_GAP = 120;
+  // Space between groups when they are packed after the layout settles, in world units
+  const PACK_GAP = 180;
+
+  // Stars: degree-1 neighbours of a node with at least STAR_MIN_LEAVES of them are spread evenly
+  // around it; above STAR_WIDE_FROM the ring widens so each gets STAR_SLOT of its circumference
+  const STAR_MIN_LEAVES = 3;
+  const STAR_WIDE_FROM = 8;
+  const STAR_SLOT = 120;
+  const STAR_RADIUS = 190;
+
+  // Crossing reduction after the forces settle: groups up to this size only; larger groups keep the
+  // force layout
+  const SWAP_MAX_NODES = 30;
+  const SWAP_MAX_LINKS = 60;
+  const SWAP_MAX_ROUNDS = 20;
+  const ARC_SAMPLES = 8;
+
+  // Crossing reduction, star spreading and fit view run once the first layout settles and after each
+  // Re-layout; settling after a drag keeps the dragged positions
+  let layoutPassPending = true;
+
+  // View: the off-screen rule treats node centres within 28 px of the canvas edge as outside
+  const OFFSCREEN_MARGIN = 28;
+  const VIEW_MARGIN = 34;
+
+  // Label placement
+  const LABEL_GAP = 4;
+  const LABEL_RINGS = 6;
+  const LABEL_DIRECTIONS = 16;
+  const LABEL_GRID_CELL = 48;
+  // While the simulation moves a larger graph, labels sit under their nodes unchecked until it settles
+  const LABEL_LIVE_MAX_NODES = 200;
+  const EDGE_LABEL_POSITIONS = [0.5, 0.4, 0.6, 0.3, 0.7];
+  const edgeLabelOrder = edgesByRank.slice().sort((e, f) => ((f.count || 0) - (e.count || 0)) || edgeOrder(e, f));
+
   function resize() {
     const rect = canvas.getBoundingClientRect();
     width = Math.max(320, Math.floor(rect.width));
@@ -405,49 +487,99 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
   }
 
+  // Radial tree of one group around its first (highest-ranked) node: each node gets a share of its
+  // parent's angle in proportion to the size of its subtree. Returns positions relative to the centre
+  // and the group's radius.
+  function radialTree(comp) {
+    const root = comp[0];
+    const children = new Map(comp.map(n => [n.id, []]));
+    const depth = new Map([[root.id, 0]]);
+    const order = [root];
+    for (let i = 0; i < order.length; i++) {
+      rankedNeighbours(order[i]).forEach(nb => {
+        if (!depth.has(nb.id)) {
+          depth.set(nb.id, depth.get(order[i].id) + 1);
+          children.get(order[i].id).push(nb);
+          order.push(nb);
+        }
+      });
+    }
+    // Siblings linked to each other sit next to each other around their parent, so a triangle on the
+    // root does not cross another
+    children.forEach((kids, id) => {
+      const rest = kids.slice();
+      const chained = [];
+      while (rest.length) {
+        const last = chained[chained.length - 1];
+        const k = last ? rest.findIndex(n => neighbours.get(last.id).has(n.id)) : -1;
+        chained.push(rest.splice(k >= 0 ? k : 0, 1)[0]);
+      }
+      children.set(id, chained);
+    });
+    const weight = new Map();
+    for (let i = order.length - 1; i >= 0; i--) {
+      let w = 1;
+      children.get(order[i].id).forEach(c => { w += weight.get(c.id); });
+      weight.set(order[i].id, w);
+    }
+    const rootChildren = children.get(root.id).length;
+    const firstRing = rootChildren > STAR_WIDE_FROM
+      ? Math.max(LEVEL_DISTANCE, rootChildren * STAR_SLOT / (2 * Math.PI)) : LEVEL_DISTANCE;
+    const ringRadius = d => (d === 0 ? 0 : firstRing + (d - 1) * LEVEL_DISTANCE);
+    const place = new Map([[root.id, { x: 0, y: 0 }]]);
+    const wedge = new Map([[root.id, [-Math.PI / 2, 1.5 * Math.PI]]]);
+    let extent = 0;
+    order.forEach(n => {
+      const [a0, a1] = wedge.get(n.id);
+      const kids = children.get(n.id);
+      const total = kids.reduce((s, c) => s + weight.get(c.id), 0);
+      let a = a0;
+      kids.forEach(c => {
+        const span = (a1 - a0) * weight.get(c.id) / total;
+        wedge.set(c.id, [a, a + span]);
+        const mid = a + span / 2;
+        const r = ringRadius(depth.get(c.id));
+        place.set(c.id, { x: Math.cos(mid) * r, y: Math.sin(mid) * r });
+        extent = Math.max(extent, r + (c.size || 10));
+        a += span;
+      });
+    });
+    return { place, radius: Math.max(90, extent) };
+  }
+
   function seedPositions() {
     const numComps = components.length;
     if (numComps === 0) return;
-
-    if (numComps === 1) {
-      const comp = components[0];
-      const radius = Math.max(120, Math.sqrt(comp.length) * 55);
-      comp.forEach((node, index) => {
-        const angle = (Math.PI * 2 * index) / Math.max(comp.length, 1);
-        node.x = width / 2 + Math.cos(angle) * radius;
-        node.y = height / 2 + Math.sin(angle) * radius;
+    const trees = components.map(radialTree);
+    // Groups packed in rows, largest first, in cells of their diameter plus GROUP_GAP; the rows are
+    // as wide as makes the packing about as wide as the canvas is, relative to its height
+    const cell = trees.map(t => 2 * t.radius + GROUP_GAP);
+    const aspect = width / Math.max(height, 1);
+    const rowWidth = Math.max(Math.max(...cell), Math.sqrt(cell.reduce((s, d) => s + d * d, 0) * aspect));
+    const centres = [];
+    let x = 0, y = 0, rowHeight = 0, totalWidth = 0;
+    cell.forEach(d => {
+      if (x > 0 && x + d > rowWidth) { y += rowHeight; x = 0; rowHeight = 0; }
+      centres.push({ x: x + d / 2, y: y + d / 2 });
+      x += d;
+      rowHeight = Math.max(rowHeight, d);
+      totalWidth = Math.max(totalWidth, x);
+    });
+    const totalHeight = y + rowHeight;
+    centres.forEach(c => { c.x += width / 2 - totalWidth / 2; c.y += height / 2 - totalHeight / 2; });
+    components.forEach((comp, idx) => {
+      const c = centres[idx];
+      comp.forEach(node => {
+        const p = trees[idx].place.get(node.id);
+        node.x = c.x + p.x;
+        node.y = c.y + p.y;
         node.vx = 0;
         node.vy = 0;
         node.fixed = false;
-        node.componentId = 0;
-        node.clusterCenter = { x: width / 2, y: height / 2 };
+        node.componentId = idx;
+        node.clusterCenter = { x: c.x, y: c.y };
       });
-    } else {
-      // Multiple disconnected groups: assign distinct spatial cluster centers
-      const compRadius = c => Math.max(90, Math.sqrt(c.length) * 55);
-      const maxCompR = Math.max(...components.map(compRadius));
-      const distBetweenCenters = Math.max(380, maxCompR * 2.2);
-      const orbitRadius = Math.max(distBetweenCenters, (distBetweenCenters * numComps) / (2 * Math.PI));
-
-      components.forEach((comp, idx) => {
-        const angle = (2 * Math.PI * idx) / numComps;
-        const cx = width / 2 + Math.cos(angle) * orbitRadius;
-        const cy = height / 2 + Math.sin(angle) * orbitRadius;
-        const r = compRadius(comp);
-
-        comp.forEach((node, nIdx) => {
-          const nAngle = (2 * Math.PI * nIdx) / Math.max(comp.length, 1);
-          const jitter = ((nIdx % 3) - 1) * 15;
-          node.x = cx + Math.cos(nAngle) * (r + jitter);
-          node.y = cy + Math.sin(nAngle) * (r + jitter);
-          node.vx = 0;
-          node.vy = 0;
-          node.fixed = false;
-          node.componentId = idx;
-          node.clusterCenter = { x: cx, y: cy };
-        });
-      });
-    }
+    });
   }
 
   function worldToScreen(x, y) {
@@ -463,12 +595,19 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       nodes.forEach(n => { n.vx = 0; n.vy = 0; });
       if (isSimulating) {
         isSimulating = false;
+        if (layoutPassPending) {
+          layoutPassPending = false;
+          reduceCrossings();
+          spreadStars();
+          packGroups();
+          fitView();
+        }
         draw();
       }
       return;
     }
 
-    const repulsionNodes = nodes.length > 400 ? nodes.slice(0, 400) : nodes;
+    const repulsionNodes = nodesByRank.length > 400 ? nodesByRank.slice(0, 400) : nodesByRank;
 
     // 1. Repulsion force + Hard non-overlap collision resolution
     for (let i = 0; i < repulsionNodes.length; i++) {
@@ -502,10 +641,9 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     }
 
     // 2. Edge attraction springs
-    edges.forEach((edge) => {
+    edgesByRank.forEach((edge) => {
       const a = byId.get(edge.from);
       const b = byId.get(edge.to);
-      if (!a || !b) return;
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
@@ -518,7 +656,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     });
 
     // 3. Cluster center gravity & damping
-    nodes.forEach((node) => {
+    nodesByRank.forEach((node) => {
       if (node.fixed) return;
       const center = node.clusterCenter || { x: width / 2, y: height / 2 };
       node.vx += (center.x - node.x) * CENTER_FORCE * alpha;
@@ -534,32 +672,427 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     alpha *= ALPHA_DECAY;
   }
 
+  // Deterministic hash for stable per-edge curve offsets, taken over the structural ranks of the
+  // two ends so that ids and labels never change a curve
+  function edgeHash(fromKey, toKey) {
+    let h = 0;
+    const s = fromKey + ":" + toKey;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    }
+    return h;
+  }
+
+  // Bend of a connection's arc in world units (15 to 30), the same for both directions of a link.
+  // Every arc bends to the left of its direction of travel, so the two arcs of a two-way link are
+  // mirror images, and the curve keeps its shape at every zoom.
+  const arcBend = new Map();
+  function arcControl(edge, a, b) {
+    let magnitude = arcBend.get(edge);
+    if (magnitude === undefined) {
+      const ra = rank.get(edge.from), rb = rank.get(edge.to);
+      magnitude = 15 + (Math.abs(edgeHash(String(Math.min(ra, rb)), String(Math.max(ra, rb)))) % 16);
+      arcBend.set(edge, magnitude);
+    }
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    return { x: (a.x + b.x) / 2 - (dy / d) * magnitude, y: (a.y + b.y) / 2 + (dx / d) * magnitude };
+  }
+
+  function arcPolyline(edge) {
+    const a = byId.get(edge.from);
+    const b = byId.get(edge.to);
+    const c = arcControl(edge, a, b);
+    const points = [];
+    for (let i = 0; i <= ARC_SAMPLES; i++) {
+      const t = i / ARC_SAMPLES;
+      const u = 1 - t;
+      points.push({ x: u * u * a.x + 2 * u * t * c.x + t * t * b.x, y: u * u * a.y + 2 * u * t * c.y + t * t * b.y });
+    }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    points.forEach(p => {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    });
+    return { points, minX, maxX, minY, maxY };
+  }
+
+  function side(a, b, c) {
+    return (c.x - a.x) * (b.y - a.y) - (b.x - a.x) * (c.y - a.y);
+  }
+
+  function segmentsCross(p1, p2, q1, q2) {
+    return side(q1, q2, p1) * side(q1, q2, p2) < 0 && side(p1, p2, q1) * side(p1, p2, q2) < 0;
+  }
+
+  function polylinesCross(p, q) {
+    if (p.maxX < q.minX || q.maxX < p.minX || p.maxY < q.minY || q.maxY < p.minY) return false;
+    const pp = p.points, qp = q.points;
+    for (let i = 0; i < pp.length - 1; i++) {
+      for (let j = 0; j < qp.length - 1; j++) {
+        if (segmentsCross(pp[i], pp[i + 1], qp[j], qp[j + 1])) return true;
+      }
+    }
+    return false;
+  }
+
+  function sameLink(e, f) {
+    return (e.from === f.from && e.to === f.to) || (e.from === f.to && e.to === f.from);
+  }
+
+  function shareNode(e, f) {
+    return e.from === f.from || e.from === f.to || e.to === f.from || e.to === f.to;
+  }
+
+  function groupMembers() {
+    const groups = new Map();
+    nodesByRank.forEach(n => {
+      if (!groups.has(n.componentId)) groups.set(n.componentId, []);
+      groups.get(n.componentId).push(n);
+    });
+    return groups;
+  }
+
+  function groupArcs(members) {
+    const ids = new Set(members.map(n => n.id));
+    return edgesByRank.filter(e => ids.has(e.from) && ids.has(e.to));
+  }
+
+  // Whether an arc passes over a node that is not one of its ends (within the node's size plus 4)
+  function arcOverNode(poly, edge, node) {
+    if (node.id === edge.from || node.id === edge.to) return false;
+    const r = (node.size || 10) + 4;
+    if (node.x + r < poly.minX || node.x - r > poly.maxX || node.y + r < poly.minY || node.y - r > poly.maxY) return false;
+    const pts = poly.points;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p = pts[i], q = pts[i + 1];
+      const dx = q.x - p.x, dy = q.y - p.y;
+      const len2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((node.x - p.x) * dx + (node.y - p.y) * dy) / len2));
+      const ex = p.x + t * dx - node.x, ey = p.y + t * dy - node.y;
+      if (ex * ex + ey * ey < r * r) return true;
+    }
+    return false;
+  }
+
+  // Layout conflicts in a group: pairs of crossing arcs plus arcs passing over a node
+  function countConflicts(members, arcs) {
+    const poly = arcs.map(arcPolyline);
+    let count = 0;
+    for (let i = 0; i < arcs.length; i++) {
+      for (let j = i + 1; j < arcs.length; j++) {
+        if (!shareNode(arcs[i], arcs[j]) && polylinesCross(poly[i], poly[j])) count++;
+      }
+      members.forEach(n => { if (arcOverNode(poly[i], arcs[i], n)) count++; });
+    }
+    return count;
+  }
+
+  // Greedy swaps of node positions within each group, in structural order, kept only when they
+  // lower the number of conflicts (crossing arcs, arcs over a node) and put no two nodes on top of
+  // each other; repeated until a round changes nothing. Arcs that share a node are not counted as
+  // crossing.
+  function reduceCrossings() {
+    groupMembers().forEach(members => {
+      if (members.length < 4 || members.length > SWAP_MAX_NODES) return;
+      const arcs = groupArcs(members);
+      const links = new Set(arcs.map(e => Math.min(rank.get(e.from), rank.get(e.to)) + ">" + Math.max(rank.get(e.from), rank.get(e.to))));
+      if (links.size > SWAP_MAX_LINKS) return;
+
+      const touching = new Map(members.map(n => [n.id, []]));
+      arcs.forEach((e, i) => { touching.get(e.from).push(i); touching.get(e.to).push(i); });
+      const poly = arcs.map(arcPolyline);
+      // crosses[i]: the arcs that arc i crosses, kept current as swaps are accepted
+      const crosses = arcs.map(() => new Set());
+      for (let i = 0; i < arcs.length; i++) {
+        for (let j = i + 1; j < arcs.length; j++) {
+          if (!shareNode(arcs[i], arcs[j]) && polylinesCross(poly[i], poly[j])) {
+            crosses[i].add(j);
+            crosses[j].add(i);
+          }
+        }
+      }
+
+      // over[i]: the nodes arc i passes over, kept current as swaps are accepted
+      const over = arcs.map((e, i) => new Set(members.filter(n => arcOverNode(poly[i], e, n)).map(n => n.id)));
+
+      function countPairs(set, lists) {
+        let count = 0;
+        set.forEach(i => lists[i].forEach(j => { if (!set.has(j) || i < j) count++; }));
+        return count;
+      }
+
+      // Conflicts that a swap of a and b can change: crossings of the arcs touching them, those
+      // arcs over any node, and the other arcs over a or b
+      function localScore(set, lists, overLists, a, b) {
+        let count = countPairs(set, lists);
+        set.forEach(i => { count += overLists[i].size; });
+        for (let i = 0; i < arcs.length; i++) {
+          if (set.has(i)) continue;
+          if (overLists[i].has(a.id)) count++;
+          if (overLists[i].has(b.id)) count++;
+        }
+        return count;
+      }
+
+      function overAfterSwap(set, a, b) {
+        return arcs.map((e, i) => {
+          if (set.has(i)) return new Set(members.filter(n => arcOverNode(poly[i], e, n)).map(n => n.id));
+          const now = new Set(over[i]);
+          [a, b].forEach(n => { if (arcOverNode(poly[i], e, n)) now.add(n.id); else now.delete(n.id); });
+          return now;
+        });
+      }
+
+      function crossingsAfterSwap(set) {
+        const lists = [];
+        set.forEach(i => {
+          const found = new Set();
+          for (let j = 0; j < arcs.length; j++) {
+            if (i !== j && !shareNode(arcs[i], arcs[j]) && polylinesCross(poly[i], poly[j])) found.add(j);
+          }
+          lists[i] = found;
+        });
+        return lists;
+      }
+
+      function acceptCrossings(set, lists) {
+        set.forEach(i => {
+          crosses[i].forEach(j => crosses[j].delete(i));
+          crosses[i] = lists[i];
+        });
+        set.forEach(i => crosses[i].forEach(j => crosses[j].add(i)));
+      }
+
+      function crowded(node) {
+        return members.some(o => o !== node &&
+          Math.hypot(o.x - node.x, o.y - node.y) < (o.size || 10) + (node.size || 10) + 8);
+      }
+
+      function swap(a, b, set) {
+        const x = a.x, y = a.y;
+        a.x = b.x; a.y = b.y; b.x = x; b.y = y;
+        set.forEach(i => { poly[i] = arcPolyline(arcs[i]); });
+      }
+
+      for (let round = 0; round < SWAP_MAX_ROUNDS; round++) {
+        let improved = false;
+        for (let i = 0; i < members.length; i++) {
+          for (let j = i + 1; j < members.length; j++) {
+            const a = members[i], b = members[j];
+            if (a.fixed || b.fixed) continue;
+            const set = new Set(touching.get(a.id).concat(touching.get(b.id)));
+            const before = localScore(set, crosses, over, a, b);
+            if (before === 0) continue;
+            swap(a, b, set);
+            const lists = crossingsAfterSwap(set);
+            const overLists = overAfterSwap(set, a, b);
+            if (localScore(set, lists, overLists, a, b) < before && !crowded(a) && !crowded(b)) {
+              acceptCrossings(set, lists);
+              overLists.forEach((o, i) => { over[i] = o; });
+              improved = true;
+            } else {
+              swap(a, b, set);
+            }
+          }
+        }
+        if (!improved) break;
+      }
+    });
+  }
+
+  // Degree-1 neighbours of a hub are spread evenly around it: through the gaps between the hub's
+  // other neighbours, each gap getting a share of the leaves in proportion to its angle, keeping
+  // the leaves' angular order. A leaf that would sit on another node moves outward. The change is
+  // kept only if it adds no crossing and no arc over a node in the group.
+  function spreadStars() {
+    const groups = groupMembers();
+    nodesByRank.forEach(hub => {
+      if (hub.fixed) return;
+      const nbs = rankedNeighbours(hub);
+      const leaves = nbs.filter(n => neighbours.get(n.id).size === 1 && !n.fixed);
+      if (leaves.length < STAR_MIN_LEAVES) return;
+      const others = nbs.filter(n => neighbours.get(n.id).size !== 1 || n.fixed);
+      const angleOf = n => Math.atan2(n.y - hub.y, n.x - hub.x);
+      const members = groups.get(hub.componentId);
+      const arcs = groupArcs(members);
+      const before = countConflicts(members, arcs);
+      const saved = leaves.map(n => [n.x, n.y]);
+
+      const radius = leaves.length > STAR_WIDE_FROM
+        ? Math.max(STAR_RADIUS, leaves.length * STAR_SLOT / (2 * Math.PI)) : STAR_RADIUS;
+      const fixedAngles = others.map(angleOf).sort((a, b) => a - b);
+      const base = fixedAngles.length ? fixedAngles[0] : -Math.PI / 2;
+      const norm = a => ((a - base) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const slots = [];
+      if (fixedAngles.length === 0) {
+        for (let k = 0; k < leaves.length; k++) slots.push(base + (2 * Math.PI * (k + 0.5)) / leaves.length);
+      } else {
+        const gaps = fixedAngles.map((a, i) => {
+          const next = i + 1 < fixedAngles.length ? fixedAngles[i + 1] : fixedAngles[0] + 2 * Math.PI;
+          return { start: a, size: next - a };
+        });
+        const exact = gaps.map(g => leaves.length * g.size / (2 * Math.PI));
+        const counts = exact.map(Math.floor);
+        let left = leaves.length - counts.reduce((s, c) => s + c, 0);
+        exact.map((x, i) => [x - Math.floor(x), i]).sort((p, q) => (q[0] - p[0]) || (p[1] - q[1]))
+          .forEach(([, i]) => { if (left > 0) { counts[i]++; left--; } });
+        gaps.forEach((g, i) => {
+          for (let k = 0; k < counts[i]; k++) slots.push(g.start + g.size * (k + 1) / (counts[i] + 1));
+        });
+      }
+      const ordered = leaves.slice().sort((p, q) => (norm(angleOf(p)) - norm(angleOf(q))) || byRank(p, q));
+      slots.sort((p, q) => norm(p) - norm(q));
+      ordered.forEach((leaf, k) => {
+        let r = radius;
+        for (let step = 0; step < 8; step++) {
+          leaf.x = hub.x + Math.cos(slots[k]) * r;
+          leaf.y = hub.y + Math.sin(slots[k]) * r;
+          const blocked = nodes.some(o => o !== leaf && !ordered.slice(0, k).includes(o) && !leaves.includes(o) &&
+            Math.hypot(o.x - leaf.x, o.y - leaf.y) < (o.size || 10) + (leaf.size || 10) + 24);
+          if (!blocked) break;
+          r += 40;
+        }
+      });
+      if (countConflicts(members, arcs) > before) {
+        leaves.forEach((n, i) => { n.x = saved[i][0]; n.y = saved[i][1]; });
+      }
+    });
+  }
+
+  // Groups packed in rows by their settled extent, tallest first (ties in structural order), each
+  // keeping its shape. The row width is the one, among the widths at which a row would break, that
+  // lets the whole packing be drawn largest on this canvas.
+  function packGroups() {
+    const groups = Array.from(groupMembers().values());
+    if (groups.length < 2) return;
+    const boxes = groups.map(members => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      members.forEach(n => {
+        const r = n.size || 10;
+        x0 = Math.min(x0, n.x - r); y0 = Math.min(y0, n.y - r);
+        x1 = Math.max(x1, n.x + r); y1 = Math.max(y1, n.y + r);
+      });
+      return { members, x0, y0, w: x1 - x0 + PACK_GAP, h: y1 - y0 + PACK_GAP, rank: rank.get(members[0].id) };
+    }).sort((a, b) => (b.h - a.h) || (a.rank - b.rank));
+    const availW = Math.max(100, width - 2 * VIEW_MARGIN);
+    const availH = Math.max(100, height - 2 * VIEW_MARGIN - 30);
+    function shelf(rowWidth) {
+      const spots = [];
+      let x = 0, y = 0, rowH = 0, total = 0;
+      boxes.forEach(b => {
+        if (x > 0 && x + b.w > rowWidth) { y += rowH; x = 0; rowH = 0; }
+        spots.push({ x, y });
+        x += b.w;
+        rowH = Math.max(rowH, b.h);
+        total = Math.max(total, x);
+      });
+      return { spots, w: total, h: y + rowH };
+    }
+    const widths = new Set([Math.max(...boxes.map(b => b.w))]);
+    let run = 0;
+    boxes.forEach(b => { run += b.w; widths.add(run); });
+    let best = null;
+    Array.from(widths).sort((a, b) => a - b).forEach(rowWidth => {
+      const packed = shelf(rowWidth);
+      const zoom = Math.min(availW / packed.w, availH / packed.h);
+      if (!best || zoom > best.zoom + 1e-9) best = { zoom, packed };
+    });
+    boxes.forEach((b, i) => {
+      const dx = best.packed.spots[i].x - b.x0;
+      const dy = best.packed.spots[i].y - b.y0;
+      b.members.forEach(n => {
+        n.x += dx; n.y += dy;
+        if (n.clusterCenter) n.clusterCenter = { x: n.clusterCenter.x + dx, y: n.clusterCenter.y + dy };
+      });
+    });
+  }
+
+  // Overlays drawn over the canvas by the page (the off-screen banner and the hint line), as boxes
+  // in canvas coordinates
+  function overlayBoxes() {
+    const boxes = [];
+    if (typeof canvas.getBoundingClientRect !== "function") return boxes;
+    const origin = canvas.getBoundingClientRect();
+    ["offscreen-alert", "hint"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el || typeof el.getBoundingClientRect !== "function") return;
+      if (el.style && el.style.display === "none") return;
+      const r = el.getBoundingClientRect();
+      if (!r || !(r.width > 0) || !(r.height > 0)) return;
+      boxes.push({ x0: r.left - origin.left, y0: r.top - origin.top, x1: r.right - origin.left, y1: r.bottom - origin.top });
+    });
+    return boxes;
+  }
+
+  // Fit view: the largest zoom (up to 1.35) at which every node lies inside the canvas, at least
+  // VIEW_MARGIN from its edges and clear of the overlays, and every label finds a free place inside
+  // the canvas; below the zoom at which labels are drawn, nodes alone decide
   function fitView() {
     if (nodes.length === 0) {
       scale = 1; panX = 0; panY = 0;
       draw();
       return;
     }
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, maxSize = 0;
     nodes.forEach(n => {
-      const pad = (n.size || 10) + 45;
-      minX = Math.min(minX, n.x - pad);
-      maxX = Math.max(maxX, n.x + pad);
-      minY = Math.min(minY, n.y - pad);
-      maxY = Math.max(maxY, n.y + pad);
+      minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
+      minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
+      maxSize = Math.max(maxSize, n.size || 10);
     });
-
-    const gw = Math.max(120, maxX - minX);
-    const gh = Math.max(120, maxY - minY);
-    const padding = 65;
-    const availW = Math.max(100, width - padding * 2);
-    const availH = Math.max(100, height - padding * 2);
-
-    scale = Math.max(0.12, Math.min(1.35, Math.min(availW / gw, availH / gh)));
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    panX = width / 2 - centerX * scale;
-    panY = height / 2 - centerY * scale;
+    const area = { x0: VIEW_MARGIN, y0: VIEW_MARGIN, x1: width - VIEW_MARGIN, y1: height - VIEW_MARGIN };
+    overlayBoxes().forEach(b => {
+      // An overlay along the bottom edge (the hint line) shortens the area from below
+      if (b.y0 > height / 2 && b.x1 > 0 && b.x0 < width) area.y1 = Math.min(area.y1, b.y0 - 4);
+    });
+    const availW = Math.max(40, area.x1 - area.x0);
+    const availH = Math.max(40, area.y1 - area.y0);
+    const gw = maxX - minX, gh = maxY - minY;
+    let s = Math.min(1.35, (availW - 2 * maxSize) / Math.max(gw, 1), (availH - 2 * maxSize) / Math.max(gh, 1));
+    s = Math.max(0.12, s);
+    function setView(z) {
+      scale = z;
+      panX = (area.x0 + area.x1) / 2 - ((minX + maxX) / 2) * scale;
+      panY = (area.y0 + area.y1) / 2 - ((minY + maxY) / 2) * scale;
+      updateOffscreenIndicators();
+    }
+    // First the largest zoom at which every node is in view (no off-screen badge)
+    for (let attempt = 0; attempt < 80; attempt++) {
+      setView(s);
+      if (borderIndicators.length === 0 || s <= 0.12) break;
+      s = Math.max(0.12, s * 0.96);
+    }
+    // Then, for graphs up to LABEL_LIVE_MAX_NODES nodes, if a label finds no free place, the largest
+    // zoom at which all do, by bisection; zooming out never drops below the zoom at which labels are
+    // drawn just to avoid such a label: the zoom with the fewest of them is kept instead
+    let failures = nodes.length <= LABEL_LIVE_MAX_NODES ? placeLabels().failures : 0;
+    if (failures > 0 && s > 0.36) {
+      let best = { scale: s, failures };
+      let hi = s, lo = 0.36;
+      for (let step = 0; step < 7 && best.failures > 0; step++) {
+        const mid = (hi + lo) / 2;
+        setView(mid);
+        const f = placeLabels().failures;
+        if (f < best.failures || (f === best.failures && mid > best.scale)) best = { scale: mid, failures: f };
+        if (f === 0) lo = mid; else hi = mid;
+      }
+      if (best.failures > 0) {
+        setView(lo);
+        const f = placeLabels().failures;
+        if (f < best.failures) best = { scale: lo, failures: f };
+      } else {
+        // Largest zoom found with every label placed
+        let top = best.scale;
+        for (let step = 0; step < 4; step++) {
+          const mid = (top + hi) / 2;
+          setView(mid);
+          if (placeLabels().failures === 0) top = mid; else hi = mid;
+        }
+        best.scale = top;
+      }
+      setView(best.scale);
+    }
     draw();
   }
 
@@ -573,9 +1106,25 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     draw();
   }
 
+  function pillText(cluster) {
+    const count = cluster.items.length;
+    return count === 1 ? (cluster.items[0].node.label || cluster.items[0].node.id) : `+${count} devices`;
+  }
+
+  // Badge of an off-screen cluster, inward from the canvas edge
+  function pillBox(cluster) {
+    const inward = 24;
+    const bx = cluster.x - Math.cos(cluster.angle) * inward;
+    const by = cluster.y - Math.sin(cluster.angle) * inward;
+    ctx.font = "10px monospace";
+    const pw = ctx.measureText(pillText(cluster)).width + 12;
+    const ph = 20;
+    return { x0: bx - pw / 2, y0: by - ph / 2, x1: bx + pw / 2, y1: by + ph / 2, cx: bx, cy: by };
+  }
+
   function updateOffscreenIndicators() {
     borderIndicators = [];
-    const margin = 28;
+    const margin = OFFSCREEN_MARGIN;
     const cx = width / 2;
     const cy = height / 2;
     const left = margin;
@@ -584,7 +1133,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     const bottom = height - margin;
 
     const offNodes = [];
-    nodes.forEach(n => {
+    nodesByRank.forEach(n => {
       const sp = worldToScreen(n.x, n.y);
       if (sp.x < margin || sp.x > width - margin || sp.y < margin || sp.y > height - margin) {
         offNodes.push({ node: n, sx: sp.x, sy: sp.y });
@@ -634,11 +1183,35 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
         borderIndicators.push({ x: item.x, y: item.y, angle: item.angle, items: [item] });
       }
     });
+
+    // Clusters whose badges would overlap are merged into one "+N devices" badge
+    let mergedAny = true;
+    while (mergedAny) {
+      mergedAny = false;
+      const boxes = borderIndicators.map(pillBox);
+      for (let i = 0; i < borderIndicators.length && !mergedAny; i++) {
+        for (let j = i + 1; j < borderIndicators.length && !mergedAny; j++) {
+          if (boxesOverlap(boxes[i], boxes[j], 2)) {
+            const a = borderIndicators[i], b = borderIndicators[j];
+            const n = a.items.length + b.items.length;
+            a.x = (a.x * a.items.length + b.x * b.items.length) / n;
+            a.y = (a.y * a.items.length + b.y * b.items.length) / n;
+            a.angle = Math.atan2(a.y - cy, a.x - cx);
+            a.items = a.items.concat(b.items);
+            borderIndicators.splice(j, 1);
+            mergedAny = true;
+          }
+        }
+      }
+    }
+    borderIndicators.forEach(c => {
+      c.box = pillBox(c);
+      c.hitArea = { x: c.box.x0, y: c.box.y0, w: c.box.x1 - c.box.x0, h: c.box.y1 - c.box.y0 };
+    });
   }
 
   function drawBorderIndicators() {
     borderIndicators.forEach(cluster => {
-      const count = cluster.items.length;
       const first = cluster.items[0].node;
       const x = cluster.x;
       const y = cluster.y;
@@ -662,69 +1235,33 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       ctx.restore();
 
       // 2. Device info badge positioned inward from canvas edge
-      const inward = 24;
-      const bx = x - Math.cos(angle) * inward;
-      const by = y - Math.sin(angle) * inward;
-      const label = count === 1 ? first.id : `+${count} devices`;
-      ctx.font = "10px monospace";
-      const tw = ctx.measureText(label).width;
-      const pw = tw + 12;
-      const ph = 20;
-
+      const box = cluster.box;
       ctx.beginPath();
-      const rx = bx - pw / 2;
-      const ry = by - ph / 2;
-      if (ctx.roundRect) ctx.roundRect(rx, ry, pw, ph, 4);
-      else ctx.rect(rx, ry, pw, ph);
+      if (ctx.roundRect) ctx.roundRect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0, 4);
+      else ctx.rect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
       ctx.fillStyle = isHovered ? "rgba(35, 42, 56, 0.96)" : "rgba(18, 22, 31, 0.92)";
       ctx.fill();
       ctx.strokeStyle = isHovered ? "#ffffff" : (first.color || "#f2a400");
       ctx.lineWidth = isHovered ? 1.5 : 1;
       ctx.stroke();
 
+      ctx.font = "10px monospace";
       ctx.fillStyle = isHovered ? "#ffffff" : "#e2e8f0";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(label, bx, by);
-
-      cluster.hitArea = { x: rx, y: ry, w: pw, h: ph };
+      ctx.fillText(pillText(cluster), box.cx, box.cy);
     });
-  }
-
-  // Deterministic hash for stable per-edge curve offsets
-  function edgeHash(fromId, toId) {
-    let h = 0;
-    const s = fromId + ":" + toId;
-    for (let i = 0; i < s.length; i++) {
-      h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-    }
-    return h;
   }
 
   function drawArrow(edge, a, b) {
     const start = worldToScreen(a.x, a.y);
     const end = worldToScreen(b.x, b.y);
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const d = Math.sqrt(dx * dx + dy * dy) || 1;
-    const nx = dx / d;
-    const ny = dy / d;
 
-    // Perpendicular direction (used for curve offset and arrowhead)
-    const perpX = -ny;
-    const perpY = nx;
-
-    // Deterministic curve offset from edge hash
-    const h = edgeHash(edge.from, edge.to);
-    const sign = (h % 2 === 0) ? 1 : -1;
-    const magnitude = 15 + (Math.abs(h) % 16);
-    const curveOffset = sign * magnitude * scale;
-
-    // Bezier control point: offset perpendicular from straight-line midpoint
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
-    const cpX = midX + perpX * curveOffset;
-    const cpY = midY + perpY * curveOffset;
+    // Bezier control point from the arc's world geometry
+    const control = arcControl(edge, a, b);
+    const cp = worldToScreen(control.x, control.y);
+    const cpX = cp.x;
+    const cpY = cp.y;
 
     // Target point: pull back from the destination node by its radius
     const nodeRadius = Math.max(6, b.size * scale);
@@ -757,46 +1294,293 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
     ctx.closePath();
     ctx.fillStyle = isConnectedToHover ? "#f2a400" : (isEdgeDimmed ? "rgba(67, 75, 92, 0.25)" : "#5a6375");
     ctx.fill();
+  }
 
-    // Protocol label at the actual Bezier midpoint (t=0.5)
-    if (edge.label && scale > 0.5 && !isEdgeDimmed) {
-      const labelX = 0.25 * start.x + 0.5 * cpX + 0.25 * end.x;
-      const labelY = 0.25 * start.y + 0.5 * cpY + 0.25 * end.y;
-      const fontSize = Math.max(9, Math.min(12, Math.round(10 * scale)));
-      ctx.font = `${fontSize}px monospace`;
-      const textWidth = ctx.measureText(edge.label).width;
-      const padX = 5;
-      const padY = 3;
+  function drawEdgeLabel(edge, place) {
+    const isConnectedToHover = hoverNode ? (edge.from === hoverNode.id || edge.to === hoverNode.id) : false;
+    if (hoverNode && !isConnectedToHover) return;
+    ctx.font = `${place.fontSize}px monospace`;
+    ctx.fillStyle = "rgba(12, 15, 21, 0.9)";
+    ctx.strokeStyle = isConnectedToHover ? "#f2a400" : "rgba(109, 118, 136, 0.45)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const box = place.box;
+    if (ctx.roundRect) ctx.roundRect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0, 3);
+    else ctx.rect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = isConnectedToHover ? "#ffffff" : "#c5ccd8";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(edge.label, (box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2);
+  }
 
-      ctx.fillStyle = "rgba(12, 15, 21, 0.9)";
-      ctx.strokeStyle = isConnectedToHover ? "#f2a400" : "rgba(109, 118, 136, 0.45)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      const lx = labelX - textWidth / 2 - padX;
-      const ly = labelY - fontSize / 2 - padY;
-      const lw = textWidth + padX * 2;
-      const lh = fontSize + padY * 2;
-      if (ctx.roundRect) ctx.roundRect(lx, ly, lw, lh, 3);
-      else ctx.rect(lx, ly, lw, lh);
-      ctx.fill();
-      ctx.stroke();
+  // Text widths by font size and text; the font must be set on ctx before the first lookup
+  const labelWidths = new Map();
+  function labelWidth(text, fontSize) {
+    const key = fontSize + "px " + text;
+    if (!labelWidths.has(key)) labelWidths.set(key, ctx.measureText(text).width);
+    return labelWidths.get(key);
+  }
 
-      ctx.fillStyle = isConnectedToHover ? "#ffffff" : "#c5ccd8";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(edge.label, labelX, labelY);
+  function boxesOverlap(a, b, margin) {
+    const m = margin === undefined ? 1 : margin;
+    return a.x0 < b.x1 + m && b.x0 < a.x1 + m && a.y0 < b.y1 + m && b.y0 < a.y1 + m;
+  }
+
+  function boxOnCircle(box, c) {
+    const nx = Math.min(Math.max(c.x, box.x0), box.x1);
+    const ny = Math.min(Math.max(c.y, box.y0), box.y1);
+    const r = c.r + 1;
+    return (nx - c.x) * (nx - c.x) + (ny - c.y) * (ny - c.y) < r * r;
+  }
+
+  // Whether a segment passes through a box grown by one pixel (Liang-Barsky clipping)
+  function segmentOnBox(s, box) {
+    const x0 = box.x0 - 1, y0 = box.y0 - 1, x1 = box.x1 + 1, y1 = box.y1 + 1;
+    const dx = s.x1 - s.x0, dy = s.y1 - s.y0;
+    let t0 = 0, t1 = 1;
+    const tests = [[-dx, s.x0 - x0], [dx, x1 - s.x0], [-dy, s.y0 - y0], [dy, y1 - s.y0]];
+    for (const [p, q] of tests) {
+      if (p === 0) {
+        if (q < 0) return false;
+      } else {
+        const t = q / p;
+        if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+        else { if (t < t0) return false; if (t < t1) t1 = t; }
+      }
     }
+    return t1 - t0 > 1e-6;
+  }
+
+  function segmentOnCircle(s, c) {
+    const dx = s.x1 - s.x0, dy = s.y1 - s.y0;
+    const len2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((c.x - s.x0) * dx + (c.y - s.y0) * dy) / len2));
+    const px = s.x0 + t * dx - c.x, py = s.y0 + t * dy - c.y;
+    return px * px + py * py < (c.r + 1) * (c.r + 1);
+  }
+
+  function segmentBounds(s) {
+    return { x0: Math.min(s.x0, s.x1), y0: Math.min(s.y0, s.y1), x1: Math.max(s.x0, s.x1), y1: Math.max(s.y0, s.y1) };
+  }
+
+  // Grid of everything a label must not touch: node circles, placed labels, leader lines, off-screen
+  // badges and page overlays, in screen coordinates
+  function makeLabelGrid() {
+    const cells = new Map();
+    function eachCell(box, fn) {
+      const cx0 = Math.floor(box.x0 / LABEL_GRID_CELL), cx1 = Math.floor(box.x1 / LABEL_GRID_CELL);
+      const cy0 = Math.floor(box.y0 / LABEL_GRID_CELL), cy1 = Math.floor(box.y1 / LABEL_GRID_CELL);
+      for (let cx = cx0; cx <= cx1; cx++) {
+        for (let cy = cy0; cy <= cy1; cy++) fn(cx * 1048576 + cy);
+      }
+    }
+    function add(item) {
+      eachCell(item.bounds, key => {
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key).push(item);
+      });
+    }
+    function nearby(bounds, fn) {
+      const seen = new Set();
+      let hit = false;
+      eachCell(bounds, key => {
+        if (hit) return;
+        for (const item of (cells.get(key) || [])) {
+          if (seen.has(item)) continue;
+          seen.add(item);
+          if (fn(item)) { hit = true; return; }
+        }
+      });
+      return hit;
+    }
+    return {
+      addCircle(c, owner) { add({ circle: c, owner, bounds: { x0: c.x - c.r, y0: c.y - c.r, x1: c.x + c.r, y1: c.y + c.r } }); },
+      addBox(box) { add({ box, bounds: box }); },
+      addSegment(s) { add({ segment: s, bounds: segmentBounds(s) }); },
+      boxHits(box) {
+        return nearby(box, item => item.circle ? boxOnCircle(box, item.circle)
+          : item.box ? boxesOverlap(box, item.box) : segmentOnBox(item.segment, box));
+      },
+      // Pieces of arcs of another link (the two arcs of a two-way link are one link)
+      boxHitsOtherThan(box, edge) {
+        return nearby(box, item => item.segment && !sameLink(item.segment.edge, edge) && segmentOnBox(item.segment, box));
+      },
+      // A leader line may start on its own node's circle and end on its own label
+      segmentHits(s, owner) {
+        return nearby(segmentBounds(s), item => item.circle ? (item.owner !== owner && segmentOnCircle(s, item.circle))
+          : item.box ? segmentOnBox(s, item.box)
+          : segmentsCross({ x: s.x0, y: s.y0 }, { x: s.x1, y: s.y1 }, { x: item.segment.x0, y: item.segment.y0 }, { x: item.segment.x1, y: item.segment.y1 }));
+      },
+    };
+  }
+
+  // Direction for a node's first label candidate: away from the mean position of its neighbours (for
+  // the leaves of a star, radially outward from the hub); straight down when that is undefined
+  function preferredAngle(node) {
+    let sx = 0, sy = 0, n = 0;
+    neighbours.get(node.id).forEach(id => { const o = byId.get(id); sx += o.x; sy += o.y; n++; });
+    if (n === 0) return Math.PI / 2;
+    const dx = node.x - sx / n, dy = node.y - sy / n;
+    if (Math.hypot(dx, dy) < 1) return Math.PI / 2;
+    return Math.atan2(dy, dx);
+  }
+
+  // Label box whose nearest side lies at `distance` from the node centre in direction `angle`
+  function labelBox(pos, distance, w, h, angle) {
+    const ux = Math.cos(angle), uy = Math.sin(angle);
+    const cx = pos.x + ux * distance + ux * w / 2;
+    const cy = pos.y + uy * distance + uy * h / 2;
+    return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
+  }
+
+  // A connection's drawn arc in screen coordinates, as n + 1 points (start to the far node centre)
+  function screenArc(edge, n) {
+    const a = byId.get(edge.from), b = byId.get(edge.to);
+    const start = worldToScreen(a.x, a.y);
+    const end = worldToScreen(b.x, b.y);
+    const control = arcControl(edge, a, b);
+    const cp = worldToScreen(control.x, control.y);
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, u = 1 - t;
+      pts.push({ x: u * u * start.x + 2 * u * t * cp.x + t * t * end.x, y: u * u * start.y + 2 * u * t * cp.y + t * t * end.y });
+    }
+    return pts;
+  }
+
+  function leaderFor(pos, r, box) {
+    const tx = Math.min(Math.max(pos.x, box.x0), box.x1);
+    const ty = Math.min(Math.max(pos.y, box.y0), box.y1);
+    const d = Math.hypot(tx - pos.x, ty - pos.y) || 1;
+    return { x0: pos.x + (tx - pos.x) / d * (r + 1), y0: pos.y + (ty - pos.y) / d * (r + 1), x1: tx, y1: ty };
+  }
+
+  // Label placement in screen coordinates, redone on every draw. Node labels come first, in
+  // structural order: each takes the first candidate, from its preferred direction outward through
+  // 16 directions and 6 rings, that lies inside the canvas and touches nothing already there; a
+  // label placed beyond the first ring is joined to its node by a leader line, which must not cross
+  // anything either. Edge labels follow, busiest connection first, at points along their arc, also
+  // clear of every other link's arcs; one that does not fit is not drawn, and a two-way link whose
+  // arcs carry the same text gets one label. `failures` counts node labels left in their first candidate.
+  // The last placement, reused while the view, the canvas, the node positions and the overlays are
+  // unchanged (a hover only redraws)
+  let placementKey = null, placementResult = null;
+  function placeLabels() {
+    const checked = !isSimulating || nodes.length <= LABEL_LIVE_MAX_NODES;
+    let positions = 0;
+    nodes.forEach((n, i) => { positions += (i + 1) * (n.x * 7.3 + n.y * 3.1); });
+    const key = [scale, panX, panY, width, height, checked, positions, borderIndicators.length,
+      offscreenAlert.style.display].join("|");
+    if (key === placementKey) return placementResult;
+    placementResult = computeLabelPlacement(checked);
+    placementKey = key;
+    return placementResult;
+  }
+
+  function computeLabelPlacement(checked) {
+    const result = { nodeLabels: new Map(), edgeLabels: new Map(), failures: 0 };
+    if (scale <= 0.35) return result;
+    const grid = makeLabelGrid();
+    const limit = { x0: 2, y0: 2, x1: width - 2, y1: height - 2 };
+    const inside = box => box.x0 >= limit.x0 && box.y0 >= limit.y0 && box.x1 <= limit.x1 && box.y1 <= limit.y1;
+    if (checked) {
+      nodes.forEach(node => {
+        const pos = worldToScreen(node.x, node.y);
+        grid.addCircle({ x: pos.x, y: pos.y, r: Math.max(6, node.size * scale) }, node);
+      });
+      overlayBoxes().forEach(b => grid.addBox(b));
+      borderIndicators.forEach(c => grid.addBox(c.box));
+    }
+
+    const nodeFont = Math.max(9, Math.min(13, Math.round(11 * scale)));
+    ctx.font = `${nodeFont}px monospace`;
+    nodesByRank.forEach(node => {
+      const pos = worldToScreen(node.x, node.y);
+      const r = Math.max(6, node.size * scale);
+      const w = labelWidth(node.label, nodeFont);
+      const h = nodeFont;
+      const preferred = checked ? preferredAngle(node) : Math.PI / 2;
+      let chosen = null, leader = null;
+      if (checked) {
+        search:
+        for (let ring = 0; ring < LABEL_RINGS; ring++) {
+          for (let k = 0; k < LABEL_DIRECTIONS; k++) {
+            const turn = (k % 2 === 1 ? 1 : -1) * Math.ceil(k / 2);
+            const angle = preferred + turn * (2 * Math.PI / LABEL_DIRECTIONS);
+            const box = labelBox(pos, r + LABEL_GAP + ring * (h + 6), w, h, angle);
+            if (!inside(box) || grid.boxHits(box)) continue;
+            let line = null;
+            if (ring > 0) {
+              line = leaderFor(pos, r, box);
+              if (grid.segmentHits(line, node)) continue;
+            }
+            chosen = box;
+            leader = line;
+            break search;
+          }
+        }
+      }
+      if (!chosen) {
+        if (checked) result.failures++;
+        chosen = labelBox(pos, r + LABEL_GAP, w, h, preferred);
+      }
+      grid.addBox(chosen);
+      if (leader) grid.addSegment(leader);
+      result.nodeLabels.set(node.id, { box: chosen, fontSize: nodeFont, leader });
+    });
+
+    if (scale > 0.5) {
+      const edgeFont = Math.max(9, Math.min(12, Math.round(10 * scale)));
+      ctx.font = `${edgeFont}px monospace`;
+      // An edge label touches no connection but its own: every drawn arc, as straight pieces
+      const curves = makeLabelGrid();
+      if (checked) {
+        drawnEdges.forEach(edge => {
+          const pts = screenArc(edge, 12);
+          for (let i = 0; i < pts.length - 1; i++) {
+            curves.addSegment({ x0: pts[i].x, y0: pts[i].y, x1: pts[i + 1].x, y1: pts[i + 1].y, edge });
+          }
+        });
+      }
+      const placedLinks = [];
+      edgeLabelOrder.forEach(edge => {
+        if (!edge.label) return;
+        // One label for a two-way link whose arcs carry the same text
+        if (placedLinks.some(e => sameLink(e, edge) && e.label === edge.label)) return;
+        const a = byId.get(edge.from), b = byId.get(edge.to);
+        const start = worldToScreen(a.x, a.y);
+        const end = worldToScreen(b.x, b.y);
+        const control = arcControl(edge, a, b);
+        const cp = worldToScreen(control.x, control.y);
+        const w = labelWidth(edge.label, edgeFont) + 10;
+        const h = edgeFont + 6;
+        for (const t of EDGE_LABEL_POSITIONS) {
+          const u = 1 - t;
+          const x = u * u * start.x + 2 * u * t * cp.x + t * t * end.x;
+          const y = u * u * start.y + 2 * u * t * cp.y + t * t * end.y;
+          const box = { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 };
+          if (!checked || (inside(box) && !grid.boxHits(box) && !curves.boxHitsOtherThan(box, edge))) {
+            grid.addBox(box);
+            result.edgeLabels.set(edge, { box, fontSize: edgeFont });
+            placedLinks.push(edge);
+            return;
+          }
+        }
+      });
+    }
+    return result;
   }
 
   function draw() {
     ctx.clearRect(0, 0, width, height);
+    updateOffscreenIndicators();
+    const labels = placeLabels();
 
-    // 1. Draw connections
-    edges.forEach((edge) => {
-      const a = byId.get(edge.from);
-      const b = byId.get(edge.to);
-      if (a && b) drawArrow(edge, a, b);
-    });
+    // 1. Draw connections, then the edge labels that have a place
+    drawnEdges.forEach((edge) => drawArrow(edge, byId.get(edge.from), byId.get(edge.to)));
+    labels.edgeLabels.forEach((place, edge) => drawEdgeLabel(edge, place));
 
     // 2. Draw nodes
     nodes.forEach((node) => {
@@ -824,23 +1608,34 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       ctx.strokeStyle = isHovered ? "#ffffff" : "rgba(255,255,255,0.25)";
       ctx.lineWidth = 1.5;
       ctx.stroke();
-
-      // Node label with backdrop outline
-      if (scale > 0.35 && !isDimmed) {
-        const fontSize = Math.max(9, Math.min(13, Math.round(11 * scale)));
-        ctx.font = `${fontSize}px monospace`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(12, 15, 21, 0.9)";
-        ctx.strokeText(node.label, pos.x, pos.y + radius + 5);
-        ctx.fillStyle = isHovered ? "#ffffff" : "#e9edf5";
-        ctx.fillText(node.label, pos.x, pos.y + radius + 5);
-      }
     });
 
-    // 3. Off-screen navigation indicators
-    updateOffscreenIndicators();
+    // 3. Node labels with backdrop outline, and leader lines to labels placed away from their node
+    nodes.forEach((node) => {
+      const place = labels.nodeLabels.get(node.id);
+      if (!place) return;
+      const isHovered = (hoverNode === node);
+      const isConnectedToHover = hoverNode && (adj.get(hoverNode.id) || []).includes(node.id);
+      if (hoverNode && !isHovered && !isConnectedToHover) return;
+      if (place.leader) {
+        ctx.beginPath();
+        ctx.moveTo(place.leader.x0, place.leader.y0);
+        ctx.lineTo(place.leader.x1, place.leader.y1);
+        ctx.strokeStyle = "rgba(233, 237, 245, 0.45)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.font = `${place.fontSize}px monospace`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(12, 15, 21, 0.9)";
+      ctx.strokeText(node.label, place.box.x0, place.box.y0);
+      ctx.fillStyle = isHovered ? "#ffffff" : "#e9edf5";
+      ctx.fillText(node.label, place.box.x0, place.box.y0);
+    });
+
+    // 4. Off-screen navigation indicators
     drawBorderIndicators();
   }
 
@@ -994,6 +1789,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
   document.getElementById("zoom-out-btn").addEventListener("click", () => zoom(0.8));
   document.getElementById("relayout-btn").addEventListener("click", () => {
     alpha = 1.0;
+    layoutPassPending = true;
     isSimulating = true;
     loop();
   });

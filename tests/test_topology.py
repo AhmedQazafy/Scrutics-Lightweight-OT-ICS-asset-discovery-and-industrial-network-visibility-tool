@@ -210,3 +210,15 @@ def test_topology_html_uses_curved_edges_quadratic_bezier(tmp_path):
 
     assert "quadraticCurveTo" in html
     assert "edgeHash" in html
+
+
+def test_isolated_panel_is_titled_for_every_asset_type(tmp_path):
+    """The side panel lists every device without a drawn connection, whatever its type."""
+    inventory = AssetInventory()
+    inventory.update("192.168.1.10", "00:11:22:33:44:55")
+    export_topology(inventory, {}, str(tmp_path))
+    html = (tmp_path / "topology.html").read_text(encoding="utf-8")
+
+    assert "<h3>Isolated Assets</h3>" in html
+    assert '"No isolated assets."' in html
+    assert "isolated unknown" not in html.lower()

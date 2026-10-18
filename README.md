@@ -363,7 +363,7 @@ Run `python3 -m scrutics doctor` first : it identifies most issues.
 - No MAC addresses in Zeek/Suricata logs : OUI vendor matching unavailable, and devices are identified by IP address. Their application-layer logs (`modbus.log`, `dnp3.log`, Suricata `modbus` events) are used only as observations of the protocol's port
 - No IPv6 support
 - No Linux cooked (SLL/SLL2, `tcpdump -i any`) or raw-IP captures: see "Supported capture types"
-- Topology layout does not avoid crossing connections or overlapping labels; drag nodes apart to read a dense group
+- Topology groups of more than 30 devices or 60 links keep the force layout and can show crossing connections; a protocol label that does not fit beside its connection is not shown
 - WSL2 file performance : keep Scrutics on the Linux filesystem, not `/mnt/c/...`
 - Very large topology graphs may become slower to render
 

@@ -1,0 +1,782 @@
+{
+ "nodes": [
+  {
+   "id": "04:18:d6:83:db:16",
+   "label": "10.10.10.1",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 22,
+   "vendor": "Ubiquiti Inc",
+   "vendor_display": "Ubiquiti Inc",
+   "vendor_note": "",
+   "protocol": "S7comm / IEC 61850 MMS / ICCP (client, port)",
+   "role": "Possible OT Client",
+   "confidence": 35,
+   "mac": "04:18:d6:83:db:16",
+   "packet_count": 121
+  },
+  {
+   "id": "28:63:36:89:59:82",
+   "label": "10.10.10.10",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 30,
+   "vendor": "Siemens AG",
+   "vendor_display": "Siemens AG",
+   "vendor_note": "",
+   "protocol": "S7comm (port)",
+   "role": "Siemens PLC",
+   "confidence": 64,
+   "mac": "28:63:36:89:59:82",
+   "packet_count": 348729
+  },
+  {
+   "id": "00:1c:06:27:64:11",
+   "label": "10.10.10.20",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 27,
+   "vendor": "Siemens Numerical Control Ltd., Nanjing",
+   "vendor_display": "Siemens Numerical Control Ltd., Nanjing",
+   "vendor_note": "OT-associated vendor; no OT service observed in this capture",
+   "protocol": "S7comm / IEC 61850 MMS / ICCP (client, port)",
+   "role": "Possible OT Client",
+   "confidence": 55,
+   "mac": "00:1c:06:27:64:11",
+   "packet_count": 347505
+  },
+  {
+   "id": "54:ee:75:3f:4a:db",
+   "label": "10.10.10.30",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 25,
+   "vendor": "Wistron InfoComm(Kunshan)Co.,Ltd.",
+   "vendor_display": "Wistron InfoComm(Kunshan)Co.,Ltd.",
+   "vendor_note": "",
+   "protocol": "S7comm / IEC 61850 MMS / ICCP (client, port)",
+   "role": "Possible OT Client",
+   "confidence": 44,
+   "mac": "54:ee:75:3f:4a:db",
+   "packet_count": 129701
+  },
+  {
+   "id": "00:71:00:ff:11:a2",
+   "label": "192.168.57.2",
+   "type": "IT",
+   "color": "#4a90d9",
+   "size": 18,
+   "vendor": "Unknown",
+   "vendor_display": "Unknown",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "IT device",
+   "confidence": 19,
+   "mac": "00:71:00:ff:11:a2",
+   "packet_count": 17
+  },
+  {
+   "id": "00:1e:ec:26:d2:ac",
+   "label": "192.168.57.3",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 19,
+   "vendor": "COMPAL INFORMATION (KUNSHAN) CO., LTD.",
+   "vendor_display": "COMPAL INFORMATION (KUNSHAN) CO., LTD.",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 23,
+   "mac": "00:1e:ec:26:d2:ac",
+   "packet_count": 4
+  },
+  {
+   "id": "00:07:7c:1a:61:83",
+   "label": "192.168.88.1",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 36,
+   "vendor": "Westermo Network Technologies AB",
+   "vendor_display": "Westermo Network Technologies AB",
+   "vendor_note": "",
+   "protocol": "IT (standard ports only), S7comm / IEC 61850 MMS / ICCP (client, port), Modbus TCP (client, port), Foundation Fieldbus HSE (client, port), EtherNet/IP IO (client, port), ROC Plus (client, port), DNP3 (client, port), Foxboro FoxApi (client, port)",
+   "role": "Possible OT Client",
+   "confidence": 100,
+   "mac": "00:07:7c:1a:61:83",
+   "packet_count": 207691
+  },
+  {
+   "id": "b0:99:28:d9:1a:24",
+   "label": "192.168.88.1",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 17,
+   "vendor": "FUJITSU LIMITED",
+   "vendor_display": "FUJITSU LIMITED",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 15,
+   "mac": "b0:99:28:d9:1a:24",
+   "packet_count": 17
+  },
+  {
+   "id": "00:0a:dc:64:85:c3",
+   "label": "192.168.88.2",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 15,
+   "vendor": "RuggedCom Inc.",
+   "vendor_display": "RuggedCom Inc.",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 5,
+   "mac": "00:0a:dc:64:85:c3",
+   "packet_count": 16
+  },
+  {
+   "id": "00:e0:62:00:17:0a",
+   "label": "192.168.88.15",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 16,
+   "vendor": "HOST ENGINEERING",
+   "vendor_display": "HOST ENGINEERING",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 10,
+   "mac": "00:e0:62:00:17:0a",
+   "packet_count": 23
+  },
+  {
+   "id": "00:a0:45:6f:4b:83",
+   "label": "192.168.88.20",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 36,
+   "vendor": "Phoenix Contact GmbH & Co. KG",
+   "vendor_display": "Phoenix Contact GmbH & Co. KG",
+   "vendor_note": "",
+   "protocol": "Modbus TCP (port)",
+   "role": "PLC / RTU / Modbus Gateway",
+   "confidence": 100,
+   "mac": "00:a0:45:6f:4b:83",
+   "packet_count": 8835
+  },
+  {
+   "id": "00:d0:c9:a5:c9:2d",
+   "label": "192.168.88.25",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 36,
+   "vendor": "ADVANTECH CO., LTD.",
+   "vendor_display": "ADVANTECH CO., LTD.",
+   "vendor_note": "OT-associated vendor; no OT service observed in this capture",
+   "protocol": "IT (standard ports only)",
+   "role": "Unclassified",
+   "confidence": 100,
+   "mac": "00:d0:c9:a5:c9:2d",
+   "packet_count": 2649
+  },
+  {
+   "id": "00:1c:06:01:d4:23",
+   "label": "192.168.88.30",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 36,
+   "vendor": "Siemens Numerical Control Ltd., Nanjing",
+   "vendor_display": "Siemens Numerical Control Ltd., Nanjing",
+   "vendor_note": "",
+   "protocol": "S7comm (port)",
+   "role": "Siemens PLC",
+   "confidence": 100,
+   "mac": "00:1c:06:01:d4:23",
+   "packet_count": 6546
+  },
+  {
+   "id": "00:40:8c:7f:0b:bc",
+   "label": "192.168.88.49",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 36,
+   "vendor": "Axis Communications AB",
+   "vendor_display": "Axis Communications AB",
+   "vendor_note": "",
+   "protocol": "IT (standard ports only)",
+   "role": "Unclassified",
+   "confidence": 100,
+   "mac": "00:40:8c:7f:0b:bc",
+   "packet_count": 7288
+  },
+  {
+   "id": "00:05:e4:01:24:d3",
+   "label": "192.168.88.50",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 36,
+   "vendor": "Red Lion Controls Inc.",
+   "vendor_display": "Red Lion Controls Inc.",
+   "vendor_note": "",
+   "protocol": "Modbus TCP (port)",
+   "role": "PLC / RTU / Modbus Gateway",
+   "confidence": 100,
+   "mac": "00:05:e4:01:24:d3",
+   "packet_count": 5433
+  },
+  {
+   "id": "00:d0:c9:bd:2e:57",
+   "label": "192.168.88.51",
+   "type": "IT",
+   "color": "#4a90d9",
+   "size": 36,
+   "vendor": "ADVANTECH CO., LTD.",
+   "vendor_display": "ADVANTECH CO., LTD.",
+   "vendor_note": "OT-associated vendor; no OT service observed in this capture",
+   "protocol": "Unknown",
+   "role": "IT device",
+   "confidence": 100,
+   "mac": "00:d0:c9:bd:2e:57",
+   "packet_count": 10141
+  },
+  {
+   "id": "28:cf:e9:18:b5:ed",
+   "label": "192.168.88.52",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 22,
+   "vendor": "Apple, Inc.",
+   "vendor_display": "Apple, Inc.",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 33,
+   "mac": "28:cf:e9:18:b5:ed",
+   "packet_count": 18
+  },
+  {
+   "id": "00:90:e8:26:40:23",
+   "label": "192.168.88.60",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 36,
+   "vendor": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_display": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_note": "",
+   "protocol": "Modbus TCP (port)",
+   "role": "PLC / RTU / Modbus Gateway",
+   "confidence": 100,
+   "mac": "00:90:e8:26:40:23",
+   "packet_count": 8783
+  },
+  {
+   "id": "00:90:e8:27:8c:37",
+   "label": "192.168.88.61",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 36,
+   "vendor": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_display": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_note": "",
+   "protocol": "Modbus TCP (port)",
+   "role": "PLC / RTU / Modbus Gateway",
+   "confidence": 100,
+   "mac": "00:90:e8:27:8c:37",
+   "packet_count": 52256
+  },
+  {
+   "id": "00:80:63:b5:b6:bb",
+   "label": "192.168.88.75",
+   "type": "IT",
+   "color": "#4a90d9",
+   "size": 36,
+   "vendor": "Hirschmann Automation and Control GmbH",
+   "vendor_display": "Hirschmann Automation and Control GmbH",
+   "vendor_note": "",
+   "protocol": "IT (standard ports only)",
+   "role": "IT device",
+   "confidence": 100,
+   "mac": "00:80:63:b5:b6:bb",
+   "packet_count": 6020
+  },
+  {
+   "id": "00:90:e8:26:7b:17",
+   "label": "192.168.88.80",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 21,
+   "vendor": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_display": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_note": "OT-associated vendor; no OT service observed in this capture",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 30,
+   "mac": "00:90:e8:26:7b:17",
+   "packet_count": 16
+  },
+  {
+   "id": "ac:cf:23:02:23:6e",
+   "label": "192.168.88.85",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 15,
+   "vendor": "Hi-flying electronics technology Co.,Ltd",
+   "vendor_display": "Hi-flying electronics technology Co.,Ltd",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 5,
+   "mac": "ac:cf:23:02:23:6e",
+   "packet_count": 19
+  },
+  {
+   "id": "00:0a:dc:5b:27:a0",
+   "label": "192.168.88.95",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 36,
+   "vendor": "RuggedCom Inc.",
+   "vendor_display": "RuggedCom Inc.",
+   "vendor_note": "",
+   "protocol": "DNP3 (port), Modbus TCP (port)",
+   "role": "OT device (multiple OT protocols)",
+   "confidence": 100,
+   "mac": "00:0a:dc:5b:27:a0",
+   "packet_count": 11175
+  },
+  {
+   "id": "00:e0:62:40:57:66",
+   "label": "192.168.88.100",
+   "type": "OT",
+   "color": "#e07b39",
+   "size": 36,
+   "vendor": "HOST ENGINEERING",
+   "vendor_display": "HOST ENGINEERING",
+   "vendor_note": "",
+   "protocol": "Modbus TCP (port)",
+   "role": "PLC / RTU / Modbus Gateway",
+   "confidence": 100,
+   "mac": "00:e0:62:40:57:66",
+   "packet_count": 44025
+  },
+  {
+   "id": "00:11:22:7b:c5:50",
+   "label": "192.168.88.105",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 15,
+   "vendor": "CIMSYS Inc",
+   "vendor_display": "CIMSYS Inc",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 5,
+   "mac": "00:11:22:7b:c5:50",
+   "packet_count": 15
+  },
+  {
+   "id": "00:40:9d:28:ee:0d",
+   "label": "192.168.88.115",
+   "type": "IT",
+   "color": "#4a90d9",
+   "size": 36,
+   "vendor": "DigiBoard",
+   "vendor_display": "DigiBoard",
+   "vendor_note": "",
+   "protocol": "IT (standard ports only)",
+   "role": "IT device",
+   "confidence": 100,
+   "mac": "00:40:9d:28:ee:0d",
+   "packet_count": 18745
+  },
+  {
+   "id": "00:90:e8:10:af:c8",
+   "label": "192.168.88.130",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 23,
+   "vendor": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_display": "MOXA TECHNOLOGIES CORP., LTD.",
+   "vendor_note": "OT-associated vendor; no OT service observed in this capture",
+   "protocol": "IT (standard ports only)",
+   "role": "Unclassified",
+   "confidence": 38,
+   "mac": "00:90:e8:10:af:c8",
+   "packet_count": 15
+  },
+  {
+   "id": "00:0a:dc:64:85:c2",
+   "label": "192.168.89.1",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 16,
+   "vendor": "RuggedCom Inc.",
+   "vendor_display": "RuggedCom Inc.",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 10,
+   "mac": "00:0a:dc:64:85:c2",
+   "packet_count": 13404
+  },
+  {
+   "id": "70:71:bc:3a:0d:e8",
+   "label": "192.168.89.2",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 33,
+   "vendor": "PEGATRON CORPORATION",
+   "vendor_display": "PEGATRON CORPORATION",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 78,
+   "mac": "70:71:bc:3a:0d:e8",
+   "packet_count": 13409
+  }
+ ],
+ "isolated_nodes": [
+  {
+   "id": "00:0c:29:51:a9:47",
+   "label": "192.168.0.2",
+   "type": "Unknown",
+   "color": "#8f98a8",
+   "size": 21,
+   "vendor": "VMware, Inc.",
+   "vendor_display": "VMware, Inc.",
+   "vendor_note": "",
+   "protocol": "Unknown",
+   "role": "Unclassified",
+   "confidence": 28,
+   "mac": "00:0c:29:51:a9:47",
+   "packet_count": 1636
+  },
+  {
+   "id": "00:0e:8c:a3:4e:cf",
+   "label": "192.168.2.67",
+   "type": "IT",
+   "color": "#4a90d9",
+   "size": 23,
+   "vendor": "Siemens AG",
+   "vendor_display": "Siemens AG",
+   "vendor_note": "OT-associated vendor; no OT service observed in this capture",
+   "protocol": "IT (standard ports only)",
+   "role": "IT device",
+   "confidence": 36,
+   "mac": "00:0e:8c:a3:4e:cf",
+   "packet_count": 1
+  }
+ ],
+ "edges": [
+  {
+   "from": "00:1c:06:27:64:11",
+   "to": "28:63:36:89:59:82",
+   "label": "S7comm",
+   "count": 345299,
+   "width": 8
+  },
+  {
+   "from": "28:63:36:89:59:82",
+   "to": "00:1c:06:27:64:11",
+   "label": "S7comm",
+   "count": 187308,
+   "width": 8
+  },
+  {
+   "from": "28:63:36:89:59:82",
+   "to": "54:ee:75:3f:4a:db",
+   "label": "55000, 55001, 55002, 55003, 55555, S7comm",
+   "count": 161321,
+   "width": 8
+  },
+  {
+   "from": "54:ee:75:3f:4a:db",
+   "to": "28:63:36:89:59:82",
+   "label": "S7comm",
+   "count": 129383,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:90:e8:27:8c:37",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55000, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 50207,
+   "width": 8
+  },
+  {
+   "from": "00:90:e8:27:8c:37",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 45678, 514, 5432, 55000, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 47967,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:e0:62:40:57:66",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 45678, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 44197,
+   "width": 8
+  },
+  {
+   "from": "00:e0:62:40:57:66",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 34962, 34964, 34980, 389, 4000, 445, 45678, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 43778,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:40:9d:28:ee:0d",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55001, 55555, 636, 8080, 8443, DNP3, EtherNet/IP, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 19244,
+   "width": 8
+  },
+  {
+   "from": "00:40:9d:28:ee:0d",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 34980, 389, 4000, 445, 514, 5432, 55001, 55555, 636, 8080, 8443, DNP3, EtherNet/IP, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 18463,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:0a:dc:5b:27:a0",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 11658,
+   "width": 8
+  },
+  {
+   "from": "00:0a:dc:5b:27:a0",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55003, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 11063,
+   "width": 8
+  },
+  {
+   "from": "00:d0:c9:bd:2e:57",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 137, 139, 1433, 1434, 161, 3306, 34962, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 10069,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:90:e8:26:40:23",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 9706,
+   "width": 8
+  },
+  {
+   "from": "00:0a:dc:64:85:c2",
+   "to": "70:71:bc:3a:0d:e8",
+   "label": "",
+   "count": 9547,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:d0:c9:bd:2e:57",
+   "label": "1089, 1090, 1091, 137, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 9386,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:a0:45:6f:4b:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 9381,
+   "width": 8
+  },
+  {
+   "from": "00:90:e8:26:40:23",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 8689,
+   "width": 8
+  },
+  {
+   "from": "00:a0:45:6f:4b:83",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 8588,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:80:63:b5:b6:bb",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55001, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 8429,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:40:8c:7f:0b:bc",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55002, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 7380,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:1c:06:01:d4:23",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 34980, 389, 4000, 445, 45678, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 7341,
+   "width": 8
+  },
+  {
+   "from": "00:40:8c:7f:0b:bc",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55002, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 7241,
+   "width": 8
+  },
+  {
+   "from": "00:1c:06:01:d4:23",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 34980, 389, 4000, 445, 45678, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 6447,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "ac:cf:23:02:23:6e",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 34980, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 6046,
+   "width": 8
+  },
+  {
+   "from": "00:80:63:b5:b6:bb",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55001, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 5979,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:05:e4:01:24:d3",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 5823,
+   "width": 8
+  },
+  {
+   "from": "00:05:e4:01:24:d3",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 5404,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:e0:62:00:17:0a",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 45678, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 4232,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:11:22:7b:c5:50",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 4068,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:d0:c9:a5:c9:2d",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only)",
+   "count": 2673,
+   "width": 8
+  },
+  {
+   "from": "00:d0:c9:a5:c9:2d",
+   "to": "00:07:7c:1a:61:83",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only)",
+   "count": 2376,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:90:e8:26:7b:17",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 2090,
+   "width": 8
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:0a:dc:64:85:c3",
+   "label": "1089, 1090, 1091, 139, 1433, 1434, 161, 3306, 389, 4000, 445, 514, 5432, 55555, 636, 8080, 8443, DNP3, EtherNet/IP IO, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 2054,
+   "width": 8
+  },
+  {
+   "from": "04:18:d6:83:db:16",
+   "to": "28:63:36:89:59:82",
+   "label": "S7comm",
+   "count": 108,
+   "width": 6
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "00:90:e8:10:af:c8",
+   "label": "445, IT (standard ports only), Modbus TCP, S7comm",
+   "count": 96,
+   "width": 5
+  },
+  {
+   "from": "28:63:36:89:59:82",
+   "to": "04:18:d6:83:db:16",
+   "label": "S7comm",
+   "count": 77,
+   "width": 5
+  },
+  {
+   "from": "28:cf:e9:18:b5:ed",
+   "to": "00:07:7c:1a:61:83",
+   "label": "IT (standard ports only)",
+   "count": 13,
+   "width": 3
+  },
+  {
+   "from": "00:07:7c:1a:61:83",
+   "to": "28:cf:e9:18:b5:ed",
+   "label": "IT (standard ports only)",
+   "count": 13,
+   "width": 3
+  },
+  {
+   "from": "00:e0:62:00:17:0a",
+   "to": "00:07:7c:1a:61:83",
+   "label": "",
+   "count": 8,
+   "width": 3
+  },
+  {
+   "from": "00:90:e8:27:8c:37",
+   "to": "b0:99:28:d9:1a:24",
+   "label": "IT (standard ports only)",
+   "count": 8,
+   "width": 3
+  },
+  {
+   "from": "00:1e:ec:26:d2:ac",
+   "to": "00:71:00:ff:11:a2",
+   "label": "IT (standard ports only)",
+   "count": 4,
+   "width": 2
+  },
+  {
+   "from": "00:90:e8:10:af:c8",
+   "to": "00:07:7c:1a:61:83",
+   "label": "IT (standard ports only)",
+   "count": 1,
+   "width": 2
+  }
+ ],
+ "summary": {
+  "assets": 31,
+  "ot": 8,
+  "it": 5,
+  "unknown": 18,
+  "connections": 43,
+  "isolated_count": 2
+ }
+}
