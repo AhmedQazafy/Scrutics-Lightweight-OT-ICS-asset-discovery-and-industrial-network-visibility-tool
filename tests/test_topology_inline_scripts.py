@@ -2,23 +2,19 @@
 
 import os
 import re
-import shutil
 import subprocess
 
 import pytest
 
 from scrutics.db.inventory import Asset
 from scrutics.topology import HTML_TEMPLATE, build_graph_data, generate_topology_html
+from tests.node_runtime import require_node
 
 _SCRIPT_RE = re.compile(r"<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>", re.S | re.I)
 
 
 def _node():
-    node = shutil.which("node")
-    if node is None:
-        if os.environ.get("CI"):
-            pytest.fail("Node.js is required in CI to check the topology page scripts")
-        pytest.skip("Node.js not installed")
+    node = require_node()
     return node
 
 

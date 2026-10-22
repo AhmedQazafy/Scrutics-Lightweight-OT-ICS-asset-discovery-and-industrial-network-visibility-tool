@@ -12,7 +12,6 @@ import io
 import json
 import os
 import re
-import shutil
 import subprocess
 import time
 from contextlib import redirect_stderr, redirect_stdout
@@ -28,6 +27,7 @@ from scrutics.ai.gemini_provider import GeminiProvider
 from scrutics.ai.ollama_provider import OllamaProvider
 from scrutics.ai.openai_provider import OpenAIProvider
 from scrutics.ai.provider import LLMConnectionError, LLMProviderError, LLMResponseError, LLMTimeoutError
+from tests.node_runtime import require_node
 
 OK_BODY = {
     "gemini": {"candidates": [{"content": {"role": "model", "parts": [{"text": "ok"}]}}]},
@@ -285,11 +285,7 @@ def _js_function(page, name):
 
 def _chat_js(tmp_path, function, outcomes, ok_body):
     """Run one provider call of the page in Node. outcomes: [status, headers] or "reject" per fetch."""
-    node = shutil.which("node")
-    if node is None:
-        if os.environ.get("CI"):
-            pytest.fail("Node.js is required in CI to check the topology page scripts")
-        pytest.skip("Node.js not installed")
+    node = require_node()
     from scrutics.topology import generate_topology_html
 
     page = generate_topology_html({"nodes": [], "edges": []})

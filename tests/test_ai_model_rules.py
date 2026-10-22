@@ -10,7 +10,6 @@ import io
 import json
 import os
 import re
-import shutil
 import subprocess
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
@@ -26,6 +25,7 @@ from scrutics.ai.model_rules import FALLBACK_CHECKED, FALLBACK_LABEL, fallback_m
 from scrutics.ai.openai_provider import OpenAIProvider
 from scrutics.ai.provider import LLMResponseError
 from scrutics.ai.tools import SessionContext
+from tests.node_runtime import require_node
 
 ANTHROPIC_KEY = "sk-ant-test"
 OPENAI_KEY = "sk-openai-test"
@@ -419,11 +419,7 @@ def _js_function(page, name):
 
 
 def _run_chat(tmp_path, function, status, body):
-    node = shutil.which("node")
-    if node is None:
-        if os.environ.get("CI"):
-            pytest.fail("Node.js is required in CI to check the topology page scripts")
-        pytest.skip("Node.js not installed")
+    node = require_node()
     from scrutics.topology import generate_topology_html
 
     page = generate_topology_html({"nodes": [], "edges": []})

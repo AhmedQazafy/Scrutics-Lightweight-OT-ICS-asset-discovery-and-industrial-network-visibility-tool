@@ -11,7 +11,6 @@ import asyncio
 import json
 import os
 import re
-import shutil
 import subprocess
 
 import pytest
@@ -23,6 +22,7 @@ from scrutics.cli import _print_table
 from scrutics.db.inventory import Asset, AssetInventory
 from scrutics.topology import HTML_TEMPLATE, build_graph_data, generate_topology_html, write_manifest
 from scrutics.ui.tui import ScruticsApp
+from tests.node_runtime import require_node
 
 PLC_IP, PLC_MAC = "10.0.0.10", "00:0e:8c:00:00:10"
 HMI_IP, HMI_MAC = "10.0.0.20", "00:0c:26:00:00:20"
@@ -94,11 +94,7 @@ def _js_function(page, name):
 
 
 def _graph_summary(tmp_path, graph):
-    node = shutil.which("node")
-    if node is None:
-        if os.environ.get("CI"):
-            pytest.fail("Node.js is required in CI to check the topology page scripts")
-        pytest.skip("Node.js not installed")
+    node = require_node()
     page = generate_topology_html(graph)
     script = "\n".join([
         f"var GRAPH = {json.dumps(json.dumps(graph))};",

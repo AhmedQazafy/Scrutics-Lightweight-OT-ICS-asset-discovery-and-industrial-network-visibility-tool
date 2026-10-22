@@ -30,6 +30,7 @@ from scrutics.ai.gemini_provider import GeminiProvider
 from scrutics.ai.openai_provider import OpenAIProvider
 from scrutics.ai.provider import LLMProviderError
 from scrutics.ai.redact import redact
+from tests.node_runtime import require_node
 
 CANARY = "CANARY-sk-0123456789abcdefABCDEF"
 
@@ -534,11 +535,7 @@ def _js_function(page, name):
 
 
 def test_topology_chat_sends_the_gemini_key_only_in_a_header(tmp_path):
-    node = shutil.which("node")
-    if node is None:
-        if os.environ.get("CI"):
-            pytest.fail("Node.js is required in CI to check the topology page scripts")
-        pytest.skip("Node.js not installed")
+    node = require_node()
     from scrutics.topology import generate_topology_html
 
     page = generate_topology_html({"nodes": [], "edges": []})

@@ -27,8 +27,9 @@ from pathlib import Path
 import pytest
 
 from scrutics.topology import generate_topology_html
+from tests.node_runtime import require_node
 from tests.topology_layout_checks import (
-    WINDOWS, connections_over_nodes, crossings_by_group, find_node, outside_view, overlaps, page_parts, relabel,
+    WINDOWS, connections_over_nodes, crossings_by_group, outside_view, overlaps, page_parts, relabel,
     run_harness,
 )
 
@@ -38,12 +39,7 @@ RELABELINGS = 20
 
 
 def _node():
-    node = find_node()
-    if node is None:
-        if os.environ.get("CI"):
-            pytest.fail("Node.js is required in CI to check the topology page layout")
-        pytest.skip("Node.js not installed")
-    return node
+    return require_node("check the topology page layout")
 
 
 def _graph(fixture):

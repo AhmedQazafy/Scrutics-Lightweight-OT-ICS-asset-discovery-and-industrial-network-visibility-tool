@@ -9,7 +9,6 @@ import io
 import json
 import os
 import re
-import shutil
 import subprocess
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
@@ -27,6 +26,7 @@ from scrutics.ai.openai_provider import OpenAIProvider
 from scrutics.ai.provider import ChatResult, LLMProvider, LLMResponseError, truncation_notice
 from scrutics.ai.tools import SessionContext
 from scrutics.topology import generate_topology_html
+from tests.node_runtime import require_node
 
 GEMINI_KEY = "gm-test"
 ANTHROPIC_KEY = "sk-ant-test"
@@ -317,11 +317,7 @@ def _js_function(page, name):
 
 
 def _chat(tmp_path, function, body):
-    node = shutil.which("node")
-    if node is None:
-        if os.environ.get("CI"):
-            pytest.fail("Node.js is required in CI to check the topology page scripts")
-        pytest.skip("Node.js not installed")
+    node = require_node()
     page = generate_topology_html({"nodes": [], "edges": []})
     script = "\n".join([
         "var " + re.search(r"AI_MODELS = (\{.*?\});", page).group(0),
