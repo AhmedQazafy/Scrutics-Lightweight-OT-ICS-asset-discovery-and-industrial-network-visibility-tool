@@ -347,8 +347,9 @@ the answer length that fits its limit. An answer cut off at the limit is shown w
 so (CLI, TUI, topology chat); one cut off before any text is reported; other empty answers (Gemini
 safety or malformed calls, Anthropic refusals) are not.
 
-**Retries.** HTTP 429, 502, 503, 529 and connections that could not be opened: up to 4 attempts,
-at most 30 s per wait and 60 s in total, honouring `Retry-After` within those limits. Read
+**Retries.** HTTP 429, 502, 503, 529 and, for the assistant, connections that could not be opened
+(the topology chat does not retry those): up to 4 attempts, at most 30 s per wait and 60 s in
+total, honouring `Retry-After` within those limits. Read
 timeouts, errors after the request was sent, HTTP 500, 504, 408 and other 4xx are not retried.
 
 **Topology chat.** Runs in the browser and sees only a summary of the page: asset counts by type,
@@ -383,8 +384,9 @@ longer used. `oui status` and `doctor` report the active database and its age.
   with invented devices, Scapy 2.7.0, process RSS): about 9 KB per device that talks to one other host with the baseline on (about 880
   MB per 100,000 invented devices), about 1 KB more per further host it talks to (19 KB with ten),
   and about 7 KB per device with `--no-baseline`.
-- **Tests:** the suite (1,779 tests) passes on Scapy 2.7.0 and 2.8.0; one browser test is
-  skipped when Playwright is not installed.
+- **Tests:** the suite (1,867 tests) passes on Scapy 2.7.0 and 2.8.0; one browser test is
+  skipped when Playwright is not installed. 41 tests run the topology page's scripts in Node.js
+  and skip without it; with `CI` set or `SCRUTICS_REQUIRE_NODE=1` they fail instead.
 - **Simulation lab** (`docker-compose.yml`, `sim/`): two Modbus TCP servers, EtherNet/IP and
   BACnet stubs (listeners only, no CIP or BACnet traffic) and a traffic generator that opens TCP
   connections and sends two-byte UDP datagrams to them (no Modbus requests), on a Docker bridge.

@@ -15,6 +15,7 @@ from ipaddress import ip_address
 from typing import Any, Optional
 
 import scrutics
+from scrutics.diagnostics import VERSION
 from scrutics.protocol_display import protocol_display_text
 from scrutics.vendor_display import display_vendor_name, vendor_note
 
@@ -2704,7 +2705,7 @@ def write_manifest(session_dir: str, metadata: dict | None = None, errors: list 
         manifest_data = {
             "format": "scrutics-evidence",
             "version": 1,
-            "scrutics_version": meta.get("scrutics_version", "0.6.1"),
+            "scrutics_version": meta.get("scrutics_version", VERSION.removeprefix("v")),
             "created_at": created_at,
             "capture_started": capture_started,
             "capture_ended": capture_ended,

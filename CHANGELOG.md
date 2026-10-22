@@ -2,7 +2,7 @@
 
 All notable changes to Scrutics are documented here.
 
-## [Unreleased]
+## [0.7.0] — 2026-10-22
 
 ### Fixed — Input Robustness
 - **Faster processing of client traffic**: classification rules are loaded once and reused instead of being re-read from disk for every packet from a device without a listening service (about 30 times faster on such traffic). Behavioral constraints now follow a rule reload (`R` key, SIGHUP or the config file watcher) like the rest of classification, and an invalid edit keeps the rules in use.
@@ -105,7 +105,7 @@ All notable changes to Scrutics are documented here.
 ### Fixed — Damaged and Truncated Capture Files
 - **A capture file that ends at a damaged record is reported**: before, a PCAP record whose length field was corrupted was read as one packet holding the rest of the file, and the analysis ended as if the file were complete, with `0 rejected` in the summary while most of the file was never read. A PCAP-NG block with a bad length either ended the analysis the same way or stopped the run with an error and no results.
 - Reading now stops at the first damaged record, which is not processed, and the run summary (CLI and TUI) says which of two cases applies: the last record is incomplete (the file ends inside it, as when a capture is stopped abruptly; it is skipped), or the file is damaged before its end (the rest of the file is not read). The location is a record number for PCAP files and a packet count with a byte offset for PCAP-NG files. Both are counted as rejected input. Scrutics does not try to find the next readable record after a damaged one.
-- A corrupted record length (up to 4 GB) no longer makes Scrutics try to read that much into memory: reads never ask the file for more than it holds. Detection gives the same results with Scapy 2.7 and 2.8.
+- A corrupted record length (up to 4 GB) no longer makes Scrutics try to read that much into memory: reads never ask the file for more than it holds. Detection of damaged and incomplete records gives the same results with Scapy 2.7 and 2.8 (one pcapng case, a packet naming an undescribed interface, differs: see "Known Gaps — Capture, Rules and Topology").
 - Known limitations: a PCAP record whose corrupted length still fits in the remaining bytes is not detected; the records after it are read misaligned, as damaged data, until a record runs past the end of the file. A PCAP-NG file with exactly four stray bytes after its last complete block is read as complete.
 
 ### Changed — Event Log

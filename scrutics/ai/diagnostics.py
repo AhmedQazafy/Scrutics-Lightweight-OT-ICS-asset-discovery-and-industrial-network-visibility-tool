@@ -323,7 +323,7 @@ def run_ai_diagnostics(
                 json.dump({
                     "format": "scrutics-evidence",
                     "version": 1,
-                    "scrutics_version": "0.6.1",
+                    "scrutics_version": "0.7.0",
                     "created_at": "2026-09-19T00:00:00Z",
                     "capture_started": "2026-09-19T00:00:00Z",
                     "capture_ended": "2026-09-19T00:01:00Z",

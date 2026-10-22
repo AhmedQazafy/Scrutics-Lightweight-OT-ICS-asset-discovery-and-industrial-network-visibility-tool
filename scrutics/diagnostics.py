@@ -10,7 +10,7 @@ import platform
 import shutil
 
 
-VERSION = "v0.6.1"
+VERSION = "v0.7.0"
 _PKG_DIR = os.path.dirname(__file__)
 
 

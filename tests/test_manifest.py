@@ -262,3 +262,18 @@ def test_capture_started_fallback_and_override(tmp_path):
     manifest3 = read_manifest(unmatched_dir)
     assert manifest3["capture_started"] == "2026-09-01T10:00:00Z"
 
+
+
+def test_manifest_reports_the_package_version(tmp_path):
+    """The manifest's scrutics_version is the package version, the same one the banner shows."""
+    import re
+    from scrutics.diagnostics import VERSION
+
+    pyproject = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pyproject.toml")
+    with open(pyproject, encoding="utf-8") as f:
+        package_version = re.search(r'^version = "([^"]+)"$', f.read(), re.M).group(1)
+
+    with open(write_manifest(str(tmp_path / "scrutics_20261017_120000")), encoding="utf-8") as f:
+        data = json.load(f)
+    assert VERSION == f"v{package_version}"
+    assert data["scrutics_version"] == package_version
