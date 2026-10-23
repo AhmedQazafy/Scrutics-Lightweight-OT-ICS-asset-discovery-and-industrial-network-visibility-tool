@@ -47,8 +47,10 @@ from scrutics.seconds_input import MIN_BASELINE, MIN_DURATION, parse_whole_secon
 from scrutics.csv_input import allow_large_fields
 from scrutics.vendor_display import display_vendor_name, vendor_note
 from scrutics.protocol_display import (
-    PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text, split_display_column,
+    PROTOCOL_COLUMN_TITLE, PROTOCOL_COLUMN_WIDTH, protocol_display_entries, protocol_display_text,
+    split_display_column,
 )
+from scrutics.type_display import classification_type_label
 
 TAGLINE = "Passive OT/ICS Network Asset Discovery"
 SESSION_FLUSH_INTERVAL = 15.0
@@ -2014,7 +2016,7 @@ def asset_row_cells(asset, anomaly_count: int) -> tuple:
         f"{asset.classification_confidence_pct}%",
         _baseline_display(asset.baseline_status),
         str(anomaly_count),
-        asset.classification_type,
+        classification_type_label(asset.classification_type),
     )
 
 
@@ -2174,7 +2176,8 @@ class DetailScreen(ModalScreen):
             lines.append("")
 
             class_color = "green" if asset.classification_type == "OT" else "yellow" if asset.classification_type == "IT" else "cyan"
-            lines.append(f"[bold]Classification:[/bold] [{class_color}]{asset.classification_type}[/{class_color}]")
+            class_label = classification_type_label(asset.classification_type)
+            lines.append(f"[bold]Classification:[/bold] [{class_color}]{class_label}[/{class_color}]")
             lines.append(f"Domain: {asset.domain}")
             lines.append(f"Role: {asset.role}")
             lines.append(f"Confidence: {asset.classification_confidence_pct}%")
@@ -2422,7 +2425,7 @@ class ScruticsApp(App):
     def on_mount(self):
         table = self.query_one("#asset-table", DataTable)
         table.add_columns(
-            "IP Address", "MAC", "Vendor", "Protocol",
+            "IP Address", "MAC", "Vendor", PROTOCOL_COLUMN_TITLE,
             "Role", "Conf%", "Baseline", "Anomalies", "Type"
         )
         self.set_interval(0.5, self._refresh_display)

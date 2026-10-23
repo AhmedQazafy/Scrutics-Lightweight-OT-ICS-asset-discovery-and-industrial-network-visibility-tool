@@ -1691,7 +1691,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       `Type: ${node.type}<br>` +
       `Vendor: ${node.vendor_display}<br>` +
       (node.vendor_note ? `Vendor note: ${node.vendor_note}<br>` : "") +
-      `Protocol: ${node.protocol}<br>` +
+      `Protocols: ${node.protocol}<br>` +
       `Role: ${node.role}<br>` +
       `MAC: ${node.mac}<br>` +
       `Confidence: ${node.confidence}%<br>` +
@@ -1809,7 +1809,7 @@ body { background: #151820; color: #e9edf5; font-family: ui-monospace, SFMono-Re
       "MAC": n.mac || "",
       "Vendor": n.vendor || "",
       "Vendor note": n.vendor_note || "",
-      "Protocol": n.protocol || "",
+      "Protocols": n.protocol || "",
       "Role": n.role || "",
       "Type": n.type,
       "Confidence %": n.confidence,

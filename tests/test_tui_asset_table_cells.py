@@ -3,7 +3,7 @@ The asset table's cells for a live capture and for a loaded session.
 
 Both tables build their rows with the same cell function. The Anomalies column counts anomalies
 per IP address (live: the engine's newest 100; loaded: every row of anomalies.csv), and the Type
-column shows the canonical classification_type.
+column shows the canonical classification_type ("Unclassified" for Unknown).
 """
 
 import asyncio
@@ -103,7 +103,7 @@ def test_loaded_anomalies_column_is_zero_without_anomalies_csv(tmp_path, monkeyp
 
 def test_live_type_column_shows_classification_type():
     first, updated = _live_rows()
-    expected = {PLC: "OT", SWITCH: "Infrastructure", UNKNOWN: "Unknown"}
+    expected = {PLC: "OT", SWITCH: "Infrastructure", UNKNOWN: "Unclassified"}
     assert {ip: row[8] for ip, row in first.items()} == expected
     assert {ip: row[8] for ip, row in updated.items()} == expected
 

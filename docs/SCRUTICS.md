@@ -277,6 +277,23 @@ every row of `anomalies.csv`. The TUI redraws its asset table every
 0.5 s, work that headless mode does not do; how much this costs on large inventories was not
 measured for this release.
 
+**Asset tables (TUI and headless).** The Protocols column (`PROTOCOLS` in the headless table) lists,
+most important first: OT protocols the device serves (by name when the Modbus parser saw it answer,
+with ` (port)` when only a listening port shows it); OT protocols the parser saw it request
+(` (client)`); OT services it only contacted by port (` (client, port)`); IT services it serves
+(` (port)`), then IT services it contacted (` (client, port)`), each in the order Telnet, RDP, VNC,
+SSH/SFTP, SMB/CIFS, NetBIOS/SMB, databases and LDAP, SNMP, email, NetBIOS, Syslog, HTTP, HTTPS,
+DNS, NTP, DHCP; then discovery protocols with ` (discovery)`: mDNS and WS-Discovery from the
+device's discovery evidence, DHCP from DHCP evidence or a contacted DHCP server port. A served
+standard IT port without a signature name shows `IT (standard ports only)`. A device with no entry
+shows "None observed". When the entries do not fit in 32 characters, the last ones are left out
+and counted as `+N`; only when the first entry alone does not fit is its name cut (marked `~`),
+never its qualifier. The same entries are saved in the
+`protocol_display` column of `assets.csv`, and a loaded session shows them as saved. The Type column
+(`TYPE`) shows `OT`, `IT`, `Infrastructure` or `Unclassified`; `Unclassified` is the display of the
+stored class `Unknown`, which `assets.csv`, the exports and the assistant keep. The TUI detail panel
+uses the same label. This is display only: classification and evidence do not read it.
+
 **Rules and configuration:** `~/.scrutics/scrutics.yaml` if it exists, otherwise
 `scrutics/config/custom_rules.yaml`. The file is polled every 2.5 s; `R` in the TUI and SIGHUP
 reload at once; an invalid edit keeps the rules in use. Built-in rules are in
@@ -393,6 +410,14 @@ longer used. `oui status` and `doctor` report the active database and its age.
   It exercises vendor lookup and port classification, not the Modbus parser, and is not a model of
   a real plant.
 
+**Release checklist.**
+
+1. Set the version in `pyproject.toml` and `scrutics/diagnostics.py` (`VERSION`), and date the
+   CHANGELOG heading.
+2. Run the suite on Scapy 2.7.0 and 2.8.0 with `SCRUTICS_REQUIRE_NODE=1`, so the topology page
+   tests cannot be skipped.
+3. Regenerate and review the screenshots in `docs/screenshots/`.
+
 ---
 
 ## 15. Known gaps (v0.7)
@@ -403,6 +428,8 @@ longer used. `oui status` and `doctor` report the active database and its age.
 - Confidence measures the amount of evidence, not certainty (section 7).
 - Protocols other than Modbus TCP are identified by port only; Zeek and Suricata application-layer
   records are used as port observations (sections 3, 6).
+- The Protocols column can show both a rule's name and the signature name for the same served
+  port, because the port a rule matched is not kept (section 10).
 - No Infrastructure classification (section 6).
 - No IPv6, Linux cooked (SLL/SLL2) or raw-IP captures (section 3).
 - A port rule's constraints reach the devices that contact the port (section 8).

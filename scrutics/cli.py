@@ -37,7 +37,8 @@ from scrutics.diagnostics import (
     list_interfaces, suggest_interface, check_output_dir,
 )
 from scrutics.db.inventory import AssetInventory, limit_summary_line
-from scrutics.protocol_display import PROTOCOL_COLUMN_WIDTH, protocol_display_text
+from scrutics.protocol_display import PROTOCOL_COLUMN_TITLE, PROTOCOL_COLUMN_WIDTH, protocol_display_text
+from scrutics.type_display import classification_type_label
 from scrutics.db.session_export import export_summary_line
 from scrutics.seconds_input import baseline_option, duration_option
 from scrutics.vendor_display import VENDOR_NOTE, count_vendor_notes, display_vendor_name
@@ -527,11 +528,11 @@ def _print_table(inventory: AssetInventory):
         return
     w = PROTOCOL_COLUMN_WIDTH
     print(f"\n{'─'*(92 + w)}")
-    print(f"{'IP':<18} {'MAC':<20} {'VENDOR':<22} {'PROTOCOL':<{w}} {'ROLE':<28} {'CONF%':<7} {'TYPE'}")
+    print(f"{'IP':<18} {'MAC':<20} {'VENDOR':<22} {PROTOCOL_COLUMN_TITLE.upper():<{w}} {'ROLE':<28} {'CONF%':<7} {'TYPE'}")
     print(f"{'─'*(92 + w)}")
     for a in assets:
         proto  = protocol_display_text(a, w)
-        type_s = "OT" if a.is_ot is True else "IT" if a.is_ot is False else "?"
+        type_s = classification_type_label(a.classification_type)
         print(f"{a.ip:<18} {a.mac:<20} {display_vendor_name(a.vendor)[:22]:<22} {proto:<{w}} "
               f"{a.role[:28]:<28} {a.classification_confidence_pct:<7}% {type_s}")
     print(f"{'─'*(92 + w)}")
