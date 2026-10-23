@@ -303,8 +303,9 @@ reload at once; an invalid edit keeps the rules in use. Built-in rules are in
 
 ## 11. Topology page
 
-`topology.html` draws devices with connections as a force-directed graph (drag, zoom; labels hide
-when zoomed out), lists devices with no drawn connection in a side panel, and exports Assets,
+`topology.html` draws devices with connections as a graph that opens fitted to the window, with
+small groups arranged to avoid crossing connections and large groups kept in a force layout (drag,
+zoom; labels hide when zoomed out), lists devices with no drawn connection in a side panel, and exports Assets,
 Connections and Summary sheets to `.xlsx` in the browser. Node size follows confidence. The layout
 starts each group as a radial tree around its most connected device and packs groups in rows; once
 it settles, devices in a group of up to 30 devices and 60 links swap places while that lowers the
@@ -333,9 +334,10 @@ Anthropic, and Ollama (local or on your network). Default models: `gemini-3.8-fl
 statistics, asset list (filter by type and minimum confidence; at most 100 results), one asset
 by IP address, connections (at most 100) and anomalies. It makes at most 5 tool rounds per
 question. It reads every row of the session files, and says which files or rows it could not
-read. An asset looked up by IP address is the first device with that address, and its evidence
-comes from `evidence.json`, which is keyed by IP address, so for devices that shared an address
-the evidence may belong to the other device.
+read and why (for example a damaged `evidence.json` or a file that is not UTF-8); the assistant is
+then told that its answers cover only the part that was loaded. An asset looked up by IP address
+is the first device with that address, and its evidence comes from `evidence.json`, which is keyed
+by IP address, so for devices that shared an address the evidence may belong to the other device.
 
 **What it sends.** Your question and the session data the assistant looks up go to the provider
 you configured. The assistant only reads; it changes nothing.
@@ -349,25 +351,54 @@ assistant, and clears it on a session switch; nothing is kept after Scrutics exi
 questions and errors are shown as plain text (no Markdown rendering), wrapped to the panel.
 
 **Keys.** Sent only to their own provider, in a request header (Gemini in `x-goog-api-key`).
-Removed from every message Scrutics prints or raises, including DEBUG logging. Setup stores keys
-in `~/.scrutics/ai_keys.sh` (mode 0600) with one marked loader line in `~/.bashrc` (Linux, macOS,
-WSL), or as a per-user variable (Windows `.bat`). `--provider` uses that provider's own key from
-its environment variable. Residual limits: Python's `http.client` debug output, if you turn it on,
-prints headers including the key; `list-models --key KEY` puts the key on the command line.
+Removed from every message Scrutics prints or raises, including DEBUG logging. Setup never puts a
+key on a command line or into a script's code, where other users of the machine could see it.
+
+- Linux, macOS and WSL: `scrutics ai` setup, the TUI setup and `scrutics/config/scrutics_ai_setup.sh`
+  store keys in `~/.scrutics/ai_keys.sh` (mode 0600), rewritten whole at each setup. `~/.bashrc`
+  gets one line, marked `# Scrutics AI keys`, that loads it in new terminals; it is added once, and
+  no other line of `~/.bashrc` is edited or removed. `export GEMINI_API_KEY=`, `OPENAI_API_KEY=` or
+  `ANTHROPIC_API_KEY=` lines that Scrutics did not write (they may hold an old key, including lines
+  from earlier versions) are reported by line number so you can remove them. To remove a key,
+  delete its line from `~/.scrutics/ai_keys.sh`, or delete the file and the marked line.
+- Windows: `scrutics_ai_setup.bat` asks for the key without showing it and saves it as a variable
+  for your Windows account only, asking before it replaces an existing one; open a new terminal
+  afterwards. If a Windows policy blocks its PowerShell helper, it says so and how to add the
+  variable yourself (System Properties > Environment Variables, User variables). Remove the key
+  under *Edit environment variables for your account*. Setup run from `scrutics ai` on Windows keeps
+  the key for that session only and points to the `.bat`.
+
+**Another provider for one run.** `scrutics ai --provider NAME` (also with `--diagnose`) uses that
+provider's own key from its environment variable (`GEMINI_API_KEY`, `OPENAI_API_KEY` or
+`ANTHROPIC_API_KEY`; Ollama needs none) and its default model unless `--model` is given. The
+configured key, model and base URL never go to a different provider; of the other settings only
+`max_tokens` carries over, and timeout and temperature take that provider's defaults. If the
+variable is not set, Scrutics stops before sending anything and names it.
+
+**Residual key limits.** If you turn on Python's low-level HTTP debug output yourself
+(`http.client.HTTPConnection.debuglevel`), Python prints every request header, including the key;
+Scrutics never turns it on. `list-models PROVIDER --key KEY` puts the key on the command line,
+where other users of the machine can see it while the command runs (for example with `ps`) and
+your shell history keeps it; set the provider's environment variable instead, which `list-models`
+reads when `--key` is not given.
 
 **Models and requests.** Model lists come from the provider (OpenAI limited to `gpt-6-luna` and
-`gpt-6-sol`); a fallback list is labelled with its 2026-10-16 check date. Temperature is sent only
-to models documented to accept it. Output limits: Gemini 8192 tokens with a low thinking level on
-`gemini-3.8-flash`, Anthropic 4096, none sent to OpenAI or Ollama; setup writes no `max_tokens`, and
+`gpt-6-sol`, the models whose tool calls work on the Chat Completions API Scrutics uses); when the
+list cannot be fetched, setup says why and shows a fallback list labelled with its 2026-10-16 check
+date. A model named in `ai.yaml` is used as given. Temperature is sent only to models documented
+to accept it. Output limits: Gemini 8192 tokens with a low thinking level on
+`gemini-3.8-flash` (thinking counts toward the limit), Anthropic 4096, none sent to OpenAI or
+Ollama; set `max_tokens` in `~/.scrutics/ai.yaml` to change it. Setup writes no `max_tokens`, and
 an `ai.yaml` holding exactly 1024 (written by earlier setups) gets the default. The model is told
 the answer length that fits its limit. An answer cut off at the limit is shown with a notice saying
 so (CLI, TUI, topology chat); one cut off before any text is reported; other empty answers (Gemini
 safety or malformed calls, Anthropic refusals) are not.
 
 **Retries.** HTTP 429, 502, 503, 529 and, for the assistant, connections that could not be opened
-(the topology chat does not retry those): up to 4 attempts, at most 30 s per wait and 60 s in
-total, honouring `Retry-After` within those limits. Read
-timeouts, errors after the request was sent, HTTP 500, 504, 408 and other 4xx are not retried.
+(the topology chat does not retry those, because a browser cannot tell whether the request was
+sent): up to 4 attempts, at most 30 s per wait and 60 s in total, honouring `Retry-After` within
+those limits. Read timeouts, errors after the request was sent, HTTP 500, 504, 408 and other 4xx
+are not retried, so a reply is never generated twice.
 
 **Topology chat.** Runs in the browser and sees only a summary of the page: asset counts by type,
 address, vendor, protocol and confidence for up to 20 OT devices, IT devices by address only (a

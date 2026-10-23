@@ -2,46 +2,46 @@
 
 All notable changes to Scrutics are documented here.
 
-## [0.7.0] — 2026-10-22
+## [0.7.0]: 2026-10-22
 
-### Fixed — Input Robustness
+### Fixed: Input Robustness
 - **Faster processing of client traffic**: classification rules are loaded once and reused instead of being re-read from disk for every packet from a device without a listening service (about 30 times faster on such traffic). Behavioral constraints now follow a rule reload (`R` key, SIGHUP or the config file watcher) like the rest of classification, and an invalid edit keeps the rules in use.
 - **One bad packet or log line no longer stops an analysis**: live capture, PCAP/PCAP-NG files, Zeek logs and Suricata EVE logs skip an item that cannot be processed and continue. The run summary reports how many items were rejected as malformed and how many unexpected errors were contained.
 - **ARP frames with a non-IPv4 protocol address** are ignored instead of stopping processing.
 - **mDNS queries with a malformed question or a name that is not valid UTF-8**: the name is ignored and the rest of the message is still used.
 - **Timestamps outside the representable date range** (NaN, infinite, beyond year 9999) reject that packet or log record instead of stopping the run.
 
-### Fixed — Processing Speed Under Scans and Floods
+### Fixed: Processing Speed Under Scans and Floods
 - **A host that contacts many addresses no longer slows processing down**: the work done for each of its packets no longer grows with the number of addresses it has already contacted.
 - **A device with a new-peer rate limit (`max_new_peers_per_hour`) that contacts many addresses no longer slows processing down**: counting its recent new peers no longer goes through its whole peer history.
 - **A host that contacts many ports no longer slows processing down**: rule and signature lookups for its packets no longer go through every port it has contacted.
 - **A host that announces many names no longer slows processing down**: mDNS names, DHCP host names and DHCP client FQDNs are looked up directly instead of being compared with every record the host already has.
 - **Behavioral constraints from port rules are chosen the same way every time**: when a device without a listening service has contacted several ports whose rules set behavioral constraints, the rule of the highest such port is applied, whatever order the ports were contacted in. Before, the choice depended on internal ordering.
 
-### Fixed — Bounded Memory Per Device
+### Fixed: Bounded Memory Per Device
 - **A device that announces many names or identifiers no longer grows without limit**: each kind of evidence keeps the first 64 distinct values seen for a device (for example mDNS names, DHCP host names, DHCP vendor class identifiers), and the DNS name list keeps the first 64 names. Further values are counted instead of stored. A value already kept is still recorded from additional sources. A saved session loads with the same limits.
 - **A host that contacts very many addresses no longer grows without limit**: a device keeps its first 4096 peer addresses, and the same limit applies to the first-contact times kept for `max_new_peers_per_hour`. `peer_count` is the number of peers kept. Once a device has 4096 peers, a further new peer is not reported as a new peer by the behavioral baseline and is not counted toward its new-peer rate; it still appears in the topology. Every refused addition is counted, repeats included.
 - **A device that keeps changing IP address no longer grows without limit**: its IP history keeps the most recent 256 address changes, and older entries are counted as dropped. Returning to a forgotten address gives the same behavioral results as before.
 - **Repeat-alert suppression no longer keeps an entry forever for every peer, port or MAC/IP pair alerted on**: each entry is forgotten once its cooldown has passed by a margin of one more cooldown (`MAC_CHANGED`, `DEVICE_MOVED` and behavioral-constraint violations). Alerts are unchanged for traffic in time order. For input out of time order (for example merged captures), a packet more than one cooldown older than the newest one seen can raise an alert that an older run would have suppressed, at most once per cooldown for each alert key. The set of known ports for `alert_on_new_port` is kept for the whole run as before.
 
-### Added — Per-Device Limit Reporting
+### Added: Per-Device Limit Reporting
 - **Entries not kept because of a per-device limit are reported, never silently dropped**: `assets.csv` gains the columns `ip_history_dropped`, `evidence_overflow` (with a per-type breakdown in `evidence_overflow_by_type`, for example `hostname:6|dns:2`), `dns_names_overflow`, `peer_additions_rejected` and `peer_first_seen_overflow`. They are appended after the existing columns and read 0 (empty for the breakdown) for a device that stayed within every limit. The per-asset JSON export carries the same counts. Loading a saved session reads them back; older sessions load with 0. The CLI run summary prints the totals over all devices, and the TUI shows the total in its status line and a warning when anything was not kept.
 
-### Changed — Port Labels
+### Changed: Port Labels
 - **Port 20547/TCP is labeled ProConOS** (the Phoenix Contact PLC runtime) instead of PCWorx; port 1962/TCP keeps the PCWorx label. The port evidence, event log line and classification reason for 20547 now name ProConOS. A device serving both ports is credited with two OT services instead of one, so its classification reason lists both, and a user rule that classifies it as IT lists both as conflicts. Class, confidence, role and evidence weights are unchanged. A saved session keeps its stored text until the device is seen again.
 
-### Changed — Log Import Validation
+### Changed: Log Import Validation
 - A Zeek log whose header cannot be used (an empty `#separator`, or data without a `#fields` header) is reported as a clear file error.
 - Suricata EVE lines are type-checked one by one: a line that is not a JSON object, or has a field of the wrong type (for example a `dest_port` given as a string or a fraction, or a non-integer alert severity), is rejected and the rest of the file is imported.
 - A destination port must be a port number (0 to 65535). A Zeek `conn.log` line whose `id.resp_p` is not a decimal port number from 0 to 65535 (other than `-`, meaning unset) is now rejected as a whole line; before, such a line was kept with no port. A Suricata EVE line whose `dest_port` is outside that range is rejected likewise. Rejected lines are counted in the run summary.
 
-### Changed — Protocol Column
+### Changed: Protocol Column
 - **The protocol column says how each protocol of a device is known**, so a client such as an HMI polling PLCs no longer shows "Unknown". Entries are listed in this order: protocols the device serves, shown by name when a protocol parser saw the device answer as a server and with ` (port)` when only a listening port shows it; protocols a parser saw the device request as a client, with ` (client)` (for example `Modbus TCP (client)`); and OT services the device only contacted by port, with ` (client, port)` (for example `S7comm / IEC 61850 MMS / ICCP (client, port)`). IT services and discovery protocols follow (see "Protocols and Type Columns" below). This applies to the TUI asset table (live and reloaded sessions), the CLI table, the topology node label and tooltip, the TUI asset export and the AI asset tools. Classification, confidence and evidence are unchanged.
 - The protocol column in the TUI and CLI tables is wider (32 characters). When the entries do not fit, the last ones (lowest priority) are left out and counted as `+N`; only when the first entry alone does not fit is its protocol name cut (marked `~`), and the qualifier is always kept.
 - `assets.csv` gains a last column, `protocol_display`, with the same entries separated by `|`. The `protocol` column still lists only the served protocols, unlabeled. Sessions saved before this column existed show their served protocols as saved.
 - Known limitation: a served protocol named by a user rule that matched the device by MAC alone is still shown with ` (port)`.
 
-### Changed — Protocols and Type Columns (display change)
+### Changed: Protocols and Type Columns (display change)
 - **This is a display change only**: classification, evidence, weights, confidence and anomalies are unchanged, and so are the stored and exported values.
 - **The column is now titled "Protocols"** in the TUI table, the headless table (`PROTOCOLS`), the topology tooltip and the topology page's spreadsheet export. The `assets.csv` field keeps its name, `protocol_display`.
 - **IT services are named** instead of showing "Unknown" or `IT (standard ports only)`: services the device serves, by signature name with ` (port)` (for example `SMB/CIFS (port)`), then services it contacted, with ` (client, port)` (for example `HTTPS (client, port)`). Both come after the OT entries, each in this order: Telnet, RDP, VNC, SSH/SFTP, SMB/CIFS, NetBIOS/SMB, databases and LDAP, SNMP, email, NetBIOS name service, Syslog, then HTTP, HTTPS, DNS, NTP and DHCP. `IT (standard ports only)` is still shown for a served standard IT port that has no signature name.
@@ -50,20 +50,20 @@ All notable changes to Scrutics are documented here.
 - **The Type column shows "Unclassified"** where the classification is `Unknown`, in the TUI table, the TUI detail panel and the headless table. `assets.csv`, the TUI asset export, session files and the AI tools keep `Unknown`.
 - **The headless TYPE column shows the classification**: it showed `OT`, `IT` or `?` from the OT flag, so an infrastructure device appeared as `IT`; it now shows `OT`, `IT`, `Infrastructure` or `Unclassified`, like the TUI.
 
-### Changed — Confidence Shown on Screen (behaviour change)
+### Changed: Confidence Shown on Screen (behaviour change)
 - **Every screen shows the evidence-based classification confidence**: the headless table (`CONF%`), the TUI table during a capture, and the topology page (node size, isolated-asset list, tooltip, CSV export and the chat's device summary) now show the same confidence as the TUI detail view and a loaded session: the accumulated weight of the device's evidence, capped at 100. Before, these showed the older multi-factor score, which is only computed while the baseline runs, so a `--no-baseline` run showed 0% for every device, and the same device could show different values on different screens.
 - **Topology node sizes change**, because node size follows this confidence: nodes of well-evidenced devices are larger and devices with little evidence keep the smallest size.
 - The chat's device summary shows `0%` for a device with no confidence (it showed `?%`).
 - **The assistant matches the screens**: its asset results report `classification_confidence_pct` (the field was `confidence_pct`), and its minimum-confidence filter uses the same value, so on a `--no-baseline` session it no longer reports 0% for every device or filters every device out. A session written before the `classification_confidence` column existed is read with its `confidence_pct`.
 - `assets.csv` still has both columns (`confidence_pct` for the multi-factor score, `classification_confidence` for the evidence-based value).
 
-### Fixed — TUI Asset Table Matches the Session Files (behaviour change)
+### Fixed: TUI Asset Table Matches the Session Files (behaviour change)
 - **A loaded session's Anomalies column counts anomalies**: it showed the number of evidence records of each device, so it did not match `anomalies.csv`. It now counts the rows of `anomalies.csv` for each IP address.
 - **The Type column shows the classification during a capture too**: the live table showed `OT`, `IT` or `?`, so an infrastructure device (a switch or router) appeared as `IT` and an unclassified one as `?`, while a loaded session and `assets.csv` said `Infrastructure` and `Unknown`. Both tables now show `OT`, `IT`, `Infrastructure` or `Unclassified` (stored as `Unknown`), in full (a loaded session cut it to 8 characters).
 - **Live and loaded rows are built the same way**, so a loaded session also shows vendor and role at the live table's widths, and a missing MAC as `Unknown`.
 - During a capture the Anomalies column counts each device's anomalies among the newest 100 the TUI keeps on screen; a loaded session counts every anomaly in `anomalies.csv`, so the same device can show a higher count once the session is loaded.
 
-### Changed — Topology Layout (behaviour change)
+### Changed: Topology Layout (behaviour change)
 - **The page opens with everything in view**: once the layout settles, and after Re-layout, the view is fitted so that every device and every label is inside the canvas, clear of the hint line, so no "devices outside view" banner appears on opening. `F` and Fit View do the same. When every label cannot be placed, the view zooms out only as far as the zoom at which labels are still drawn.
 - **Groups start as radial trees and connections no longer cross where a group can be drawn without crossings**: each group is laid out around its most connected device, with devices that are linked to each other next to each other. Once the layout settles, groups are packed closely in rows by their actual size, in the arrangement that can be drawn largest on the canvas, so labels stay readable at fit view on smaller windows. Once the layout settles, devices in a group swap places while that lowers the number of crossing connections and of connections passing over a device. Groups of up to 30 devices and 60 links are rearranged; larger groups keep the force layout and can still show crossings. Dragging a device does not rearrange the group again.
 - **Stars**: devices connected only to one hub are spread evenly around it, in the gaps between the hub's other connections, and their labels point outward; a hub with more than 8 such devices gets a wider ring.
@@ -74,7 +74,7 @@ All notable changes to Scrutics are documented here.
 - **Off-screen badges** show the device's address (they showed its MAC address), and badges that would overlap are merged into one "+N devices" badge.
 - **The side panel is titled "Isolated Assets"** (was "Isolated Unknown Assets"): it lists every device without a drawn connection, whatever its type.
 
-### Fixed — Which Side of a Connection Offers the Service
+### Fixed: Which Side of a Connection Offers the Service
 - **Fewer false OT devices from client source ports**: a device is credited with a listening service only from packets it sends itself, never from packets sent to it. A port counts only on its own transport: a TCP-only signature such as IEC 60870-5-104 (2404) is never credited from a UDP packet, nor a UDP-only one such as BACnet/IP (47808) from TCP. A user rule port without `protocol` takes the transport of the port's signature (both transports when the port has none). When both ports of a packet are service ports and nothing else shows which side serves, the lower port is taken as the service, so a workstation that uses 44818 as its temporary port for DNS lookups is no longer shown as an EtherNet/IP device.
 - **Unanswered connection attempts no longer create devices**: a TCP SYN that gets no answer, a UDP datagram that gets no reply and Zeek `conn.log` records in state S0 or REJ (and RSTOS0, SH) no longer create a device at the probed address, and no longer give it the probed port. A port scan of empty addresses therefore no longer fills the inventory with OT devices. The scanning host still records the ports it contacted. A device seen through its own traffic or other evidence keeps its entry, without the probed port. A device that only receives traffic in a capture (for example a mirror port that copies one direction) is no longer listed from the ports it was contacted on.
 - **Replies no longer mark a device as initiating connections**: a PLC that only answers its polling HMI is no longer reported as initiating, so a `never_initiates` rule no longer alerts on its replies. Initiation evidence now carries a confidence: MEDIUM from a TCP SYN or a validated Modbus request, LOW when only the port numbers show which side is the client. A device keeps one initiation record, raised from LOW to MEDIUM and never lowered. A `never_initiates` alert states when it was triggered by LOW evidence.
@@ -87,7 +87,7 @@ All notable changes to Scrutics are documented here.
 - **ICMP records no longer credit ports**: a Zeek or Suricata ICMP record no longer gives a device a TCP/UDP service port.
 - Known limitations: a session seen only from the middle (no SYN in the capture) that the server ends with a reset is not credited from Suricata flow events. A one-way UDP flow in Zeek or Suricata does not credit the sender's own port. Suricata event types other than `flow`, `modbus`, `dnp3` and `enip` record no direction.
 
-### Fixed — Vendor Identification
+### Fixed: Vendor Identification
 - **Corrected bundled vendor data, from the IEEE registry**: the bundled vendor database is rebuilt from the IEEE Registration Authority registry (MA-L, MA-M, MA-S and IAB listings retrieved 2026-10-10; the file header names each listing and its SHA-256). Most entries of the previous list named the wrong vendor: for example 00:90:27 and 00:0C:F1 are registered to Intel (they were labelled Beckhoff and Mitsubishi), 00:90:E8 to Moxa (labelled GE Fanuc), 00:D0:C9 to Advantech (labelled Pilz) and 00:0E:8C to Siemens (labelled Moxa). The file now lists every assignment of the industrial, network-infrastructure and IT vendors Scrutics recognises, about 4,900 in all, with each organisation name exactly as registered. Blocks the IEEE shares between many holders (for example 00:50:C2) are never attributed to one vendor: a MAC in such a block resolves to the holder of its own smaller block, or to Unknown. A vendor name is the holder of the MAC assignment, not necessarily the maker of the device. A database installed with `scrutics oui update` or `scrutics oui import` still takes precedence over the bundled one.
 - **Fewer false "OT vendor" labels**: a vendor name now matches a known vendor only by whole words, with a reviewed list of names and exclusions, instead of by any substring. Before, "ge" made NETGEAR, Sagemcom, Edgecore and about 1,400 other registered organisations OT vendors, and "abb", "intel", "hp" and "delta" matched inside unrelated names. GE automation names (GE Fanuc, GE Multilin, GE Grid, GE Intelligent Platforms, GE Digital Energy) are OT vendors, other General Electric names are neutral, and GE Healthcare is not a known vendor; Delta Controls is an OT vendor and Delta Electronics neutral. A name that matches two known vendors equally closely is Unknown. The vendor still never decides a device's classification: class, role and the deciding rule do not change; the vendor class, the OT-vendor evidence, the confidence scores and the classification reason text can.
 - **Vendor names on screen**: names that the registry writes with a trailing comma (for example "Siemens AG,") are shown without it in the TUI, the CLI table, the topology page and the assistant; CSV and JSON exports keep the registered name.
@@ -95,36 +95,36 @@ All notable changes to Scrutics are documented here.
 - **Saved sessions keep their stored vendors**: a session saved before this version keeps the vendor names and vendor classes it was saved with, also when it is loaded and fed further traffic; devices first seen afterwards are identified with the corrected data.
 - **Bundled database age**: the age reported for the bundled vendor database (startup warning, `scrutics oui status`, `scrutics doctor`) is taken from the retrieval date in its header. Before, the header of the rebuilt file was not recognised and the age was counted from 2025-01-01, so every run warned that the database was outdated and suggested `scrutics oui update`.
 
-### Added — Vendor Note
+### Added: Vendor Note
 - **"OT-associated vendor; no OT service observed in this capture"**: shown for a device whose vendor is an OT vendor but which this capture did not show serving an OT service, so a PLC seen only as a client or behind a closed port is not overlooked. It appears in the TUI detail panel, as a new last column `vendor_note` in `assets.csv` (after `protocol_display`), in the TUI asset export, on the topology page (tooltip and its CSV export), in the assistant's asset results, and as a count in the CLI summary. It is a display note only: it adds no evidence and changes no class, role, score or confidence. A saved session's note follows the vendor data stored with it.
 
-### Fixed — OUI Database Update
+### Fixed: OUI Database Update
 - **Clearer `scrutics oui update` errors**: when the download is refused (for example HTTP 418, which the IEEE server returns to some client user agents), fails on the network, or arrives incomplete, the message says what happened, that the installed database was not changed, and how to install the file offline with `scrutics oui import`. A response that is not 200, or shorter than its stated length, is no longer passed on. Requests now identify Scrutics with its installed version. The developer script `scripts/download_oui.py` uses the same download, validates the file before replacing the existing one, and keeps the existing file on failure.
 
-### Fixed — Topology Assistant
+### Fixed: Topology Assistant
 - **The assistant panel in `topology.html` works again**: a page-template escaping error broke its script, so the AI button, the panel and the chat did nothing. The assistant is now also given a summary of the graph (see "Known Gaps — AI" for what it contains); before, its context described an empty network.
 - The topology chat uses the same default models as the AI configuration for OpenAI, Anthropic and Gemini, instead of its own model names (it named the retired `gemini-2.0-flash`). The API key stays in page memory only and is never stored.
 
-### Fixed — TUI Crashes and Input Validation
+### Fixed: TUI Crashes and Input Validation
 - **Two devices on one IP address no longer close the TUI**: when a device is replaced on the same address, Scrutics keeps a separate entry for each device, and the asset table (live and reloaded sessions) failed with a duplicate-row error. Rows are now identified by device (MAC address, or IP address when no MAC is known), both devices are listed, and the detail view opens the device whose row is selected. A row also no longer shows another device's values after devices change address. The anomaly count in the table is still counted per IP address, because anomalies record only the address.
 - **Live Capture dialog**: Duration and Baseline take whole seconds. Duration is 0 or more (0 runs until stopped) and Baseline is 1 or more. Any other value (for example `1.5`, `60s`, `-5` or an empty field) shows a message in the dialog, keeps it open and starts no capture. Before, such a value closed the TUI, a negative duration ran until stopped while showing a negative time, a baseline of 0 locked every baseline on the first packet, and an empty field silently took the default.
 - **The TUI's default capture duration is 60 seconds**, the same as the CLI (it was 120).
 - **`--duration` and `--baseline` use the same rule** on the command line: an invalid value (for example `--duration -5` or `--duration 1.5`) is a usage error naming the option instead of starting a capture that runs until stopped.
 
-### Fixed — Damaged and Truncated Capture Files
+### Fixed: Damaged and Truncated Capture Files
 - **A capture file that ends at a damaged record is reported**: before, a PCAP record whose length field was corrupted was read as one packet holding the rest of the file, and the analysis ended as if the file were complete, with `0 rejected` in the summary while most of the file was never read. A PCAP-NG block with a bad length either ended the analysis the same way or stopped the run with an error and no results.
 - Reading now stops at the first damaged record, which is not processed, and the run summary (CLI and TUI) says which of two cases applies: the last record is incomplete (the file ends inside it, as when a capture is stopped abruptly; it is skipped), or the file is damaged before its end (the rest of the file is not read). The location is a record number for PCAP files and a packet count with a byte offset for PCAP-NG files. Both are counted as rejected input. Scrutics does not try to find the next readable record after a damaged one.
 - A corrupted record length (up to 4 GB) no longer makes Scrutics try to read that much into memory: reads never ask the file for more than it holds. Detection of damaged and incomplete records gives the same results with Scapy 2.7 and 2.8 (one pcapng case, a packet naming an undescribed interface, differs: see "Known Gaps — Capture, Rules and Topology").
 - Known limitations: a PCAP record whose corrupted length still fits in the remaining bytes is not detected; the records after it are read misaligned, as damaged data, until a record runs past the end of the file. A PCAP-NG file with exactly four stray bytes after its last complete block is read as complete.
 
-### Changed — Event Log
+### Changed: Event Log
 - **An OS hint is logged once per device**, when the device gains it, instead of for every packet with a TTL: in a real session nearly all events were these repeats. A changed TTL is a new hint and is logged once. The DHCP OS fingerprint event follows the same rule. The OS hint evidence and its de-duplication are unchanged.
 
-### Added — Frames That Cannot Produce a Device
+### Added: Frames That Cannot Produce a Device
 - **Frames that cannot produce a device are counted by kind**: devices are built from Ethernet frames with an IPv4 or ARP source address. Other frames (Linux cooked captures SLL and SLL2, as written by `tcpdump -i any`; raw IP captures; IPv6; PROFINET; IEC 61850 GOOSE and Sampled Values; LLDP; IEEE 802.3 LLC such as STP; other link types and ethertypes) were dropped without being counted. They are now counted by kind, and the run summary (CLI and TUI, file analysis and live capture) lists the counts.
 - **A capture that produces no devices says why it saw nothing usable**: the capture contains no frames; no frame was of a kind devices are built from (with the kinds seen); or such frames were present but none produced a device (with how many had a source address outside the inventory scope, or a broadcast or zero source MAC). A file that stopped early at a damaged record is explained by its own line. The lines state the counts observed and nothing more.
 
-### Fixed — Complete Session Exports
+### Fixed: Complete Session Exports
 - **`events.csv` and `anomalies.csv` keep every record**: headless sessions rewrote both files from the in-memory display lists at every checkpoint and at the end, and the TUI rewrote `anomalies.csv` the same way. These lists keep only the newest 500 events and 100 anomalies, so longer sessions lost everything older without notice, and the manifest's anomaly count stopped at 100. The files are now written only by appending each record as it happens, and are never rewritten.
 - **Session file format**: both files now keep the format they are written in during capture. `events.csv` has the columns `timestamp,message`; `anomalies.csv` has `timestamp,ip,type,severity,detail` with timestamps written as `YYYY-MM-DD HH:MM:SS`. Before, headless sessions ended with `timestamp,message,type` and `timestamp,ip,severity,type,detail` with ISO timestamps. Scrutics reads both formats.
 - **A failed write to `anomalies.csv` no longer skips inventory updates**: before, the error was caught for each packet, but that packet's processing stopped where the anomaly was raised. For `MAC_CHANGED` and `DEVICE_MOVED` this was before the device was updated, so the packet was not counted and a moved or replaced device could stay at its old address. A failed write to `events.csv` stopped the whole run. A failed write is now counted, and capture continues unchanged.
@@ -134,19 +134,19 @@ All notable changes to Scrutics are documented here.
 - **Headless checkpoint messages**: during a headless capture, lost rows are printed at the next checkpoint (every 15 seconds) as `N rows not written to anomalies.csv (first error: …)`, and printed again only when the count changes; a snapshot file that could not be written is reported the same way.
 - Known limitation: a write failure during capture is reported at the end of the run (and in the headless checkpoint messages), not when it happens.
 
-### Fixed — AI Key Safety
+### Fixed: AI Key Safety
 - **API keys stay out of URLs, messages and error details**: the Gemini key is sent in the `x-goog-api-key` header instead of the URL, by the assistant, `scrutics ai diagnose`, model listing and the topology page's chat. Every `scrutics ai diagnose` failure message, and the error text that OpenAI and Gemini send back, is cleaned of the key and of anything shaped like a credential before it is shown. A failed request no longer keeps the underlying network error, which described the request, attached to the error Scrutics raises; the message names that error's type and its cleaned reason instead (for example `ConnectionError: ... Connection refused`).
 - **`--provider` no longer sends the configured key to another provider**: `scrutics ai --provider X` and `scrutics ai --diagnose --provider X` used the configured provider's key and model with provider X, so for example a Gemini key and a Gemini model name were sent to OpenAI. A different provider now gets only its own key, from its environment variable, and its own default model or `--model`; the configured base URL is not carried over either. Of the other settings only `max_tokens` carries over; timeout and temperature take that provider's defaults. Without that variable, Scrutics stops before sending anything and names the variable to set. `--diagnose` now also applies `--model`.
 
-### Fixed — AI Session Loading
+### Fixed: AI Session Loading
 - **The assistant reads every row of a session, or says what it could not read**: a session file with a cell longer than 131,072 characters (for example a long evidence summary) stopped loading at that row, and every later asset, connection or anomaly was silently missing, while the counts the assistant reported still came from the manifest. Cells of any size the exporter writes are now read, by the assistant and when the TUI loads a saved session. A file that cannot be read (invalid JSON, text that is not UTF-8, a malformed CSV, a file the manifest lists but that is missing) or a row that cannot be used is no longer skipped silently: `scrutics ai` prints a `Not loaded :` line for each such file, the TUI assistant shows it in its panel, and the assistant's statistics tool adds the counts actually loaded and the files not fully loaded, so the model can say its answer is based on part of the session. The statistics tool also adds the loaded counts when they differ from the manifest.
 
-### Changed — AI Default Models (behaviour change)
+### Changed: AI Default Models (behaviour change)
 - **Anthropic default is now `claude-haiku-5-5`** (was `claude-haiku-4-5`, whose retirement Anthropic lists as not sooner than October 15, 2026, so it can be retired at short notice). Requests to it send `thinking: {"type": "disabled"}` and no temperature, which this model rejects at any value but 1.
 - **OpenAI default is now `gpt-6-luna`** (was `gpt-4o-mini`, which OpenAI shuts down on January 14, 2027). Requests to it send `reasoning_effort: "none"`, which it needs to call the assistant's tools, and no temperature.
 - Configurations that name a model keep it. Both changes apply to new setups, `--provider` runs without `--model`, and the topology page's chat.
 
-### Fixed — AI Models and Request Parameters
+### Fixed: AI Models and Request Parameters
 - **Model lists offer models that work**: Anthropic models now come from Anthropic's model list (active models only); OpenAI's list is limited to the models whose requests Scrutics knows how to build (`gpt-6-luna`, `gpt-6-sol`). Before, Anthropic was a fixed list of mostly retired names, OpenAI hid current models and showed deep-research and realtime ones, and both lists were sorted in reverse alphabetical order so setup proposed the wrong model first. Setup now proposes each provider's default model when it is listed.
 - **A fallback list says it is one**: when the list cannot be fetched (no key, an error, an unreachable service), setup and `list-models` say why and show the fallback list as `Fallback list (not from your account; checked against provider documentation on 2026-10-16)`.
 - **Each model gets only the request fields it accepts**: temperature is sent only to models documented to accept it (Claude models before 4.7, and the deprecated GPT-4o and GPT-4.1 models); any other model, including one Scrutics does not know, gets no optional sampling field. Before, every request carried a temperature, so current Claude and GPT models failed with HTTP 400.
@@ -155,40 +155,40 @@ All notable changes to Scrutics are documented here.
 - **An answer cut off by the token limit before any text is reported**: a model that thinks counts its reasoning toward `max_tokens`, and when it used the whole limit before writing anything the assistant returned an empty answer. Anthropic (`stop_reason: max_tokens`) and OpenAI (`finish_reason: length`) now raise a message saying the model used its token limit, most likely on reasoning, and to raise `max_tokens` (Anthropic) or choose a model with thinking or reasoning off. A partial answer cut at the limit is still shown. The topology page's chat reports the same case.
 - Known gap: other empty answers are not yet reported: Gemini responses stopped for safety or a malformed function call, and an Anthropic refusal (`stop_reason: refusal`), still give an empty answer, and the TUI shows nothing for an empty answer.
 
-### Fixed — Answers Cut Off at the Output Limit (behaviour change)
+### Fixed: Answers Cut Off at the Output Limit (behaviour change)
 - **A cut-off answer is marked**: when a provider stops because the answer reached the output token limit (Gemini `finishReason: MAX_TOKENS`, Anthropic `stop_reason: max_tokens`, OpenAI and Ollama `finish_reason: length`), `scrutics ai`, the TUI assistant and the topology page's chat show the partial answer followed by a notice that it was cut off, with the limit used and how to raise it. Before, the answer simply stopped mid-sentence with no notice (Gemini answers were cut at 1,024 tokens, which include its thinking). A Gemini answer that reached the limit before any text is now reported like the Anthropic and OpenAI cases. A tool call cut off at the limit by OpenAI or Ollama is reported instead of being run with incomplete arguments.
 - **Longer default output limits**: Gemini requests carry `maxOutputTokens` 8192 and, for `gemini-3.8-flash`, a low thinking level (`thinkingConfig.thinkingLevel: LOW`, documented for this model by Google; thinking tokens count toward the limit); Anthropic requests carry `max_tokens` 4096. OpenAI and Ollama requests still carry no limit. The topology page's chat uses the same Gemini and Anthropic values (its OpenAI requests keep 1,024).
 - **Setup no longer writes `max_tokens`**: `scrutics ai` setup, the TUI setup, `scrutics_ai_setup.sh` and `scrutics_ai_setup.bat` stop writing `max_tokens: 1024`, so the provider's default applies. An existing `ai.yaml` holding exactly `max_tokens: 1024`, the value every earlier setup wrote, is read as the provider's default; any other value is used as written. This also applies when `--provider` carries `max_tokens` over to another provider.
 - **The model is told its answer length**: the assistant's and the topology chat's instructions state the output limit and ask for answers under a length that fits it (about 3 characters per token on three quarters of the limit: 18,400 characters for Gemini, 9,200 for Anthropic, 2,300 for the topology chat's OpenAI requests). No length is stated where no limit is sent.
 
-### Fixed — TUI Assistant Panel (behaviour change)
+### Fixed: TUI Assistant Panel (behaviour change)
 - **Text is shown as written**: questions, answers and error messages containing square brackets (for example `[red]` or a stray `[/bold]`) were read as display formatting, so parts of them vanished, took on colours, or the whole line showed raw formatting codes. They are now shown exactly as typed or received.
 - **Long lines wrap and the answer area is taller**: answers wrapped at the panel width instead of running off to the right behind a horizontal scrollbar. The panel's spacing was trimmed and the Close button moved to the top row, so the answer area shows 13 lines at 80×24 (was 3) and 19 at 120×30 (was 9).
 - **The conversation is kept while you work**: closing and reopening the assistant keeps the questions and answers so far, both on screen and as context for the next question, and an answer that arrives after you closed the panel is kept too. Switching to another session (Switch Session, or opening the assistant on another session) starts a new conversation; choosing the same session again keeps it.
 
-### Changed — Earlier Questions Sent With Each Question (behaviour change)
+### Changed: Earlier Questions Sent With Each Question (behaviour change)
 - `scrutics ai` and the TUI assistant send at most the 5 most recent exchanges, and at most 8,000 characters of their questions and answers, with each new question. Before, every earlier exchange was sent in full, so a long conversation grew every request without limit. The most recent exchange is always sent; if it alone is over 8,000 characters, its answer keeps its start and end, with `[middle of this answer omitted]` in place of the middle, so a follow-up about the first items of a long list still has them. Older exchanges that no longer fit are left out whole, oldest first.
 
-### Fixed — AI Retries
+### Fixed: AI Retries
 - **Busy or rate-limited providers are retried the same way everywhere**: the assistant (Gemini, OpenAI, Anthropic) and the topology page's chat retry HTTP 429 (rate limit), 502, 503 (unavailable) and 529 (Anthropic overloaded), and a connection that could not be opened, up to 4 attempts with waits of about 1, 2 and 4 seconds. A `Retry-After` header, or Gemini's own retry delay, is used instead when the provider sends one. No single wait is longer than 30 seconds and the waits add up to at most 60 seconds; a provider that asks for a longer wait gets no retry, and the message says how long it asked for. Before, the topology chat failed on the first 503, and OpenAI and Anthropic were never retried.
 - **Requests that may already have been processed are not repeated**: read timeouts, a connection lost after the request was sent, and HTTP 500, 504 and 408 fail at once, so a reply is never generated (and billed) twice. Gemini used to retry these. Other 4xx statuses (including 401 and 403) are never retried. In the topology chat a failed connection is not retried either, because a browser cannot tell whether the request was sent.
 - **Retry progress and the final message**: the CLI spinner, the TUI assistant and the topology chat show what is being retried (for example `Anthropic returned HTTP 529 (overloaded); waiting 2s before retry (attempt 2 of 4)`). After the last attempt the message names the provider, the status and the number of attempts, and says what to do: wait, or for 429 check the plan's rate limits and quota.
 - **A Gemini rate-limit answer from a proxy no longer crashes the assistant**: a 429 whose body has `error` as text (as some proxies and gateways send) raised an unexpected error and ended the `scrutics ai` session. It is now retried like any other 429.
 
-### Fixed — AI Key Storage During Setup
+### Fixed: AI Key Storage During Setup
 - **Keys are stored in a private file, and `~/.bashrc` is no longer rewritten**: setup wrote the key as an `export` line into `~/.bashrc`, which other users can usually read, and every reconfigure added another line while the old keys stayed (the setup script instead deleted every `export` line for that variable, including lines you wrote yourself). The key now goes to `~/.scrutics/ai_keys.sh` (mode 0600, rewritten whole on each setup), and `~/.bashrc` gets one marked line that loads it, added once. Other `export` lines for the provider variables are reported with their line numbers, never changed or removed. Existing `~/.bashrc` lines from earlier versions are left in place and reported; remove them yourself once the new setup works.
 - **The setup scripts no longer put the key on a command line**: `scrutics_ai_setup.sh` passed the key inside a `python3 -c` command, where other local users could read it (for example with `ps`), and a key containing a quote broke the script. It now hands the key to Python on standard input or in the environment. `scrutics_ai_setup.bat` showed the key while it was typed, passed it on a `powershell -Command` line and printed it again for WSL users; it now reads the key in PowerShell without showing it, saves it as a per-user variable, asks before replacing one that already exists, and never prints it. If a Windows policy stops the PowerShell helper, it names the variable to add by hand under System Properties > Environment Variables (User variables).
 - **The setup script labels a fallback model list** the same way as `scrutics ai` setup, with the reason the list could not be fetched.
 - `scrutics ai` setup on Windows keeps the key for that session only and points to `scrutics_ai_setup.bat` to store it.
 
-### Known Gaps — AI
+### Known Gaps: AI
 - If Python's low-level HTTP debug output is turned on (`http.client.HTTPConnection.debuglevel`), Python prints request headers, including the API key. Scrutics never turns it on; DEBUG logging shows no key.
 - `list-models PROVIDER --key KEY` still takes the key on the command line; the provider's environment variable is the recommended form.
 - Empty answers other than the token-limit cases are not yet reported (see "AI Models and Request Parameters").
 - The TUI assistant shows answers as plain text: Markdown such as `**bold**` or tables appears as typed. Its conversation lasts until Scrutics exits and is not saved with the session.
 - The topology page's chat sees only a summary of the page: asset counts by type, vendor, protocol and confidence for up to 20 OT devices, IT devices by address only (or a count above 10), unknown devices as a count, and connections only when there are 15 or fewer. It is given no device roles and no vendors of IT or unknown devices, so it cannot answer questions about them; `scrutics ai` and the TUI assistant look up the whole session.
 
-### Known Gaps — Capture, Rules and Topology
+### Known Gaps: Capture, Rules and Topology
 - **pcapng read differs by Scapy version**: a pcapng packet block that names an interface the file never described is skipped by Scapy 2.8, which reads on and shows only Scapy's own warning ("invalid interface id"); Scrutics does not report it. With Scapy 2.7 the read stops at that block and Scrutics reports the file as damaged there.
 - **Constraints of a port rule reach its clients**: a device that only contacts a port receives the behavioral constraints of a user rule for that port, so a rule with `port` alone and constraints such as `never_initiates` or `allowed_peers` raises alerts for every client polling the port. Scope constraint rules with `mac_prefix`; the README example now does.
 - **A rule name and a signature name for the same port**: when a user or built-in rule names a served IT port (for example a rule for port 443 called `Vendor HMI`), the Protocols column can show both `Vendor HMI (port)` and `HTTPS (port)`, because the port the rule matched is not kept with the device.
@@ -201,9 +201,9 @@ All notable changes to Scrutics are documented here.
 - **Session snapshot files are not written atomically**: `assets.csv`, `evidence.json`, `connections.csv` and the topology files are rewritten in place at each checkpoint, and only `manifest.json` is replaced atomically, so a process killed during a write can leave that file incomplete. Earlier release notes described session persistence as atomic.
 - **SIEM delivery is best effort**: anomalies are queued (up to 1,000) for the sinks; an anomaly that does not fit in the queue, or that a sink fails to send, is not delivered and not counted.
 
-## [0.6.1] — 2026-09-19
+## [0.6.1]: 2026-09-19
 
-### Fixed — AI Reliability & Tool-Calling Protocol
+### Fixed: AI Reliability & Tool-Calling Protocol
 - **Gemini Wire Protocol Compliance**:
   - Restored strict FunctionCall ID round-trip preservation without falling back to function names.
   - Aligned `thoughtSignature` placement to Google Gemini REST specification as a property on `Part` rather than inside `FunctionCall`, preventing HTTP 400 rejection on multi-turn tool replay.
@@ -219,11 +219,11 @@ All notable changes to Scrutics are documented here.
   - Isolated core package from optional `requests` requirement using PEP 562 lazy loading in `scrutics.ai`.
   - Updated CI test workflow to install `.[ai]` extra ensuring end-to-end coverage.
 
-### Added — Progressive AI Diagnostics
+### Added: Progressive AI Diagnostics
 - **14-Stage Diagnostic Engine** (`scrutics/ai/diagnostics.py`): Progressive verification from configuration and environment to DNS, TLS, authentication, schema handling, function calling, thought signatures, round-trip replay, and full agent execution loop.
 - **Diagnostics CLI**: Integrated `scrutics ai --diagnose` and `scrutics ai diagnose` command with layer-specific remediation guidance.
 
-### Added — Retry Progress Indication
+### Added: Retry Progress Indication
 - **CLI & TUI Backoff Visibility**:
   - Thread-safe `retry_callback` in `GeminiProvider` reporting attempt number, total attempts, and resolved delay before backoff sleeps.
   - CLI `Spinner` dynamically updates to reflect retry backoff delays (`Waiting Ns before retry (attempt X of Y)...`) and in-flight retried requests (`Retrying (attempt X of Y)...`) without extra line breaks. Non-TTY invocations remain silent.
@@ -239,13 +239,13 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
 
 ---
 
-## [0.6.0] — 2026-09-16
+## [0.6.0]: 2026-09-16
 
 > **Unstable release.** Core features are functional and passing tests, but some
 > integrations (Topology AI panel, end-to-end LLM flows) have not been validated
 > in production. Gemini API compatibility may require updates.
 
-### Added — AI Intelligence Layer
+### Added: AI Intelligence Layer
 - **LLM Provider abstraction** (`scrutics/ai/`) with pluggable providers:
   Ollama (local, offline), OpenAI (gpt-4o-mini), Anthropic (claude-haiku-4-5),
   Gemini (gemini-2.0-flash). Shared HTTP layer via `_openai_compat.OpenAICompatMixin`
@@ -267,7 +267,7 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
   only, disclaimer, provider selector (Gemini / OpenAI / Anthropic)
 - **WSL2 diagnostics** (`diagnose_gemini.py`) for DNS / HTTPS / API-key issues
 
-### Added — Vendor & OUI Foundation
+### Added: Vendor & OUI Foundation
 - **Vendor classification taxonomy** `vendor_class ∈ {OT, IT, NEUTRAL, UNKNOWN}`.
   `classification_type` remains canonical; `is_ot` is now a derived property.
   Cisco reclassified from OT to IT
@@ -284,7 +284,7 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
   Freshness policy < 180d / 180–364d / ≥ 365d. Doctor + startup warnings
   (non-blocking)
 
-### Added — Identity & Topology
+### Added: Identity & Topology
 - **MAC-based primary asset identity** with IP fallback. `Asset.primary_key`,
   `Asset.ip_history` chronological episodes
 - **`AssetInventory.get_or_create()`** with 5-branch resolution: known MAC,
@@ -292,7 +292,7 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
 - **`DEVICE_MOVED` (MEDIUM) and `MAC_CHANGED` (HIGH) anomalies**
 - **Asset-centric topology edges** keyed by `primary_key`
 
-### Added — Evidence Package v1
+### Added: Evidence Package v1
 - **`manifest.json`** in every session directory via `write_manifest()` /
   `read_manifest()`. Atomic write, required-field validation, graceful defaults
 
