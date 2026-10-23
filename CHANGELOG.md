@@ -2,7 +2,7 @@
 
 All notable changes to Scrutics are documented here.
 
-## [0.7.0]: 2026-10-22
+## [0.7.0] - 2026-10-22
 
 ### Fixed: Input Robustness
 - **Faster processing of client traffic**: classification rules are loaded once and reused instead of being re-read from disk for every packet from a device without a listening service (about 30 times faster on such traffic). Behavioral constraints now follow a rule reload (`R` key, SIGHUP or the config file watcher) like the rest of classification, and an invalid edit keeps the rules in use.
@@ -102,7 +102,7 @@ All notable changes to Scrutics are documented here.
 - **Clearer `scrutics oui update` errors**: when the download is refused (for example HTTP 418, which the IEEE server returns to some client user agents), fails on the network, or arrives incomplete, the message says what happened, that the installed database was not changed, and how to install the file offline with `scrutics oui import`. A response that is not 200, or shorter than its stated length, is no longer passed on. Requests now identify Scrutics with its installed version. The developer script `scripts/download_oui.py` uses the same download, validates the file before replacing the existing one, and keeps the existing file on failure.
 
 ### Fixed: Topology Assistant
-- **The assistant panel in `topology.html` works again**: a page-template escaping error broke its script, so the AI button, the panel and the chat did nothing. The assistant is now also given a summary of the graph (see "Known Gaps — AI" for what it contains); before, its context described an empty network.
+- **The assistant panel in `topology.html` works again**: a page-template escaping error broke its script, so the AI button, the panel and the chat did nothing. The assistant is now also given a summary of the graph (see "Known Gaps: AI" for what it contains); before, its context described an empty network.
 - The topology chat uses the same default models as the AI configuration for OpenAI, Anthropic and Gemini, instead of its own model names (it named the retired `gemini-2.0-flash`). The API key stays in page memory only and is never stored.
 
 ### Fixed: TUI Crashes and Input Validation
@@ -114,7 +114,7 @@ All notable changes to Scrutics are documented here.
 ### Fixed: Damaged and Truncated Capture Files
 - **A capture file that ends at a damaged record is reported**: before, a PCAP record whose length field was corrupted was read as one packet holding the rest of the file, and the analysis ended as if the file were complete, with `0 rejected` in the summary while most of the file was never read. A PCAP-NG block with a bad length either ended the analysis the same way or stopped the run with an error and no results.
 - Reading now stops at the first damaged record, which is not processed, and the run summary (CLI and TUI) says which of two cases applies: the last record is incomplete (the file ends inside it, as when a capture is stopped abruptly; it is skipped), or the file is damaged before its end (the rest of the file is not read). The location is a record number for PCAP files and a packet count with a byte offset for PCAP-NG files. Both are counted as rejected input. Scrutics does not try to find the next readable record after a damaged one.
-- A corrupted record length (up to 4 GB) no longer makes Scrutics try to read that much into memory: reads never ask the file for more than it holds. Detection of damaged and incomplete records gives the same results with Scapy 2.7 and 2.8 (one pcapng case, a packet naming an undescribed interface, differs: see "Known Gaps — Capture, Rules and Topology").
+- A corrupted record length (up to 4 GB) no longer makes Scrutics try to read that much into memory: reads never ask the file for more than it holds. Detection of damaged and incomplete records gives the same results with Scapy 2.7 and 2.8 (one pcapng case, a packet naming an undescribed interface, differs: see "Known Gaps: Capture, Rules and Topology").
 - Known limitations: a PCAP record whose corrupted length still fits in the remaining bytes is not detected; the records after it are read misaligned, as damaged data, until a record runs past the end of the file. A PCAP-NG file with exactly four stray bytes after its last complete block is read as complete.
 
 ### Changed: Event Log
@@ -201,7 +201,7 @@ All notable changes to Scrutics are documented here.
 - **Session snapshot files are not written atomically**: `assets.csv`, `evidence.json`, `connections.csv` and the topology files are rewritten in place at each checkpoint, and only `manifest.json` is replaced atomically, so a process killed during a write can leave that file incomplete. Earlier release notes described session persistence as atomic.
 - **SIEM delivery is best effort**: anomalies are queued (up to 1,000) for the sinks; an anomaly that does not fit in the queue, or that a sink fails to send, is not delivered and not counted.
 
-## [0.6.1]: 2026-09-19
+## [0.6.1] - 2026-09-19
 
 ### Fixed: AI Reliability & Tool-Calling Protocol
 - **Gemini Wire Protocol Compliance**:
@@ -239,7 +239,7 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
 
 ---
 
-## [0.6.0]: 2026-09-16
+## [0.6.0] - 2026-09-16
 
 > **Unstable release.** Core features are functional and passing tests, but some
 > integrations (Topology AI panel, end-to-end LLM flows) have not been validated
@@ -251,7 +251,7 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
   Gemini (gemini-2.0-flash). Shared HTTP layer via `_openai_compat.OpenAICompatMixin`
   for OpenAI-shaped endpoints; native translators for Anthropic and Gemini
   (`tool_use`/`tool_result` and `functionCall`/`functionResponse` respectively)
-- **`thought_signature` preservation** for Gemini 3+ multi-turn function calling —
+- **`thought_signature` preservation** for Gemini 3+ multi-turn function calling:
   required field otherwise causes HTTP 400 on follow-up turns
 - **Semantic Tool API** (`scrutics/ai/tools.py`): `SessionContext` + 5 read-only tools
   (`get_statistics`, `get_assets`, `get_asset`, `get_connections`, `get_anomalies`)
@@ -260,10 +260,10 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
   iterations, `OT_SYSTEM_PROMPT` (anti-hallucination guardrails)
 - **`scrutics ask` / `scrutics ai` CLI** with interactive REPL, session browser,
   `--provider` / `--model` overrides, `--reconfigure` / `--disable` / `--reset`
-- **`scrutics list-models <provider>`** — queries provider model discovery API
+- **`scrutics list-models <provider>`**: queries provider model discovery API
 - **TUI AI Assistant panel** (`AIAssistantModal` + onboarding modals) with
   background `@work(thread=True)` execution, session browser, freshness badge
-- **Topology HTML AI sidebar** — BYOK client-side chat, API key in browser memory
+- **Topology HTML AI sidebar**: BYOK client-side chat, API key in browser memory
   only, disclaimer, provider selector (Gemini / OpenAI / Anthropic)
 - **WSL2 diagnostics** (`diagnose_gemini.py`) for DNS / HTTPS / API-key issues
 
@@ -273,13 +273,13 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
   Cisco reclassified from OT to IT
 - **IEEE MA-L / MA-M / MA-S prefix support** with longest-prefix matching
   (9→7→6 hex nibbles). Universal MAC normalization (colon/hyphen/dot/case)
-- **Passive DHCPv4 enrichment** — options 12 (hostname), 55 (fingerprint),
+- **Passive DHCPv4 enrichment**: options 12 (hostname), 55 (fingerprint),
   60 (vendor class, two-layer evidence), 81 (FQDN, E-bit aware). Client identity
   via `BOOTP.chaddr`. Bounded pending buffer (1,000 entries) with FIFO eviction
 - **Curated OUI metadata** (`curated_oui.yaml`, 30 industrial prefixes) with
   `device_family_hint` as low-weight `os_hint` evidence. User override via
   `~/.scrutics/curated_oui.yaml`
-- **OUI lifecycle commands** — `scrutics oui status|validate|update|import`.
+- **OUI lifecycle commands**: `scrutics oui status|validate|update|import`.
   Atomic install with `.bak` rollback; SHA-256 checksum; MA-L/M/S tier counts.
   Freshness policy < 180d / 180–364d / ≥ 365d. Doctor + startup warnings
   (non-blocking)
@@ -443,7 +443,7 @@ Post-release verification checklist: see `docs/post-release-verification-v0.6.1.
 
 ---
 
-## [0.1.0] : Phase 1: Foundation
+## [0.1.0] - Phase 1: Foundation
 
 ### Added
 
